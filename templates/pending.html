@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Access Pending — Rock AI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #030712; color: #ffffff; }
+        .ambient-glow {
+            background-image: 
+                radial-gradient(circle at 50% 30%, rgba(56, 189, 248, 0.15) 0%, transparent 50%);
+            background-attachment: fixed;
+        }
+        .glass-card {
+            background: rgba(15, 23, 42, 0.7) !important;
+            backdrop-filter: blur(20px) saturate(180%);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+    </style>
+</head>
+<body class="h-full flex items-center justify-center p-4 ambient-glow">
+
+    <div class="glass-card max-w-md w-full p-8 rounded-3xl text-center space-y-6 shadow-2xl">
+        <!-- Animated Hourglass Icon -->
+        <div class="w-16 h-16 rounded-2xl bg-sky-500/10 border border-sky-500/20 text-sky-400 flex items-center justify-center mx-auto shadow-inner">
+            <i data-lucide="clock" class="w-8 h-8 animate-pulse"></i>
+        </div>
+
+        <div class="space-y-2">
+            <h1 class="text-2xl font-semibold tracking-tight text-white">Access Pending Approval</h1>
+            <p class="text-xs text-white/60 leading-relaxed">
+                Welcome, <span class="text-sky-300 font-medium">{{ user.name }}</span>! Your login request has been submitted to the founder (<strong class="text-white">Pavan Kalyan</strong>).
+            </p>
+        </div>
+
+        <div class="bg-black/40 border border-white/5 p-4 rounded-xl text-left space-y-2">
+            <div class="flex items-center justify-between text-xs">
+                <span class="text-white/40">Account Email:</span>
+                <span class="text-white font-mono text-[11px]">{{ user.email }}</span>
+            </div>
+            <div class="flex items-center justify-between text-xs">
+                <span class="text-white/40">Status:</span>
+                <span class="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[10px] border border-amber-500/30 font-medium">Pending Founder Verification</span>
+            </div>
+        </div>
+
+        <p class="text-[11px] text-white/40">
+            An email notification has been dispatched to Pavan. Once approved, refresh this page to access the Rock AI Research Laboratory.
+        </p>
+
+        <div class="pt-2 flex gap-3">
+            <a href="/" class="flex-1 py-2.5 bg-white/10 hover:bg-white/20 text-white text-xs font-semibold rounded-xl transition-all">Refresh Status</a>
+            <a href="/logout" class="py-2.5 px-4 bg-red-500/20 hover:bg-red-500/30 text-red-300 text-xs font-semibold rounded-xl transition-all">Logout</a>
+        </div>
+    </div>
+
+    <script>lucide.createIcons();</script>
+</body>
+</html>

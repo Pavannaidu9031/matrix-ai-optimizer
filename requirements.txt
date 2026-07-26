@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+jinja2
+python-multipart
+pandas
+scikit-learn
+authlib
+requests
+starlette
+psycopg2-binary
