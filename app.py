@@ -38,7 +38,7 @@ GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
 
 # Email Configuration
 SMTP_SERVER = "smtp.gmail.com"
-SMTP_PORT = 587
+SMTP_PORT = 465
 SENDER_EMAIL = os.getenv("SENDER_EMAIL", "pavannaidu9031@gmail.com")
 SENDER_PASSWORD = os.getenv("SENDER_PASSWORD")
 
@@ -96,8 +96,7 @@ def send_approval_notification(user_info, base_url="http://127.0.0.1:8000"):
             """
             msg.attach(MIMEText(html_body, "html"))
 
-            server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
-            server.starttls()
+            server = smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT)
             server.login(SENDER_EMAIL, SENDER_PASSWORD)
             server.send_message(msg)
             server.quit()
