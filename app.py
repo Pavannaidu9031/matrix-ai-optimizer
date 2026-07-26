@@ -30,17 +30,17 @@ database.init_db()
 # ==============================================================================
 # CONFIGURATION & CREDENTIALS
 # ==============================================================================
-FOUNDER_EMAIL = "pavannaidu9031@gmail.com"
+FOUNDER_EMAIL = os.getenv("FOUNDER_EMAIL", "pavannaidu9031@gmail.com")
 
-# Google OAuth Credentials (Replace with your keys from Google Cloud Console)
-GOOGLE_CLIENT_ID = "GOOGLE_CLIENT_ID"
-GOOGLE_CLIENT_SECRET = "GOOGLE_CLIENT_SECRET"
+# Google OAuth Credentials (Pulled safely from Render Environment Variables)
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
+GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
 
-# Email Configuration (Optional: 16-character Gmail App Password)
+# Email Configuration
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 587
-SENDER_EMAIL = "pavannaidu9031@gmail.com"
-SENDER_PASSWORD = "SENDER_PASSWORD"  # Generate at myaccount.google.com/apppasswords
+SENDER_EMAIL = os.getenv("SENDER_EMAIL", "pavannaidu9031@gmail.com")
+SENDER_PASSWORD = os.getenv("SENDER_PASSWORD")
 
 # OAuth Setup
 oauth = OAuth()
