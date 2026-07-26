@@ -5,6 +5,7 @@ python-multipart
 pandas
 scikit-learn
 authlib
+httpx
 requests
 starlette
 itsdangerous
