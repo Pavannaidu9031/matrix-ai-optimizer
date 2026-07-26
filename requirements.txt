@@ -7,4 +7,5 @@ scikit-learn
 authlib
 requests
 starlette
+itsdangerous
 psycopg2-binary
