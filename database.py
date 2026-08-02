@@ -18,7 +18,7 @@ def init_db():
         )
     """)
     
-    # Create experiments table
+    # Create experiments table with all existing and new fields
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS experiments (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -28,26 +28,39 @@ def init_db():
             ar_flow_sccm REAL,
             o2_flow_sccm REAL,
             substrate_temp_c REAL,
-            target_substrate_distance_mm REAL,
+            target_substrate_distance_cm REAL,
             sputtering_time_min REAL,
             film_thickness_nm REAL,
-            deposition_rate_nm_min REAL,
+            rotation_speed_rpm REAL DEFAULT 5.0,
+            substrate_type TEXT DEFAULT 'Si Wafer',
+            xrd_phase TEXT DEFAULT 'Amorphous',
+            grain_size_nm REAL,
             h2_response_time_s REAL,
+            wavelength_shift_pm REAL,
             notes TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (user_id) REFERENCES users (id)
         )
     """)
 
-    # AUTO-FIX: Check if user_id column exists in existing experiments table, add it if missing
+    # Auto-migration for existing SQLite database files
     cursor.execute("PRAGMA table_info(experiments)")
     columns = [column[1] for column in cursor.fetchall()]
-    if "user_id" not in columns:
-        cursor.execute("ALTER TABLE experiments ADD COLUMN user_id TEXT")
-    if "film_thickness_nm" not in columns:
-        cursor.execute("ALTER TABLE experiments ADD COLUMN film_thickness_nm REAL")
-    if "deposition_rate_nm_min" not in columns:
-        cursor.execute("ALTER TABLE experiments ADD COLUMN deposition_rate_nm_min REAL")
+    
+    if "target_substrate_distance_mm" in columns and "target_substrate_distance_cm" not in columns:
+        cursor.execute("ALTER TABLE experiments RENAME COLUMN target_substrate_distance_mm TO target_substrate_distance_cm")
+    if "target_substrate_distance_cm" not in columns:
+        cursor.execute("ALTER TABLE experiments ADD COLUMN target_substrate_distance_cm REAL")
+    if "rotation_speed_rpm" not in columns:
+        cursor.execute("ALTER TABLE experiments ADD COLUMN rotation_speed_rpm REAL DEFAULT 5.0")
+    if "substrate_type" not in columns:
+        cursor.execute("ALTER TABLE experiments ADD COLUMN substrate_type TEXT DEFAULT 'Si Wafer'")
+    if "xrd_phase" not in columns:
+        cursor.execute("ALTER TABLE experiments ADD COLUMN xrd_phase TEXT DEFAULT 'Amorphous'")
+    if "grain_size_nm" not in columns:
+        cursor.execute("ALTER TABLE experiments ADD COLUMN grain_size_nm REAL")
+    if "wavelength_shift_pm" not in columns:
+        cursor.execute("ALTER TABLE experiments ADD COLUMN wavelength_shift_pm REAL")
 
     conn.commit()
     conn.close()
@@ -108,19 +121,22 @@ def get_user_by_id(user_id):
     return None
 
 def add_experiment(user_id, rf_power_w, working_pressure_mtorr, ar_flow_sccm, o2_flow_sccm, 
-                   substrate_temp_c, target_substrate_distance_mm, sputtering_time_min, 
-                   film_thickness_nm, deposition_rate_nm_min, h2_response_time_s, notes):
+                   substrate_temp_c, target_substrate_distance_cm, sputtering_time_min, 
+                   film_thickness_nm, rotation_speed_rpm, substrate_type, xrd_phase,
+                   grain_size_nm, h2_response_time_s, wavelength_shift_pm, notes):
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     cursor.execute("""
         INSERT INTO experiments (
             user_id, rf_power_w, working_pressure_mtorr, ar_flow_sccm, o2_flow_sccm,
-            substrate_temp_c, target_substrate_distance_mm, sputtering_time_min,
-            film_thickness_nm, deposition_rate_nm_min, h2_response_time_s, notes
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            substrate_temp_c, target_substrate_distance_cm, sputtering_time_min,
+            film_thickness_nm, rotation_speed_rpm, substrate_type, xrd_phase,
+            grain_size_nm, h2_response_time_s, wavelength_shift_pm, notes
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (user_id, rf_power_w, working_pressure_mtorr, ar_flow_sccm, o2_flow_sccm,
-          substrate_temp_c, target_substrate_distance_mm, sputtering_time_min,
-          film_thickness_nm, deposition_rate_nm_min, h2_response_time_s, notes))
+          substrate_temp_c, target_substrate_distance_cm, sputtering_time_min,
+          film_thickness_nm, rotation_speed_rpm, substrate_type, xrd_phase,
+          grain_size_nm, h2_response_time_s, wavelength_shift_pm, notes))
     conn.commit()
     conn.close()
 
