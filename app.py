@@ -1,3 +1,11 @@
+import os
+from fastapi import FastAPI, Request, Form, Depends, HTTPException
+# ... other imports ...
+
+# Initialize FastAPI App (Render looks specifically for this variable name)
+app = FastAPI(title="Rock AI — WO3 Sputtering Optimizer")
+
+
 @app.post("/add")
 def add_experiment(
     request: Request,
