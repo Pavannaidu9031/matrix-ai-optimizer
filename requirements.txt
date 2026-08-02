@@ -4,6 +4,8 @@ jinja2
 python-multipart
 pandas
 scikit-learn
+scikit-optimize
+plotly
 authlib
 httpx
 requests
