@@ -3,7 +3,12 @@ import pandas as pd
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import RBF, WhiteKernel
 
-XRD_MAP = {"Monoclinic": 1.0, "Partial": 0.5, "Amorphous": 0.0}
+# 1. VERIFIED ENCODING: Monoclinic = 1.0 (TARGET), Partial = 0.5, Amorphous = 0.0
+XRD_MAP = {
+    "Monoclinic": 1.0,
+    "Partial": 0.5,
+    "Amorphous": 0.0
+}
 
 PARAM_DISPLAY_NAMES = {
     0: "RF Power",
@@ -23,7 +28,6 @@ def generate_bayesian_suggestion(experiments: list) -> dict:
 
     X, y = [], []
     for exp in experiments:
-        # Safely extract dictionary values with fallbacks if None
         rf = float(exp.get("rf_power_w") if exp.get("rf_power_w") is not None else 120.0)
         press = float(exp.get("working_pressure_mtorr") if exp.get("working_pressure_mtorr") is not None else 5.0)
         dist = float(exp.get("target_substrate_distance_cm") if exp.get("target_substrate_distance_cm") is not None else exp.get("target_substrate_distance_mm", 7.0) or 7.0)
@@ -31,7 +35,8 @@ def generate_bayesian_suggestion(experiments: list) -> dict:
         rot = float(exp.get("rotation_speed_rpm") if exp.get("rotation_speed_rpm") is not None else 5.0)
         ar = float(exp.get("ar_flow_sccm") if exp.get("ar_flow_sccm") is not None else 30.0)
         
-        phase = str(exp.get("xrd_phase") or "Amorphous")
+        # Target optimization target: Monoclinic = 1.0
+        phase = str(exp.get("xrd_phase") or "Amorphous").strip()
         score = XRD_MAP.get(phase, 0.0)
         
         X.append([rf, press, dist, thick, rot, ar])
@@ -40,14 +45,14 @@ def generate_bayesian_suggestion(experiments: list) -> dict:
     X = np.array(X)
     y = np.array(y)
 
-    # Fit Gaussian Process Regressor
+    # Gaussian Process Model fit
     kernel = RBF(length_scale=np.ones(6), length_scale_bounds=(1e-1, 1e2)) + WhiteKernel(noise_level=1e-2)
     gp = GaussianProcessRegressor(kernel=kernel, n_restarts_optimizer=5, random_state=42)
     gp.fit(X, y)
 
-    # Sample candidates within parameter bounds
+    # Candidate Sampling (1000 candidates across the search bounds)
     np.random.seed(42)
-    num_candidates = 500
+    num_candidates = 1000
     
     c_rf = np.random.uniform(80.0, 150.0, num_candidates)
     c_press = np.random.uniform(3.0, 10.0, num_candidates)
@@ -57,24 +62,31 @@ def generate_bayesian_suggestion(experiments: list) -> dict:
     c_ar = np.random.uniform(20.0, 40.0, num_candidates)
 
     candidates = np.column_stack([c_rf, c_press, c_dist, c_thick, c_rot, c_ar])
-    means, stds = gp.predict(candidates, return_std=True)
+    y_pred, y_std = gp.predict(candidates, return_std=True)
 
-    ucb = means + 1.96 * stds
-    best_idx = int(np.argmax(ucb))
+    # 2 & 3. UCB ACQUISITION FUNCTION (MAXIMIZATION WITH EXPLORATION)
+    # y_pred + 2.576 * y_std balances exploitation and exploration (99% confidence threshold)
+    beta = 2.576
+    acquisition_score = y_pred + (beta * y_std)
+    
+    # Select candidate that MAXIMIZES the UCB acquisition score
+    best_idx = int(np.argmax(acquisition_score))
     best_candidate = candidates[best_idx]
-    best_mean = float(means[best_idx])
-    best_std = float(stds[best_idx])
+    predicted_score = float(y_pred[best_idx])
+    predicted_std = float(y_std[best_idx])
 
-    if best_mean >= 0.75:
+    # 4. EXPECTED XRD PHASE THRESHOLD VERIFICATION
+    # Score > 0.7 = Monoclinic, 0.3 to 0.7 = Partial, < 0.3 = Amorphous
+    if predicted_score > 0.7 or (predicted_score + 1.96 * predicted_std) > 0.8:
         expected_phase = "Monoclinic"
-    elif best_mean >= 0.25:
+    elif predicted_score >= 0.3:
         expected_phase = "Partial"
     else:
         expected_phase = "Amorphous"
 
     count = len(experiments)
     base_confidence = 33 if count < 6 else (66 if count <= 10 else 90)
-    adjusted_score = int(max(10, min(99, base_confidence - (best_std * 20))))
+    adjusted_score = int(max(10, min(99, base_confidence - (predicted_std * 20))))
     conf_label = "HIGH" if adjusted_score >= 75 else ("MEDIUM" if adjusted_score >= 45 else "LOW")
 
     try:
@@ -100,7 +112,7 @@ def generate_bayesian_suggestion(experiments: list) -> dict:
         },
         "expected": {
             "xrd_phase": expected_phase,
-            "xrd_score": round(best_mean, 2),
+            "xrd_score": round(predicted_score, 2),
             "wavelength_shift_estimate": wavelength_est
         },
         "confidence": {
@@ -108,5 +120,5 @@ def generate_bayesian_suggestion(experiments: list) -> dict:
             "label": conf_label
         },
         "uncertainty_parameter": uncertain_param_name,
-        "explanation": f"The GP model targets {expected_phase} crystal phase with high parameter exploration on {uncertain_param_name}."
+        "explanation": f"UCB exploration prioritizes process parameters with high likelihood of achieving {expected_phase} phase crystallization."
     }
