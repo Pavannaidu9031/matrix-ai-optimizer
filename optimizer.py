@@ -15,7 +15,7 @@ PARAM_DISPLAY_NAMES = {
 }
 
 def generate_bayesian_suggestion(experiments: list) -> dict:
-    if len(experiments) < 3:
+    if not experiments or len(experiments) < 3:
         return {
             "error": "need_more_data",
             "message": "Log at least 3 experiments to enable AI suggestions"
@@ -23,14 +23,15 @@ def generate_bayesian_suggestion(experiments: list) -> dict:
 
     X, y = [], []
     for exp in experiments:
-        rf = float(exp.get("rf_power_w") or 100.0)
-        press = float(exp.get("working_pressure_mtorr") or 5.0)
-        dist = float(exp.get("target_substrate_distance_cm") or exp.get("target_substrate_distance_mm", 7.0) or 7.0)
-        thick = float(exp.get("film_thickness_nm") or 200.0)
-        rot = float(exp.get("rotation_speed_rpm") or 5.0)
-        ar = float(exp.get("ar_flow_sccm") or 30.0)
+        # Safely extract dictionary values with fallbacks if None
+        rf = float(exp.get("rf_power_w") if exp.get("rf_power_w") is not None else 120.0)
+        press = float(exp.get("working_pressure_mtorr") if exp.get("working_pressure_mtorr") is not None else 5.0)
+        dist = float(exp.get("target_substrate_distance_cm") if exp.get("target_substrate_distance_cm") is not None else exp.get("target_substrate_distance_mm", 7.0) or 7.0)
+        thick = float(exp.get("film_thickness_nm") if exp.get("film_thickness_nm") is not None else 200.0)
+        rot = float(exp.get("rotation_speed_rpm") if exp.get("rotation_speed_rpm") is not None else 5.0)
+        ar = float(exp.get("ar_flow_sccm") if exp.get("ar_flow_sccm") is not None else 30.0)
         
-        phase = str(exp.get("xrd_phase", "Amorphous"))
+        phase = str(exp.get("xrd_phase") or "Amorphous")
         score = XRD_MAP.get(phase, 0.0)
         
         X.append([rf, press, dist, thick, rot, ar])
@@ -39,10 +40,12 @@ def generate_bayesian_suggestion(experiments: list) -> dict:
     X = np.array(X)
     y = np.array(y)
 
+    # Fit Gaussian Process Regressor
     kernel = RBF(length_scale=np.ones(6), length_scale_bounds=(1e-1, 1e2)) + WhiteKernel(noise_level=1e-2)
     gp = GaussianProcessRegressor(kernel=kernel, n_restarts_optimizer=5, random_state=42)
     gp.fit(X, y)
 
+    # Sample candidates within parameter bounds
     np.random.seed(42)
     num_candidates = 500
     
