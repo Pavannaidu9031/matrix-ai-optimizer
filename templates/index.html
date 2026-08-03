@@ -21,6 +21,38 @@
             }
         }
     </script>
+    <style>
+        @keyframes pulse-glow {
+            0%, 100% {
+                box-shadow: 0 0 12px rgba(0, 212, 255, 0.4), 0 0 24px rgba(124, 58, 237, 0.2);
+            }
+            50% {
+                box-shadow: 0 0 24px rgba(0, 212, 255, 0.8), 0 0 40px rgba(124, 58, 237, 0.5);
+            }
+        }
+
+        .btn-glow {
+            background: linear-gradient(135deg, #00D4FF, #7C3AED);
+            animation: pulse-glow 3s infinite ease-in-out;
+        }
+
+        .btn-glow:disabled {
+            animation: none;
+            background: #374151;
+            box-shadow: none;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
+        @keyframes flash-fill {
+            0% { background-color: rgba(0, 212, 255, 0.4); }
+            100% { background-color: #1e293b; }
+        }
+
+        .flash-highlight {
+            animation: flash-fill 1.2s ease-out;
+        }
+    </style>
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen font-sans antialiased selection:bg-sky-500 selection:text-white">
 
@@ -85,8 +117,56 @@
             </div>
         {% else %}
 
+            <!-- AI SUGGESTION SECTION -->
+            <section class="bg-slate-900/80 p-6 rounded-2xl border border-slate-800 shadow-xl relative overflow-hidden" style="box-shadow: 0 0 0 1px rgba(0, 212, 255, 0.25), 0 0 32px rgba(0, 212, 255, 0.08);">
+                <div class="grid grid-cols-1 lg:grid-cols-10 gap-6 items-center">
+                    
+                    <!-- Left Column -->
+                    <div class="lg:col-span-4 space-y-2">
+                        <div class="text-xs font-bold tracking-wider text-sky-400 uppercase">BAYESIAN OPTIMIZER</div>
+                        <h2 class="text-2xl font-extrabold text-white">Suggest Next Parameters</h2>
+                        <p class="text-xs text-slate-400 leading-relaxed">
+                            Generate optimal next-run parameters from your experiment history using Gaussian Process regression.
+                        </p>
+                    </div>
+
+                    <!-- Right Column with Button -->
+                    <div class="lg:col-span-6 flex flex-col items-start lg:items-end space-y-2">
+                        <button id="btnSuggest" class="btn-glow text-white font-bold text-base px-8 py-4 rounded-xl transition flex items-center space-x-3">
+                            <span id="btnText">✦ Suggest Next Parameters</span>
+                            <div id="btnSpinner" class="hidden w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        </button>
+                        <span class="text-[11px] text-slate-400">Powered by Gaussian Process · Scikit-learn</span>
+                    </div>
+                </div>
+
+                <!-- Hidden Suggestion Output Panel -->
+                <div id="resultCard" class="hidden mt-8 pt-6 border-t border-slate-800 space-y-6">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-lg font-bold text-white">🎯 Recommended Next Run #<span id="runNum">X</span></h3>
+                        <span id="confBadge" class="px-3 py-1 rounded-full text-xs font-bold"></span>
+                    </div>
+
+                    <!-- Parameter Pills Grid -->
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        <div class="bg-sky-950/40 border border-sky-800/40 p-3 rounded-xl"><div class="text-[11px] text-slate-400">RF Power</div><div class="text-sm font-bold text-white" id="p_rf">-</div></div>
+                        <div class="bg-sky-950/40 border border-sky-800/40 p-3 rounded-xl"><div class="text-[11px] text-slate-400">Pressure</div><div class="text-sm font-bold text-white" id="p_press">-</div></div>
+                        <div class="bg-sky-950/40 border border-sky-800/40 p-3 rounded-xl"><div class="text-[11px] text-slate-400">Target Distance</div><div class="text-sm font-bold text-white" id="p_dist">-</div></div>
+                        <div class="bg-sky-950/40 border border-sky-800/40 p-3 rounded-xl"><div class="text-[11px] text-slate-400">Film Thickness</div><div class="text-sm font-bold text-white" id="p_thick">-</div></div>
+                        <div class="bg-sky-950/40 border border-sky-800/40 p-3 rounded-xl"><div class="text-[11px] text-slate-400">Rotation Speed</div><div class="text-sm font-bold text-white" id="p_rot">-</div></div>
+                        <div class="bg-sky-950/40 border border-sky-800/40 p-3 rounded-xl"><div class="text-[11px] text-slate-400">Ar Flow</div><div class="text-sm font-bold text-white" id="p_ar">-</div></div>
+                        <div class="bg-emerald-950/40 border border-emerald-800/40 p-3 rounded-xl"><div class="text-[11px] text-emerald-400">Expected XRD</div><div class="text-sm font-bold text-emerald-300" id="p_xrd">-</div></div>
+                        <div class="bg-emerald-950/40 border border-emerald-800/40 p-3 rounded-xl"><div class="text-[11px] text-emerald-400">Expected Shift</div><div class="text-sm font-bold text-emerald-300" id="p_shift">-</div></div>
+                    </div>
+
+                    <button id="btnApply" type="button" class="border border-sky-400 text-sky-400 hover:bg-sky-400/10 font-bold text-sm px-6 py-2.5 rounded-xl transition">
+                        ⬇ Apply to Form
+                    </button>
+                </div>
+            </section>
+
             <!-- EXPERIMENT INPUT FORM SECTION -->
-            <section class="space-y-4">
+            <section id="formSection" class="space-y-4">
                 <div class="flex items-center justify-between">
                     <div>
                         <h2 class="text-xl font-bold text-white">Log Experimental Run</h2>
@@ -262,6 +342,79 @@
         {% endif %}
 
     </main>
+
+    <!-- JS TRIGGER & AUTOFILL SCRIPT -->
+    <script>
+        let latestSuggestion = null;
+
+        document.getElementById('btnSuggest')?.addEventListener('click', async () => {
+            const btn = document.getElementById('btnSuggest');
+            const btnText = document.getElementById('btnText');
+            const btnSpinner = document.getElementById('btnSpinner');
+
+            btn.disabled = true;
+            btnText.innerText = "Analyzing experiments...";
+            btnSpinner.classList.remove('hidden');
+
+            try {
+                const response = await fetch('/suggest', { method: 'POST' });
+                const data = await response.json();
+
+                if (response.ok) {
+                    latestSuggestion = data;
+                    
+                    document.getElementById('runNum').innerText = data.run_number;
+                    document.getElementById('p_rf').innerText = data.suggested.rf_power + " W";
+                    document.getElementById('p_press').innerText = data.suggested.working_pressure + " mTorr";
+                    document.getElementById('p_dist').innerText = data.suggested.target_distance + " cm";
+                    document.getElementById('p_thick').innerText = data.suggested.film_thickness + " nm";
+                    document.getElementById('p_rot').innerText = data.suggested.rotation_speed + " rpm";
+                    document.getElementById('p_ar').innerText = data.suggested.ar_flow + " sccm";
+                    document.getElementById('p_xrd').innerText = data.expected.xrd_phase;
+                    document.getElementById('p_shift').innerText = data.expected.wavelength_shift_estimate + " pm";
+
+                    const badge = document.getElementById('confBadge');
+                    badge.innerText = (data.confidence?.label || 'READY') + " CONFIDENCE";
+                    badge.className = "px-3 py-1 rounded-full text-xs font-bold bg-sky-500/20 text-sky-400 border border-sky-500/30";
+
+                    document.getElementById('resultCard').classList.remove('hidden');
+                } else {
+                    alert(data.message || "Log at least 3 experiments to enable AI suggestions.");
+                }
+            } catch (err) {
+                alert("Error connecting to optimization service.");
+            } finally {
+                btn.disabled = false;
+                btnText.innerText = "✦ Suggest Next Parameters";
+                btnSpinner.classList.add('hidden');
+            }
+        });
+
+        document.getElementById('btnApply')?.addEventListener('click', () => {
+            if (!latestSuggestion) return;
+
+            const s = latestSuggestion.suggested;
+            const fields = [
+                { id: 'rf_power_w', val: s.rf_power },
+                { id: 'working_pressure_mtorr', val: s.working_pressure },
+                { id: 'target_substrate_distance_cm', val: s.target_distance },
+                { id: 'film_thickness_nm', val: s.film_thickness },
+                { id: 'rotation_speed_rpm', val: s.rotation_speed },
+                { id: 'ar_flow_sccm', val: s.ar_flow }
+            ];
+
+            fields.forEach(f => {
+                const el = document.getElementById(f.id);
+                if (el) {
+                    el.value = f.val;
+                    el.classList.add('flash-highlight');
+                    setTimeout(() => el.classList.remove('flash-highlight'), 1200);
+                }
+            });
+
+            document.getElementById('formSection')?.scrollIntoView({ behavior: 'smooth' });
+        });
+    </script>
 
 </body>
 </html>
