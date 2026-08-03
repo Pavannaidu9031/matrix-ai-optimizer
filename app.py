@@ -318,6 +318,24 @@ def add_experiment(
     )
     return RedirectResponse("/", status_code=303)
 
+    from fastapi.responses import JSONResponse
+
+@app.get("/suggest")
+@app.post("/suggest")
+async def get_bayes_suggestion(request: Request):
+    user_session = request.session.get("user")
+    if not user_session:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    raw_experiments = database.get_experiments_by_user(user_session["id"])
+    experiments = [dict(row) for row in raw_experiments] if raw_experiments else []
+
+    result = optimizer.generate_bayesian_suggestion(experiments)
+    if "error" in result:
+        return JSONResponse(status_code=400, content=result)
+    
+    return JSONResponse(content=result)
+
 @app.post("/delete/{exp_id}")
 def delete_experiment(exp_id: int, request: Request):
     user = request.session.get("user")
