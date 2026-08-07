@@ -1,6 +1,7 @@
 import io
 import os
 import smtplib
+import datetime  # ADDED: To handle timestamp conversions
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from typing import Optional
@@ -32,7 +33,7 @@ SECRET_KEY = os.getenv("SECRET_KEY", "matrix-ai-permanent-production-secret-key-
 app.add_middleware(
     SessionMiddleware,
     secret_key=SECRET_KEY,
-    max_age=86400 * 30,  # 30-day session duration
+    max_age=86400 * 30,
     same_site="lax",
     https_only=True
 )
@@ -50,24 +51,18 @@ def get_db_connection():
     if not db_url:
         raise Exception("DATABASE_URL environment variable is missing in Render settings.")
     
-    # Enforce sslmode=require
     if "sslmode=" not in db_url:
         db_url += "?sslmode=require" if "?" not in db_url else "&sslmode=require"
 
     if connection_pool is None:
         try:
-            connection_pool = pool.SimpleConnectionPool(
-                minconn=1,
-                maxconn=10,
-                dsn=db_url
-            )
+            connection_pool = pool.SimpleConnectionPool(minconn=1, maxconn=10, dsn=db_url)
         except Exception as e:
             print(f"Pool creation error: {e}. Opening direct connection.")
             return psycopg2.connect(db_url)
             
     try:
         conn = connection_pool.getconn()
-        # Verify connection is live
         if conn.closed != 0:
             return psycopg2.connect(db_url)
         return conn
@@ -169,7 +164,14 @@ def index(request: Request):
             
             rows = cur.fetchall()
             columns = [desc[0] for desc in cur.description]
-            experiments = [dict(zip(columns, row)) for row in rows]
+            
+            # FIXED: Convert datetime to string for JSON serialization in the template
+            for row in rows:
+                row_dict = dict(zip(columns, row))
+                if isinstance(row_dict.get("created_at"), datetime.datetime):
+                    row_dict["created_at"] = row_dict["created_at"].isoformat()
+                experiments.append(row_dict)
+                
             cur.close()
         finally:
             release_db_connection(conn)
@@ -245,7 +247,7 @@ def logout(request: Request):
     return RedirectResponse("/")
 
 # ==============================================================================
-# FORM SUBMISSION ROUTE (/add) - ERROR VISIBILITY ADDED
+# FORM SUBMISSION ROUTE (/add)
 # ==============================================================================
 @app.post("/add")
 async def add_experiment_form(request: Request):
@@ -339,8 +341,6 @@ async def add_experiment_form(request: Request):
                 conn.rollback()
             except Exception:
                 pass
-        
-        # UNMASK ERROR: Shows exactly why Supabase rejected the data on screen
         error_html = f"""
         <div style="font-family: sans-serif; padding: 2rem; background: #0f172a; color: white; height: 100vh;">
             <h1 style="color: #ef4444;">Database Insert Failed</h1>
@@ -439,7 +439,13 @@ async def get_experiments(request: Request):
         
         rows = cur.fetchall()
         columns = [desc[0] for desc in cur.description]
-        experiments = [dict(zip(columns, row)) for row in rows]
+        experiments = []
+        for row in rows:
+            row_dict = dict(zip(columns, row))
+            if isinstance(row_dict.get("created_at"), datetime.datetime):
+                row_dict["created_at"] = row_dict["created_at"].isoformat()
+            experiments.append(row_dict)
+            
         cur.close()
 
         return JSONResponse({
@@ -473,18 +479,26 @@ async def get_bayes_suggestion(request: Request):
             cur.execute("SELECT * FROM experiments WHERE user_email = %s ORDER BY created_at DESC", (user_email,))
             rows = cur.fetchall()
             cols = [desc[0] for desc in cur.description] if cur.description else []
-            experiments = [dict(zip(cols, r)) for r in rows]
-        except Exception as exp_err:
-            print(f"Exps fetch notice in suggest: {exp_err}")
+            for row in rows:
+                row_dict = dict(zip(cols, row))
+                if isinstance(row_dict.get("created_at"), datetime.datetime):
+                    row_dict["created_at"] = row_dict["created_at"].isoformat()
+                experiments.append(row_dict)
+        except Exception:
+            pass
 
         recent_suggestions = []
         try:
             cur.execute("SELECT * FROM suggestion_history WHERE user_email = %s ORDER BY id DESC LIMIT 3", (user_email,))
             sug_rows = cur.fetchall()
             sug_cols = [desc[0] for desc in cur.description] if cur.description else []
-            recent_suggestions = [dict(zip(sug_cols, r)) for r in sug_rows]
-        except Exception as sug_err:
-            print(f"Suggestion history fetch notice: {sug_err}")
+            for row in sug_rows:
+                row_dict = dict(zip(sug_cols, row))
+                if isinstance(row_dict.get("created_at"), datetime.datetime):
+                    row_dict["created_at"] = row_dict["created_at"].isoformat()
+                recent_suggestions.append(row_dict)
+        except Exception:
+            pass
 
         cur.close()
 
@@ -510,12 +524,11 @@ async def get_bayes_suggestion(request: Request):
             ))
             conn.commit()
             cur_hist.close()
-        except Exception as hist_err:
-            print(f"History log notice: {hist_err}")
+        except Exception:
+            pass
 
         return JSONResponse(content=result)
     except Exception as e:
-        print(f"MatrixAI Engine Error: {e}")
         return JSONResponse(status_code=500, content={"message": f"Optimization engine error: {str(e)}"})
     finally:
         if conn:
@@ -537,7 +550,12 @@ def export_csv(request: Request):
         cur.execute("SELECT * FROM experiments WHERE user_email = %s ORDER BY created_at DESC", (user_email,))
         rows = cur.fetchall()
         cols = [desc[0] for desc in cur.description]
-        experiments = [dict(zip(cols, r)) for r in rows]
+        experiments = []
+        for row in rows:
+            row_dict = dict(zip(cols, row))
+            if isinstance(row_dict.get("created_at"), datetime.datetime):
+                row_dict["created_at"] = row_dict["created_at"].isoformat()
+            experiments.append(row_dict)
         cur.close()
 
         if not experiments:
