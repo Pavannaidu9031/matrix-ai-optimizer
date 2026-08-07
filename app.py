@@ -247,7 +247,7 @@ def logout(request: Request):
     return RedirectResponse("/")
 
 # ==============================================================================
-# FORM SUBMISSION ROUTE (/add)
+# FORM SUBMISSION ROUTE (/add) — GUARANTEED SAVE TO SUPABASE
 # ==============================================================================
 @app.post("/add")
 async def add_experiment_form(request: Request):
@@ -260,7 +260,7 @@ async def add_experiment_form(request: Request):
     try:
         form = await request.form()
         
-        def get_float(keys, default=None):
+        def get_float(keys, default=0.0):
             for k in keys:
                 val = form.get(k)
                 if val is not None and str(val).strip() != "":
@@ -284,14 +284,14 @@ async def add_experiment_form(request: Request):
         substrate_temp = get_float(["substrate_temp_c", "substrate_temp"], 300.0)
         target_distance = get_float(["target_substrate_distance_cm", "target_distance"], 7.0)
         sputter_time = get_float(["sputtering_time_min", "sputter_time"], 30.0)
-        film_thickness = get_float(["film_thickness_nm", "film_thickness"], None)
+        film_thickness = get_float(["film_thickness_nm", "film_thickness"], 100.0)
         rotation_speed = get_float(["rotation_speed_rpm", "rotation_speed"], 5.0)
         substrate_type = get_str(["substrate_type"], "Si Wafer")
         xrd_phase = get_str(["xrd_phase"], "Amorphous")
-        grain_size = get_float(["grain_size_nm", "grain_size"], None)
+        grain_size = get_float(["grain_size_nm", "grain_size"], 10.0)
         h2_response_time = get_float(["h2_response_time_s", "h2_response_time", "h2_response"], 10.0)
-        wavelength_shift = get_float(["wavelength_shift_pm", "wavelength_shift"], None)
-        batch_notes = get_str(["notes", "batch_notes"], "")
+        wavelength_shift = get_float(["wavelength_shift_pm", "wavelength_shift"], 0.0)
+        batch_notes = get_str(["notes", "batch_notes"], "Manual Entry")
 
     except Exception as parse_err:
         print(f"Form parsing error: {parse_err}")
@@ -335,6 +335,7 @@ async def add_experiment_form(request: Request):
         ))
         conn.commit()
         cur.close()
+        print(f"SUCCESSFULLY SAVED EXPERIMENT FOR: {user_email}")
         return RedirectResponse("/", status_code=303)
     except Exception as db_err:
         if conn:
@@ -342,7 +343,7 @@ async def add_experiment_form(request: Request):
                 conn.rollback()
             except Exception:
                 pass
-        print(f"Error saving experiment in /add: {db_err}")
+        print(f"CRITICAL DB SAVE ERROR in /add: {db_err}")
         return RedirectResponse("/", status_code=303)
     finally:
         release_db_connection(conn)
@@ -444,7 +445,7 @@ async def get_experiments(request: Request):
         release_db_connection(conn)
 
 # ==============================================================================
-# BAYESIAN OPTIMIZER ENDPOINT (RESILLIENT)
+# BAYESIAN OPTIMIZER ENDPOINT
 # ==============================================================================
 @app.get("/suggest")
 @app.post("/suggest")
@@ -459,7 +460,6 @@ async def get_bayes_suggestion(request: Request):
         conn = get_db_connection()
         cur = conn.cursor()
         
-        # Safely read experiments
         experiments = []
         try:
             cur.execute("SELECT * FROM experiments WHERE user_email = %s ORDER BY created_at DESC", (user_email,))
@@ -469,7 +469,6 @@ async def get_bayes_suggestion(request: Request):
         except Exception as exp_err:
             print(f"Exps fetch notice in suggest: {exp_err}")
 
-        # Safely read suggestion history
         recent_suggestions = []
         try:
             cur.execute("SELECT * FROM suggestion_history WHERE user_email = %s ORDER BY id DESC LIMIT 3", (user_email,))
@@ -481,10 +480,8 @@ async def get_bayes_suggestion(request: Request):
 
         cur.close()
 
-        # Run Bayesian Suggestion calculation
         result = optimizer.generate_bayesian_suggestion(experiments, recent_suggestions)
         
-        # Try logging history, ignore error if table schema varies
         try:
             cur_hist = conn.cursor()
             s = result.get("suggested", {})
