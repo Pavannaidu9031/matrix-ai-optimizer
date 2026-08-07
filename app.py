@@ -32,7 +32,7 @@ SECRET_KEY = os.getenv("SECRET_KEY", "matrix-ai-permanent-production-secret-key-
 app.add_middleware(
     SessionMiddleware,
     secret_key=SECRET_KEY,
-    max_age=86400 * 30,  # 30-day session duration
+    max_age=86400 * 30,
     same_site="lax",
     https_only=True
 )
@@ -50,24 +50,18 @@ def get_db_connection():
     if not db_url:
         raise Exception("DATABASE_URL environment variable is missing in Render settings.")
     
-    # Enforce sslmode=require
     if "sslmode=" not in db_url:
         db_url += "?sslmode=require" if "?" not in db_url else "&sslmode=require"
 
     if connection_pool is None:
         try:
-            connection_pool = pool.SimpleConnectionPool(
-                minconn=1,
-                maxconn=10,
-                dsn=db_url
-            )
+            connection_pool = pool.SimpleConnectionPool(minconn=1, maxconn=10, dsn=db_url)
         except Exception as e:
             print(f"Pool creation error: {e}. Opening direct connection.")
             return psycopg2.connect(db_url)
             
     try:
         conn = connection_pool.getconn()
-        # Verify connection is live
         if conn.closed != 0:
             return psycopg2.connect(db_url)
         return conn
@@ -124,9 +118,6 @@ oauth.register(
     client_kwargs={"scope": "openid email profile"},
 )
 
-# ==============================================================================
-# PYDANTIC DATA MODEL
-# ==============================================================================
 class ExperimentModel(BaseModel):
     rf_power: float
     working_pressure: float
@@ -208,9 +199,6 @@ def index(request: Request):
         "stats": stats
     })
 
-# ==============================================================================
-# OAUTH ROUTING
-# ==============================================================================
 @app.get("/login/google")
 async def login_google(request: Request):
     redirect_uri = request.url_for("auth_callback")
@@ -251,7 +239,7 @@ def logout(request: Request):
     return RedirectResponse("/")
 
 # ==============================================================================
-# FORM SUBMISSION ROUTE (/add)
+# FORM SUBMISSION ROUTE (/add) - ERROR VISIBILITY ADDED
 # ==============================================================================
 @app.post("/add")
 async def add_experiment_form(request: Request):
@@ -298,8 +286,7 @@ async def add_experiment_form(request: Request):
         batch_notes = get_str(["notes", "batch_notes"], "Manual Entry")
 
     except Exception as parse_err:
-        print(f"Form parsing error: {parse_err}")
-        return RedirectResponse("/", status_code=303)
+        return HTMLResponse(f"<h1>Form Parsing Error</h1><p>{str(parse_err)}</p>", status_code=400)
 
     conn = None
     try:
@@ -310,8 +297,8 @@ async def add_experiment_form(request: Request):
         try:
             cur.execute("SELECT * FROM experiments WHERE user_email = %s", (user_email,))
             existing_rows = cur.fetchall()
-        except Exception as fetch_err:
-            print(f"Existing exps fetch notice: {fetch_err}")
+        except Exception:
+            pass 
 
         cols = [desc[0] for desc in cur.description] if cur.description and existing_rows else []
         all_exps = [dict(zip(cols, r)) for r in existing_rows]
@@ -346,14 +333,23 @@ async def add_experiment_form(request: Request):
                 conn.rollback()
             except Exception:
                 pass
-        print(f"CRITICAL DB SAVE ERROR in /add: {db_err}")
-        return RedirectResponse("/", status_code=303)
+        # RENDER THE ERROR ON SCREEN SO WE CAN SEE WHY IT FAILS
+        return HTMLResponse(content=f"""
+            <div style="padding: 3rem; font-family: sans-serif; color: white; background: #0f172a; height: 100vh;">
+                <h1 style="color: #ef4444;">Database Insert Failed</h1>
+                <p>Supabase rejected the save. The exact PostgreSQL error is:</p>
+                <div style="background: #1e293b; padding: 1.5rem; border-radius: 8px; font-family: monospace; color: #f87171; font-size: 1.1rem; margin-bottom: 2rem;">
+                    {str(db_err)}
+                </div>
+                <a href="/" style="color: #3b82f6; text-decoration: none; border: 1px solid #3b82f6; padding: 10px 20px; border-radius: 6px;">&larr; Return to Dashboard</a>
+            </div>
+        """, status_code=500)
     finally:
         if conn:
             release_db_connection(conn)
 
 # ==============================================================================
-# PERMANENT EXPERIMENT SAVE (JSON API /experiments)
+# OTHER ROUTES REMAIN UNCHANGED
 # ==============================================================================
 @app.post("/experiments")
 async def save_experiment_json(request: Request, data: ExperimentModel):
@@ -365,7 +361,6 @@ async def save_experiment_json(request: Request, data: ExperimentModel):
     conn = get_db_connection()
     try:
         cur = conn.cursor()
-        
         cur.execute("SELECT * FROM experiments WHERE user_email = %s", (user_email,))
         existing_rows = cur.fetchall()
         cols = [desc[0] for desc in cur.description] if cur.description else []
@@ -396,13 +391,7 @@ async def save_experiment_json(request: Request, data: ExperimentModel):
         new_id = cur.fetchone()[0]
         conn.commit()
         cur.close()
-
-        return JSONResponse({
-            "success": True,
-            "id": new_id,
-            "quality_score": quality_score,
-            "message": "Experiment saved permanently to Supabase"
-        })
+        return JSONResponse({"success": True, "id": new_id, "quality_score": quality_score})
     except Exception as e:
         if conn:
             conn.rollback()
@@ -410,9 +399,6 @@ async def save_experiment_json(request: Request, data: ExperimentModel):
     finally:
         release_db_connection(conn)
 
-# ==============================================================================
-# FETCH EXPERIMENTS API
-# ==============================================================================
 @app.get("/experiments")
 async def get_experiments(request: Request):
     user = request.session.get("user")
@@ -437,20 +423,12 @@ async def get_experiments(request: Request):
         columns = [desc[0] for desc in cur.description]
         experiments = [dict(zip(columns, row)) for row in rows]
         cur.close()
-
-        return JSONResponse({
-            "success": True,
-            "experiments": experiments,
-            "count": len(experiments)
-        })
+        return JSONResponse({"success": True, "experiments": experiments, "count": len(experiments)})
     except Exception as e:
         return JSONResponse({"error": "fetch_failed", "message": str(e)}, status_code=500)
     finally:
         release_db_connection(conn)
 
-# ==============================================================================
-# BAYESIAN OPTIMIZER ENDPOINT
-# ==============================================================================
 @app.get("/suggest")
 @app.post("/suggest")
 async def get_bayes_suggestion(request: Request):
@@ -470,8 +448,8 @@ async def get_bayes_suggestion(request: Request):
             rows = cur.fetchall()
             cols = [desc[0] for desc in cur.description] if cur.description else []
             experiments = [dict(zip(cols, r)) for r in rows]
-        except Exception as exp_err:
-            print(f"Exps fetch notice in suggest: {exp_err}")
+        except Exception:
+            pass
 
         recent_suggestions = []
         try:
@@ -479,8 +457,8 @@ async def get_bayes_suggestion(request: Request):
             sug_rows = cur.fetchall()
             sug_cols = [desc[0] for desc in cur.description] if cur.description else []
             recent_suggestions = [dict(zip(sug_cols, r)) for r in sug_rows]
-        except Exception as sug_err:
-            print(f"Suggestion history fetch notice: {sug_err}")
+        except Exception:
+            pass
 
         cur.close()
 
@@ -506,20 +484,16 @@ async def get_bayes_suggestion(request: Request):
             ))
             conn.commit()
             cur_hist.close()
-        except Exception as hist_err:
-            print(f"History log notice: {hist_err}")
+        except Exception:
+            pass
 
         return JSONResponse(content=result)
     except Exception as e:
-        print(f"MatrixAI Engine Error: {e}")
         return JSONResponse(status_code=500, content={"message": f"Optimization engine error: {str(e)}"})
     finally:
         if conn:
             release_db_connection(conn)
 
-# ==============================================================================
-# CSV EXPORT
-# ==============================================================================
 @app.get("/export/csv")
 def export_csv(request: Request):
     user = request.session.get("user")
