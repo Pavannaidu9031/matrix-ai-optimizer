@@ -87,10 +87,9 @@ def release_db_connection(conn):
         except Exception:
             pass
 
-# Helper to calculate quality score safely
+# Helper to calculate quality score safely without throwing exceptions
 def safe_calculate_quality_score(xrd_phase, wavelength_shift, h2_response_time, grain_size, existing_exps):
     try:
-        # Standardize dictionaries for optimizer expectations
         formatted_exps = []
         for e in existing_exps:
             item = dict(e)
@@ -103,7 +102,7 @@ def safe_calculate_quality_score(xrd_phase, wavelength_shift, h2_response_time, 
             xrd_phase, wavelength_shift, h2_response_time, grain_size, formatted_exps
         )
     except Exception as err:
-        print(f"Quality score calculation fallback triggered: {err}")
+        print(f"Quality score fallback triggered: {err}")
         return 50.0
 
 # ==============================================================================
@@ -207,49 +206,75 @@ def index(request: Request):
     })
 
 # ==============================================================================
-# FORM SUBMISSION ROUTE (/add) - BULLETPROOFED
+# FORM SUBMISSION ROUTE (/add) — FULLY CATCH-ALL & RESILIENT
 # ==============================================================================
 @app.post("/add")
-def add_experiment_form(
-    request: Request,
-    rf_power_w: float = Form(...),
-    working_pressure_mtorr: float = Form(...),
-    ar_flow_sccm: float = Form(...),
-    o2_flow_sccm: float = Form(...),
-    substrate_temp_c: float = Form(...),
-    target_substrate_distance_cm: float = Form(...),
-    sputtering_time_min: float = Form(...),
-    film_thickness_nm: float = Form(None),
-    rotation_speed_rpm: float = Form(5.0),
-    substrate_type: str = Form("Si Wafer"),
-    xrd_phase: str = Form("Amorphous"),
-    grain_size_nm: float = Form(None),
-    h2_response_time_s: float = Form(...),
-    wavelength_shift_pm: float = Form(None),
-    notes: str = Form(None)
-):
+async def add_experiment_form(request: Request):
     user = request.session.get("user")
     if not user:
-        raise HTTPException(status_code=401, detail="Unauthorized")
+        return RedirectResponse("/login/google", status_code=303)
 
     user_email = user.get("email")
-    conn = get_db_connection()
+    
+    # Safely parse form data regardless of field name variations
     try:
+        form = await request.form()
+        
+        def get_float(keys, default=None):
+            for k in keys:
+                val = form.get(k)
+                if val is not None and str(val).strip() != "":
+                    try:
+                        return float(val)
+                    except ValueError:
+                        pass
+            return default
+
+        def get_str(keys, default=""):
+            for k in keys:
+                val = form.get(k)
+                if val is not None:
+                    return str(val).strip()
+            return default
+
+        rf_power = get_float(["rf_power_w", "rf_power"], 120.0)
+        working_pressure = get_float(["working_pressure_mtorr", "working_pressure", "pressure"], 5.0)
+        ar_flow = get_float(["ar_flow_sccm", "ar_flow"], 30.0)
+        o2_flow = get_float(["o2_flow_sccm", "o2_flow"], 5.0)
+        substrate_temp = get_float(["substrate_temp_c", "substrate_temp"], 300.0)
+        target_distance = get_float(["target_substrate_distance_cm", "target_distance"], 7.0)
+        sputter_time = get_float(["sputtering_time_min", "sputter_time"], 30.0)
+        film_thickness = get_float(["film_thickness_nm", "film_thickness"], None)
+        rotation_speed = get_float(["rotation_speed_rpm", "rotation_speed"], 5.0)
+        substrate_type = get_str(["substrate_type"], "Si Wafer")
+        xrd_phase = get_str(["xrd_phase"], "Amorphous")
+        grain_size = get_float(["grain_size_nm", "grain_size"], None)
+        h2_response_time = get_float(["h2_response_time_s", "h2_response_time", "h2_response"], 10.0)
+        wavelength_shift = get_float(["wavelength_shift_pm", "wavelength_shift"], None)
+        batch_notes = get_str(["notes", "batch_notes"], "")
+
+    except Exception as parse_err:
+        print(f"Form parsing error: {parse_err}")
+        return RedirectResponse("/", status_code=303)
+
+    conn = None
+    try:
+        conn = get_db_connection()
         cur = conn.cursor()
         
-        # Safely fetch existing experiments
+        # Safely fetch existing experiments for quality score calculation
         existing_rows = []
         try:
             cur.execute("SELECT * FROM experiments WHERE user_email = %s", (user_email,))
             existing_rows = cur.fetchall()
         except Exception as fetch_err:
-            print(f"Notice during existing exps fetch: {fetch_err}")
+            print(f"Existing exps fetch notice: {fetch_err}")
 
         cols = [desc[0] for desc in cur.description] if cur.description and existing_rows else []
         all_exps = [dict(zip(cols, r)) for r in existing_rows]
 
         quality_score = safe_calculate_quality_score(
-            xrd_phase, wavelength_shift_pm, h2_response_time_s, grain_size_nm, all_exps
+            xrd_phase, wavelength_shift, h2_response_time, grain_size, all_exps
         )
 
         cur.execute("""
@@ -263,19 +288,22 @@ def add_experiment_form(
                 %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW()
             )
         """, (
-            user_email, rf_power_w, working_pressure_mtorr, ar_flow_sccm,
-            o2_flow_sccm, substrate_temp_c, target_substrate_distance_cm, sputtering_time_min,
-            film_thickness_nm, rotation_speed_rpm, substrate_type, xrd_phase,
-            grain_size_nm, h2_response_time_s, wavelength_shift_pm, notes,
+            user_email, rf_power, working_pressure, ar_flow,
+            o2_flow, substrate_temp, target_distance, sputter_time,
+            film_thickness, rotation_speed, substrate_type, xrd_phase,
+            grain_size, h2_response_time, wavelength_shift, batch_notes,
             quality_score
         ))
         conn.commit()
         cur.close()
         return RedirectResponse("/", status_code=303)
-    except Exception as e:
+    except Exception as db_err:
         if conn:
-            conn.rollback()
-        print(f"Error in /add form save: {e}")
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+        print(f"Error saving experiment in /add: {db_err}")
         return RedirectResponse("/", status_code=303)
     finally:
         release_db_connection(conn)
