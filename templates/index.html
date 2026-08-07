@@ -382,11 +382,11 @@
                                         <span class="px-2 py-1 rounded-md text-[10px] font-bold bg-red-500/20 text-red-400 border border-red-500/30">Poor ({{ q }})</span>
                                     {% endif %}
                                 </td>
-                                <td class="p-3 text-slate-400 font-medium">{{ exp.notes or '-' }}</td>
-                                <td class="p-3">{{ exp.rf_power_w }} W</td>
-                                <td class="p-3">{{ exp.working_pressure_mtorr }} mTorr</td>
-                                <td class="p-3">{{ exp.target_substrate_distance_cm }} cm</td>
-                                <td class="p-3">{{ exp.rotation_speed_rpm }} rpm</td>
+                                <td class="p-3 text-slate-400 font-medium">{{ exp.batch_notes or '-' }}</td>
+                                <td class="p-3">{{ exp.rf_power }} W</td>
+                                <td class="p-3">{{ exp.working_pressure }} mTorr</td>
+                                <td class="p-3">{{ exp.target_distance }} cm</td>
+                                <td class="p-3">{{ exp.rotation_speed }} rpm</td>
                                 <td class="p-3">{{ exp.substrate_type }}</td>
                                 <td class="p-3">
                                     {% if exp.xrd_phase == 'Monoclinic' %}
@@ -397,9 +397,9 @@
                                         <span class="px-2 py-1 rounded-md text-[10px] font-bold bg-red-500/10 text-red-400 border border-red-500/20">Amorphous</span>
                                     {% endif %}
                                 </td>
-                                <td class="p-3">{{ exp.grain_size_nm if exp.grain_size_nm is not none else '-' }}</td>
-                                <td class="p-3 font-semibold text-blue-400">{{ exp.h2_response_time_s }}s</td>
-                                <td class="p-3">{{ exp.wavelength_shift_pm if exp.wavelength_shift_pm is not none else '-' }}</td>
+                                <td class="p-3">{{ exp.grain_size if exp.grain_size is not none else '-' }}</td>
+                                <td class="p-3 font-semibold text-blue-400">{{ exp.h2_response_time }}s</td>
+                                <td class="p-3">{{ exp.wavelength_shift if exp.wavelength_shift is not none else '-' }}</td>
                             </tr>
                             {% else %}
                             <tr>
