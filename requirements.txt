@@ -6,6 +6,7 @@ pandas
 scikit-learn
 scikit-optimize
 plotly
+scipy
 authlib
 httpx
 requests
