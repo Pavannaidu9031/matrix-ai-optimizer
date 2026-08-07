@@ -3,122 +3,301 @@ import pandas as pd
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import RBF, WhiteKernel
 
-# 1. VERIFIED ENCODING: Monoclinic = 1.0 (TARGET), Partial = 0.5, Amorphous = 0.0
-XRD_MAP = {
-    "Monoclinic": 1.0,
-    "Partial": 0.5,
-    "Amorphous": 0.0
-}
+# ------------------------------------------------------------------------------
+# UPGRADE 3: Literature Pre-Seeding Prior Knowledge
+# ------------------------------------------------------------------------------
+LITERATURE_PRIORS = [
+    [100.0, 5.0, 7.0, 200.0, 5.0, 30.0, 0.0, 45.0],
+    [120.0, 4.0, 5.0, 200.0, 5.0, 30.0, 0.5, 78.0],
+    [80.0,  8.0, 7.0, 300.0, 1.0, 25.0, 0.0, 22.0],
+    [150.0, 3.0, 3.0, 200.0, 10.0, 30.0, 1.0, 142.0],
+    [100.0, 5.0, 5.0, 100.0, 5.0, 30.0, 0.0, 18.0],
+    [130.0, 4.0, 4.0, 300.0, 10.0, 35.0, 0.5, 95.0],
+    [150.0, 3.0, 3.0, 250.0, 10.0, 40.0, 1.0, 168.0],
+]
 
-PARAM_DISPLAY_NAMES = {
-    0: "RF Power",
-    1: "Working Pressure",
-    2: "Target Distance",
-    3: "Film Thickness",
-    4: "Rotation Speed",
-    5: "Ar Flow"
-}
+XRD_MAP = {"Monoclinic": 1.0, "Partial": 0.5, "Amorphous": 0.0}
+PARAM_NAMES = ["RF Power", "Pressure", "Target Distance", "Film Thickness", "Rotation Speed", "Ar Flow"]
 
-def generate_bayesian_suggestion(experiments: list) -> dict:
-    if not experiments or len(experiments) < 3:
-        return {
-            "error": "need_more_data",
-            "message": "Log at least 3 experiments to enable AI suggestions"
-        }
 
-    X, y = [], []
-    for exp in experiments:
-        rf = float(exp.get("rf_power_w") if exp.get("rf_power_w") is not None else 120.0)
-        press = float(exp.get("working_pressure_mtorr") if exp.get("working_pressure_mtorr") is not None else 5.0)
-        dist = float(exp.get("target_substrate_distance_cm") if exp.get("target_substrate_distance_cm") is not None else exp.get("target_substrate_distance_mm", 7.0) or 7.0)
-        thick = float(exp.get("film_thickness_nm") if exp.get("film_thickness_nm") is not None else 200.0)
-        rot = float(exp.get("rotation_speed_rpm") if exp.get("rotation_speed_rpm") is not None else 5.0)
-        ar = float(exp.get("ar_flow_sccm") if exp.get("ar_flow_sccm") is not None else 30.0)
-        
-        # Target optimization target: Monoclinic = 1.0
+# ------------------------------------------------------------------------------
+# UPGRADE 7: Experiment Quality Score Calculation
+# ------------------------------------------------------------------------------
+def calculate_quality_score(xrd_phase, wavelength_shift_pm, h2_response_s, grain_size_nm, all_experiments):
+    xrd_score = XRD_MAP.get(str(xrd_phase).strip(), 0.0)
+
+    # Helper function for min-max normalization with default neutral fallback
+    def normalize(val, key, default=0.5, invert=False):
+        if val is None:
+            return default
+        vals = [float(e[key]) for e in all_experiments if e.get(key) is not None]
+        if not vals or max(vals) == min(vals):
+            return 0.5
+        norm = (float(val) - min(vals)) / (max(vals) - min(vals))
+        return (1.0 - norm) if invert else norm
+
+    wave_norm = normalize(wavelength_shift_pm, "wavelength_shift_pm", default=0.5)
+    h2_norm = normalize(h2_response_s, "h2_response_time_s", default=0.5, invert=True)
+    grain_norm = normalize(grain_size_nm, "grain_size_nm", default=0.5)
+
+    quality = (xrd_score * 40.0) + (wave_norm * 30.0) + (h2_norm * 20.0) + (grain_norm * 10.0)
+    return round(float(np.clip(quality, 0.0, 100.0)), 1)
+
+
+# ------------------------------------------------------------------------------
+# MAIN OPTIMIZATION LOGIC
+# ------------------------------------------------------------------------------
+def generate_bayesian_suggestion(user_experiments: list, recent_suggestions: list = None) -> dict:
+    real_count = len(user_experiments)
+
+    # --------------------------------------------------------------------------
+    # UPGRADE 1: Dynamic Kappa UCB Schedule
+    # --------------------------------------------------------------------------
+    if real_count <= 7:
+        kappa = 2.5  # High exploration
+    elif real_count <= 15:
+        kappa = 1.5  # Balanced
+    else:
+        kappa = 0.5  # Pure exploitation
+
+    # Prepare datasets (Literature Priors + User Real Data)
+    X_list, y_xrd_list, y_wave_list = [], [], []
+
+    # Add 7 Literature Priors
+    for p in LITERATURE_PRIORS:
+        X_list.append(p[:6])
+        y_xrd_list.append(p[6])
+        y_wave_list.append(p[7])
+
+    # Add User Real Data
+    for exp in user_experiments:
+        rf = float(exp.get("rf_power_w") or 120.0)
+        press = float(exp.get("working_pressure_mtorr") or 5.0)
+        dist = float(exp.get("target_substrate_distance_cm") or exp.get("target_substrate_distance_mm") or 7.0)
+        thick = float(exp.get("film_thickness_nm") or 200.0)
+        rot = float(exp.get("rotation_speed_rpm") or 5.0)
+        ar = float(exp.get("ar_flow_sccm") or 30.0)
+
         phase = str(exp.get("xrd_phase") or "Amorphous").strip()
-        score = XRD_MAP.get(phase, 0.0)
-        
-        X.append([rf, press, dist, thick, rot, ar])
-        y.append(score)
+        xrd_val = XRD_MAP.get(phase, 0.0)
+        wave_val = float(exp["wavelength_shift_pm"]) if exp.get("wavelength_shift_pm") is not None else None
 
-    X = np.array(X)
-    y = np.array(y)
+        X_list.append([rf, press, dist, thick, rot, ar])
+        y_xrd_list.append(xrd_val)
+        y_wave_list.append(wave_val)
 
-    # Gaussian Process Model fit
-    kernel = RBF(length_scale=np.ones(6), length_scale_bounds=(1e-1, 1e2)) + WhiteKernel(noise_level=1e-2)
-    gp = GaussianProcessRegressor(kernel=kernel, n_restarts_optimizer=5, random_state=42)
-    gp.fit(X, y)
+    X = np.array(X_list)
+    y_xrd = np.array(y_xrd_list)
 
-    # Candidate Sampling (1000 candidates across the search bounds)
+    # Handle Wavelength Normalization
+    valid_waves = [v for v in y_wave_list if v is not None]
+    min_w = min(valid_waves) if valid_waves else 0.0
+    max_w = max(valid_waves) if valid_waves else 200.0
+    denom = (max_w - min_w) if max_w > min_w else 1.0
+
+    y_wave_norm = np.array([
+        (v - min_w) / denom if v is not None else 0.5 for v in y_wave_list
+    ])
+
+    # Sample Weights: Literature = 1.0, User Real Data = 3.0
+    sample_weights = np.array([1.0] * len(LITERATURE_PRIORS) + [3.0] * real_count)
+
+    # --------------------------------------------------------------------------
+    # UPGRADE 2: Fit Two Separate Gaussian Processes (Pareto Multi-Objective)
+    # --------------------------------------------------------------------------
+    kernel_xrd = RBF(length_scale=np.ones(6), length_scale_bounds=(1e-1, 1e2)) + WhiteKernel(noise_level=1e-2)
+    gp_xrd = GaussianProcessRegressor(kernel=kernel_xrd, n_restarts_optimizer=5, random_state=42)
+    gp_xrd.fit(X, y_xrd, sample_weight=sample_weights)
+
+    kernel_wave = RBF(length_scale=np.ones(6), length_scale_bounds=(1e-1, 1e2)) + WhiteKernel(noise_level=1e-2)
+    gp_wave = GaussianProcessRegressor(kernel=kernel_wave, n_restarts_optimizer=5, random_state=42)
+    gp_wave.fit(X, y_wave_norm, sample_weight=sample_weights)
+
+    # --------------------------------------------------------------------------
+    # UPGRADE 6: Adaptive Parameter Bounds
+    # --------------------------------------------------------------------------
+    if user_experiments:
+        # Find current best real run by quality score or XRD score
+        best_run = max(user_experiments, key=lambda e: float(e.get("quality_score") or 0.0))
+        b_rf = float(best_run.get("rf_power_w") or 120.0)
+        b_press = float(best_run.get("working_pressure_mtorr") or 5.0)
+        b_dist = float(best_run.get("target_substrate_distance_cm") or 5.0)
+        b_thick = float(best_run.get("film_thickness_nm") or 200.0)
+        b_ar = float(best_run.get("ar_flow_sccm") or 30.0)
+    else:
+        b_rf, b_press, b_dist, b_thick, b_ar = 120.0, 5.0, 5.0, 200.0, 30.0
+
+    if real_count <= 8:
+        # Phase 1: Full Bounds
+        bounds = [(80.0, 150.0), (3.0, 10.0), (3.0, 7.0), (100.0, 500.0), [1.0, 5.0, 10.0], (20.0, 40.0)]
+    elif real_count <= 15:
+        # Phase 2: ±30% around best
+        bounds = [
+            (max(80.0, b_rf * 0.7), min(150.0, b_rf * 1.3)),
+            (max(3.0, b_press * 0.7), min(10.0, b_press * 1.3)),
+            (max(3.0, b_dist * 0.7), min(7.0, b_dist * 1.3)),
+            (max(100.0, b_thick * 0.7), min(500.0, b_thick * 1.3)),
+            [1.0, 5.0, 10.0],
+            (max(20.0, b_ar * 0.7), min(40.0, b_ar * 1.3))
+        ]
+    else:
+        # Phase 3: ±15% around best
+        bounds = [
+            (max(80.0, b_rf * 0.85), min(150.0, b_rf * 1.15)),
+            (max(3.0, b_press * 0.85), min(10.0, b_press * 1.15)),
+            (max(3.0, b_dist * 0.85), min(7.0, b_dist * 1.15)),
+            (max(100.0, b_thick * 0.85), min(500.0, b_thick * 1.15)),
+            [1.0, 5.0, 10.0],
+            (max(20.0, b_ar * 0.85), min(40.0, b_ar * 1.15))
+        ]
+
+    # Sample Candidates
     np.random.seed(42)
     num_candidates = 1000
-    
-    c_rf = np.random.uniform(80.0, 150.0, num_candidates)
-    c_press = np.random.uniform(3.0, 10.0, num_candidates)
-    c_dist = np.random.uniform(3.0, 7.0, num_candidates)
-    c_thick = np.random.uniform(100.0, 500.0, num_candidates)
-    c_rot = np.random.choice([1.0, 5.0, 10.0], num_candidates)
-    c_ar = np.random.uniform(20.0, 40.0, num_candidates)
+    c_rf = np.random.uniform(bounds[0][0], bounds[0][1], num_candidates)
+    c_press = np.random.uniform(bounds[1][0], bounds[1][1], num_candidates)
+    c_dist = np.random.uniform(bounds[2][0], bounds[2][1], num_candidates)
+    c_thick = np.random.uniform(bounds[3][0], bounds[3][1], num_candidates)
+    c_rot = np.random.choice(bounds[4], num_candidates)
+    c_ar = np.random.uniform(bounds[5][0], bounds[5][1], num_candidates)
 
     candidates = np.column_stack([c_rf, c_press, c_dist, c_thick, c_rot, c_ar])
-    y_pred, y_std = gp.predict(candidates, return_std=True)
 
-    # 2 & 3. UCB ACQUISITION FUNCTION (MAXIMIZATION WITH EXPLORATION)
-    # y_pred + 2.576 * y_std balances exploitation and exploration (99% confidence threshold)
-    beta = 2.576
-    acquisition_score = y_pred + (beta * y_std)
-    
-    # Select candidate that MAXIMIZES the UCB acquisition score
-    best_idx = int(np.argmax(acquisition_score))
+    # GP Predictions
+    mean_xrd, std_xrd = gp_xrd.predict(candidates, return_std=True)
+    mean_wave, std_wave = gp_wave.predict(candidates, return_std=True)
+
+    # Combined Multi-Objective UCB Acquisition
+    mean_combined = 0.7 * mean_xrd + 0.3 * mean_wave
+    std_combined = 0.7 * std_xrd + 0.3 * std_wave
+    acquisition = mean_combined + (kappa * std_combined)
+
+    best_idx = int(np.argmax(acquisition))
     best_candidate = candidates[best_idx]
-    predicted_score = float(y_pred[best_idx])
-    predicted_std = float(y_std[best_idx])
 
-    # 4. EXPECTED XRD PHASE THRESHOLD VERIFICATION
-    # Score > 0.7 = Monoclinic, 0.3 to 0.7 = Partial, < 0.3 = Amorphous
-    if predicted_score > 0.7 or (predicted_score + 1.96 * predicted_std) > 0.8:
+    pred_xrd = float(mean_xrd[best_idx])
+    pred_wave_norm = float(mean_wave[best_idx])
+    pred_wave_pm = round(float(min_w + pred_wave_norm * denom), 1)
+    combined_score = round(float(mean_combined[best_idx]), 2)
+
+    if pred_xrd >= 0.7:
         expected_phase = "Monoclinic"
-    elif predicted_score >= 0.3:
+    elif pred_xrd >= 0.3:
         expected_phase = "Partial"
     else:
         expected_phase = "Amorphous"
 
-    count = len(experiments)
-    base_confidence = 33 if count < 6 else (66 if count <= 10 else 90)
-    adjusted_score = int(max(10, min(99, base_confidence - (predicted_std * 20))))
-    conf_label = "HIGH" if adjusted_score >= 75 else ("MEDIUM" if adjusted_score >= 45 else "LOW")
-
+    # --------------------------------------------------------------------------
+    # UPGRADE 4: Per-Parameter Length Scale Uncertainty Display
+    # --------------------------------------------------------------------------
     try:
-        rbf_kernel = gp.kernel_.k1
-        highest_unc_idx = int(np.argmax(rbf_kernel.length_scale))
+        rbf_k = gp_xrd.kernel_.k1
+        l_scales = rbf_k.length_scale
+        # Normalize length scales to 0.0-1.0 (larger scale = model knows less = higher uncertainty)
+        scaled_ls = (l_scales - np.min(l_scales)) / (np.max(l_scales) - np.min(l_scales) + 1e-6)
     except Exception:
-        highest_unc_idx = int(np.argmax(np.std(X, axis=0)))
+        scaled_ls = np.ones(6) * 0.5
 
-    uncertain_param_name = PARAM_DISPLAY_NAMES.get(highest_unc_idx, "Film Thickness")
+    uncertainties = {}
+    for idx, name in enumerate(PARAM_NAMES):
+        uncertainties[name] = round(float(np.clip(scaled_ls[idx], 0.1, 1.0)), 2)
 
-    shifts = [float(e["wavelength_shift_pm"]) for e in experiments if e.get("wavelength_shift_pm") is not None]
-    wavelength_est = round(float(np.mean(shifts) * 1.15), 1) if shifts else 145.0
+    most_unc = PARAM_NAMES[int(np.argmax(scaled_ls))]
+    most_cert = PARAM_NAMES[int(np.argmin(scaled_ls))]
+
+    # --------------------------------------------------------------------------
+    # UPGRADE 5: Multi-Run Convergence Detection
+    # --------------------------------------------------------------------------
+    converged = False
+    convergence_score = min(100, int((real_count / 20.0) * 100))
+    runs_to_conv = max(1, 15 - real_count)
+
+    if recent_suggestions and len(recent_suggestions) >= 2:
+        last3 = [
+            [
+                float(r["suggested_rf_power"]),
+                float(r["suggested_pressure"]),
+                float(r["suggested_distance"]),
+                float(r["suggested_thickness"]),
+                float(r["suggested_rotation"]),
+                float(r["suggested_ar_flow"]),
+            ]
+            for r in recent_suggestions
+        ]
+        last3.append(best_candidate.tolist())
+
+        variances = np.var(last3, axis=0)
+
+        # Check thresholds: RF < 5W, Pressure < 0.5mTorr, Distance < 0.3cm, Thick < 15nm, Rot < 1rpm
+        if (
+            variances[0] < 25.0
+            and variances[1] < 0.25
+            and variances[2] < 0.09
+            and variances[3] < 225.0
+            and variances[4] < 1.0
+        ):
+            converged = True
+            convergence_score = 100
+            runs_to_conv = 0
+
+    # --------------------------------------------------------------------------
+    # UPGRADE 8: Smart Scientific Explanation Generator
+    # --------------------------------------------------------------------------
+    s_rf, s_press, s_dist, s_thick, s_rot, s_ar = best_candidate
+    sentences = []
+
+    if s_rf > b_rf + 5.0:
+        sentences.append(f"Increasing RF power to {round(s_rf, 1)}W to provide higher adatom energy for monoclinic phase nucleation.")
+    elif s_rf < b_rf - 5.0:
+        sentences.append(f"Lowering RF power to {round(s_rf, 1)}W to reduce plasma damage during film growth.")
+
+    if s_dist < b_dist - 0.5:
+        sentences.append(f"Reducing target distance to {round(s_dist, 1)}cm enhances kinetic energy transfer to the growing film.")
+
+    if s_rot >= 5.0:
+        sentences.append(f"Substrate rotation at {int(s_rot)} rpm ensures circumferential coating uniformity across non-planar surfaces.")
+
+    if not sentences:
+        sentences.append(f"Balancing working pressure at {round(s_press, 1)} mTorr and Ar flow at {round(s_ar, 1)} sccm to maintain optimal stoichiometry.")
+
+    explanation = " ".join(sentences)
+
+    base_conf = 33 if real_count < 6 else (66 if real_count <= 10 else 90)
+    conf_score = int(np.clip(base_conf + (7 if not converged else 10), 10, 99))
+    conf_label = "HIGH" if conf_score >= 75 else ("MEDIUM" if conf_score >= 45 else "LOW")
 
     return {
-        "run_number": count + 1,
+        "app_name": "MatrixAI",
+        "run_number": real_count + 1,
+        "kappa_used": round(float(kappa), 2),
         "suggested": {
-            "rf_power": round(float(best_candidate[0]), 1),
-            "working_pressure": round(float(best_candidate[1]), 1),
-            "target_distance": round(float(best_candidate[2]), 1),
-            "film_thickness": round(float(best_candidate[3]), 1),
-            "rotation_speed": float(best_candidate[4]),
-            "ar_flow": round(float(best_candidate[5]), 1)
+            "rf_power": round(float(s_rf), 1),
+            "working_pressure": round(float(s_press), 1),
+            "target_distance": round(float(s_dist), 1),
+            "film_thickness": round(float(s_thick), 1),
+            "rotation_speed": float(s_rot),
+            "ar_flow": round(float(s_ar), 1),
         },
         "expected": {
             "xrd_phase": expected_phase,
-            "xrd_score": round(predicted_score, 2),
-            "wavelength_shift_estimate": wavelength_est
+            "xrd_score": round(pred_xrd, 2),
+            "wavelength_shift_estimate": pred_wave_pm,
+            "combined_score": combined_score,
         },
         "confidence": {
-            "score": adjusted_score,
-            "label": conf_label
+            "score": conf_score,
+            "label": conf_label,
+            "data_points_used": real_count + len(LITERATURE_PRIORS),
+            "literature_points": len(LITERATURE_PRIORS),
+            "real_points": real_count,
         },
-        "uncertainty_parameter": uncertain_param_name,
-        "explanation": f"UCB exploration prioritizes process parameters with high likelihood of achieving {expected_phase} phase crystallization."
+        "convergence": {
+            "converged": converged,
+            "convergence_score": convergence_score,
+            "runs_to_convergence_estimate": runs_to_conv,
+        },
+        "parameter_uncertainties": uncertainties,
+        "most_uncertain_parameter": most_unc,
+        "most_certain_parameter": most_cert,
+        "explanation": explanation,
     }
