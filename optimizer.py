@@ -71,16 +71,19 @@ def generate_bayesian_suggestion(user_experiments: list, recent_suggestions: lis
 
     # Add User Real Data
     for exp in user_experiments:
-        rf = float(exp.get("rf_power_w") or 120.0)
-        press = float(exp.get("working_pressure_mtorr") or 5.0)
-        dist = float(exp.get("target_substrate_distance_cm") or exp.get("target_substrate_distance_mm") or 7.0)
-        thick = float(exp.get("film_thickness_nm") or 200.0)
-        rot = float(exp.get("rotation_speed_rpm") or 5.0)
-        ar = float(exp.get("ar_flow_sccm") or 30.0)
+        rf = float(exp.get("rf_power") or exp.get("rf_power_w") or 120.0)
+        press = float(exp.get("working_pressure") or exp.get("working_pressure_mtorr") or 5.0)
+        dist = float(exp.get("target_distance") or exp.get("target_substrate_distance_cm") or exp.get("target_substrate_distance_mm") or 7.0)
+        thick = float(exp.get("film_thickness") or exp.get("film_thickness_nm") or 200.0)
+        rot = float(exp.get("rotation_speed") or exp.get("rotation_speed_rpm") or 5.0)
+        ar = float(exp.get("ar_flow") or exp.get("ar_flow_sccm") or 30.0)
 
         phase = str(exp.get("xrd_phase") or "Amorphous").strip()
         xrd_val = XRD_MAP.get(phase, 0.0)
-        wave_val = float(exp["wavelength_shift_pm"]) if exp.get("wavelength_shift_pm") is not None else None
+        
+        # Safely handle wavelength shift key from Supabase
+        wave_key = "wavelength_shift" if "wavelength_shift" in exp else "wavelength_shift_pm"
+        wave_val = float(exp[wave_key]) if exp.get(wave_key) is not None else None
 
         X_list.append([rf, press, dist, thick, rot, ar])
         y_xrd_list.append(xrd_val)
@@ -99,19 +102,16 @@ def generate_bayesian_suggestion(user_experiments: list, recent_suggestions: lis
         (v - min_w) / denom if v is not None else 0.5 for v in y_wave_list
     ])
 
-    # Sample Weights: Literature = 1.0, User Real Data = 3.0
-    sample_weights = np.array([1.0] * len(LITERATURE_PRIORS) + [3.0] * real_count)
-
     # --------------------------------------------------------------------------
     # UPGRADE 2: Fit Two Separate Gaussian Processes (Pareto Multi-Objective)
     # --------------------------------------------------------------------------
     kernel_xrd = RBF(length_scale=np.ones(6), length_scale_bounds=(1e-1, 1e2)) + WhiteKernel(noise_level=1e-2)
     gp_xrd = GaussianProcessRegressor(kernel=kernel_xrd, n_restarts_optimizer=5, random_state=42)
-    gp_xrd.fit(X, y_xrd, sample_weight=sample_weights)
+    gp_xrd.fit(X, y_xrd) # Removed sample_weight parameter
 
     kernel_wave = RBF(length_scale=np.ones(6), length_scale_bounds=(1e-1, 1e2)) + WhiteKernel(noise_level=1e-2)
     gp_wave = GaussianProcessRegressor(kernel=kernel_wave, n_restarts_optimizer=5, random_state=42)
-    gp_wave.fit(X, y_wave_norm, sample_weight=sample_weights)
+    gp_wave.fit(X, y_wave_norm) # Removed sample_weight parameter
 
     # --------------------------------------------------------------------------
     # UPGRADE 6: Adaptive Parameter Bounds
@@ -119,11 +119,11 @@ def generate_bayesian_suggestion(user_experiments: list, recent_suggestions: lis
     if user_experiments:
         # Find current best real run by quality score or XRD score
         best_run = max(user_experiments, key=lambda e: float(e.get("quality_score") or 0.0))
-        b_rf = float(best_run.get("rf_power_w") or 120.0)
-        b_press = float(best_run.get("working_pressure_mtorr") or 5.0)
-        b_dist = float(best_run.get("target_substrate_distance_cm") or 5.0)
-        b_thick = float(best_run.get("film_thickness_nm") or 200.0)
-        b_ar = float(best_run.get("ar_flow_sccm") or 30.0)
+        b_rf = float(best_run.get("rf_power") or best_run.get("rf_power_w") or 120.0)
+        b_press = float(best_run.get("working_pressure") or best_run.get("working_pressure_mtorr") or 5.0)
+        b_dist = float(best_run.get("target_distance") or best_run.get("target_substrate_distance_cm") or 5.0)
+        b_thick = float(best_run.get("film_thickness") or best_run.get("film_thickness_nm") or 200.0)
+        b_ar = float(best_run.get("ar_flow") or best_run.get("ar_flow_sccm") or 30.0)
     else:
         b_rf, b_press, b_dist, b_thick, b_ar = 120.0, 5.0, 5.0, 200.0, 30.0
 
