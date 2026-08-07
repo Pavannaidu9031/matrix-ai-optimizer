@@ -40,36 +40,40 @@ app.add_middleware(
 templates = Jinja2Templates(directory="templates")
 
 # ==============================================================================
-# SUPABASE POSTGRESQL CONNECTION POOLING
+# DYNAMIC SUPABASE POSTGRESQL CONNECTION (PORT 6543 POOLER READY)
 # ==============================================================================
-DATABASE_URL = os.getenv("DATABASE_URL")
 connection_pool = None
 
 def get_db_connection():
     global connection_pool
-    if not DATABASE_URL:
+    db_url = os.getenv("DATABASE_URL")
+    if not db_url:
         raise Exception("DATABASE_URL environment variable is missing in Render settings.")
     
+    # Enforce sslmode=require
+    if "sslmode=" not in db_url:
+        db_url += "?sslmode=require" if "?" not in db_url else "&sslmode=require"
+
     if connection_pool is None:
         try:
-            dsn = DATABASE_URL
-            if "sslmode=" not in dsn:
-                dsn += "?sslmode=require" if "?" not in dsn else "&sslmode=require"
-            
             connection_pool = pool.SimpleConnectionPool(
                 minconn=1,
                 maxconn=10,
-                dsn=dsn
+                dsn=db_url
             )
         except Exception as e:
             print(f"Pool creation error: {e}. Opening direct connection.")
-            return psycopg2.connect(DATABASE_URL)
+            return psycopg2.connect(db_url)
             
     try:
-        return connection_pool.getconn()
+        conn = connection_pool.getconn()
+        # Verify connection is live
+        if conn.closed != 0:
+            return psycopg2.connect(db_url)
+        return conn
     except Exception as pool_err:
         print(f"Pool getconn error: {pool_err}. Opening direct connection.")
-        return psycopg2.connect(DATABASE_URL)
+        return psycopg2.connect(db_url)
 
 def release_db_connection(conn):
     global connection_pool
@@ -247,7 +251,7 @@ def logout(request: Request):
     return RedirectResponse("/")
 
 # ==============================================================================
-# FORM SUBMISSION ROUTE (/add) — GUARANTEED SAVE TO SUPABASE
+# FORM SUBMISSION ROUTE (/add)
 # ==============================================================================
 @app.post("/add")
 async def add_experiment_form(request: Request):
@@ -335,7 +339,6 @@ async def add_experiment_form(request: Request):
         ))
         conn.commit()
         cur.close()
-        print(f"SUCCESSFULLY SAVED EXPERIMENT FOR: {user_email}")
         return RedirectResponse("/", status_code=303)
     except Exception as db_err:
         if conn:
@@ -346,7 +349,8 @@ async def add_experiment_form(request: Request):
         print(f"CRITICAL DB SAVE ERROR in /add: {db_err}")
         return RedirectResponse("/", status_code=303)
     finally:
-        release_db_connection(conn)
+        if conn:
+            release_db_connection(conn)
 
 # ==============================================================================
 # PERMANENT EXPERIMENT SAVE (JSON API /experiments)
