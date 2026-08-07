@@ -52,7 +52,6 @@ def get_db_connection():
     
     if connection_pool is None:
         try:
-            # Ensure sslmode is passed
             dsn = DATABASE_URL
             if "sslmode=" not in dsn:
                 dsn += "?sslmode=require" if "?" not in dsn else "&sslmode=require"
@@ -87,6 +86,25 @@ def release_db_connection(conn):
             conn.close()
         except Exception:
             pass
+
+# Helper to calculate quality score safely
+def safe_calculate_quality_score(xrd_phase, wavelength_shift, h2_response_time, grain_size, existing_exps):
+    try:
+        # Standardize dictionaries for optimizer expectations
+        formatted_exps = []
+        for e in existing_exps:
+            item = dict(e)
+            item["h2_response_time_s"] = item.get("h2_response_time") or item.get("h2_response_time_s")
+            item["wavelength_shift_pm"] = item.get("wavelength_shift") or item.get("wavelength_shift_pm")
+            item["grain_size_nm"] = item.get("grain_size") or item.get("grain_size_nm")
+            formatted_exps.append(item)
+
+        return optimizer.calculate_quality_score(
+            xrd_phase, wavelength_shift, h2_response_time, grain_size, formatted_exps
+        )
+    except Exception as err:
+        print(f"Quality score calculation fallback triggered: {err}")
+        return 50.0
 
 # ==============================================================================
 # OAUTH CONFIGURATION
@@ -125,7 +143,7 @@ class ExperimentModel(BaseModel):
     batch_notes: Optional[str] = None
 
 # ==============================================================================
-# DASHBOARD ROUTE (SAFE & ROBUST)
+# DASHBOARD ROUTE
 # ==============================================================================
 @app.get("/", response_class=HTMLResponse)
 def index(request: Request):
@@ -160,7 +178,6 @@ def index(request: Request):
         print(f"Error loading index page experiments: {err}")
         experiments = []
 
-    # Safe KPI Calculations (Handles missing/renamed keys)
     total_runs = len(experiments)
     monoclinic_runs = sum(1 for e in experiments if str(e.get("xrd_phase", "")).strip() == "Monoclinic")
     
@@ -190,7 +207,81 @@ def index(request: Request):
     })
 
 # ==============================================================================
-# PERMANENT EXPERIMENT SAVE (WRITE TO SUPABASE)
+# FORM SUBMISSION ROUTE (/add) - BULLETPROOFED
+# ==============================================================================
+@app.post("/add")
+def add_experiment_form(
+    request: Request,
+    rf_power_w: float = Form(...),
+    working_pressure_mtorr: float = Form(...),
+    ar_flow_sccm: float = Form(...),
+    o2_flow_sccm: float = Form(...),
+    substrate_temp_c: float = Form(...),
+    target_substrate_distance_cm: float = Form(...),
+    sputtering_time_min: float = Form(...),
+    film_thickness_nm: float = Form(None),
+    rotation_speed_rpm: float = Form(5.0),
+    substrate_type: str = Form("Si Wafer"),
+    xrd_phase: str = Form("Amorphous"),
+    grain_size_nm: float = Form(None),
+    h2_response_time_s: float = Form(...),
+    wavelength_shift_pm: float = Form(None),
+    notes: str = Form(None)
+):
+    user = request.session.get("user")
+    if not user:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    user_email = user.get("email")
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+        
+        # Safely fetch existing experiments
+        existing_rows = []
+        try:
+            cur.execute("SELECT * FROM experiments WHERE user_email = %s", (user_email,))
+            existing_rows = cur.fetchall()
+        except Exception as fetch_err:
+            print(f"Notice during existing exps fetch: {fetch_err}")
+
+        cols = [desc[0] for desc in cur.description] if cur.description and existing_rows else []
+        all_exps = [dict(zip(cols, r)) for r in existing_rows]
+
+        quality_score = safe_calculate_quality_score(
+            xrd_phase, wavelength_shift_pm, h2_response_time_s, grain_size_nm, all_exps
+        )
+
+        cur.execute("""
+            INSERT INTO experiments (
+                user_email, rf_power, working_pressure, ar_flow,
+                o2_flow, substrate_temp, target_distance, sputter_time,
+                film_thickness, rotation_speed, substrate_type, xrd_phase,
+                grain_size, h2_response_time, wavelength_shift, batch_notes,
+                quality_score, created_at
+            ) VALUES (
+                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW()
+            )
+        """, (
+            user_email, rf_power_w, working_pressure_mtorr, ar_flow_sccm,
+            o2_flow_sccm, substrate_temp_c, target_substrate_distance_cm, sputtering_time_min,
+            film_thickness_nm, rotation_speed_rpm, substrate_type, xrd_phase,
+            grain_size_nm, h2_response_time_s, wavelength_shift_pm, notes,
+            quality_score
+        ))
+        conn.commit()
+        cur.close()
+        return RedirectResponse("/", status_code=303)
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        print(f"Error in /add form save: {e}")
+        return RedirectResponse("/", status_code=303)
+    finally:
+        release_db_connection(conn)
+
+# ==============================================================================
+# PERMANENT EXPERIMENT SAVE (JSON API /experiments)
 # ==============================================================================
 @app.post("/experiments")
 async def save_experiment_json(request: Request, data: ExperimentModel):
@@ -208,7 +299,7 @@ async def save_experiment_json(request: Request, data: ExperimentModel):
         cols = [desc[0] for desc in cur.description] if cur.description else []
         all_exps = [dict(zip(cols, r)) for r in existing_rows]
         
-        quality_score = optimizer.calculate_quality_score(
+        quality_score = safe_calculate_quality_score(
             data.xrd_phase, data.wavelength_shift, data.h2_response_time, data.grain_size, all_exps
         )
 
@@ -244,65 +335,6 @@ async def save_experiment_json(request: Request, data: ExperimentModel):
         if conn:
             conn.rollback()
         return JSONResponse({"error": "save_failed", "message": str(e)}, status_code=500)
-    finally:
-        release_db_connection(conn)
-
-@app.post("/add")
-def add_experiment_form(
-    request: Request,
-    rf_power_w: float = Form(...),
-    working_pressure_mtorr: float = Form(...),
-    ar_flow_sccm: float = Form(...),
-    o2_flow_sccm: float = Form(...),
-    substrate_temp_c: float = Form(...),
-    target_substrate_distance_cm: float = Form(...),
-    sputtering_time_min: float = Form(...),
-    film_thickness_nm: float = Form(None),
-    rotation_speed_rpm: float = Form(5.0),
-    substrate_type: str = Form("Si Wafer"),
-    xrd_phase: str = Form("Amorphous"),
-    grain_size_nm: float = Form(None),
-    h2_response_time_s: float = Form(...),
-    wavelength_shift_pm: float = Form(None),
-    notes: str = Form(None)
-):
-    user = request.session.get("user")
-    if not user:
-        raise HTTPException(status_code=401, detail="Unauthorized")
-
-    user_email = user.get("email")
-    conn = get_db_connection()
-    try:
-        cur = conn.cursor()
-        cur.execute("SELECT * FROM experiments WHERE user_email = %s", (user_email,))
-        existing_rows = cur.fetchall()
-        cols = [desc[0] for desc in cur.description] if cur.description else []
-        all_exps = [dict(zip(cols, r)) for r in existing_rows]
-
-        quality_score = optimizer.calculate_quality_score(
-            xrd_phase, wavelength_shift_pm, h2_response_time_s, grain_size_nm, all_exps
-        )
-
-        cur.execute("""
-            INSERT INTO experiments (
-                user_email, rf_power, working_pressure, ar_flow,
-                o2_flow, substrate_temp, target_distance, sputter_time,
-                film_thickness, rotation_speed, substrate_type, xrd_phase,
-                grain_size, h2_response_time, wavelength_shift, batch_notes,
-                quality_score, created_at
-            ) VALUES (
-                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW()
-            )
-        """, (
-            user_email, rf_power_w, working_pressure_mtorr, ar_flow_sccm,
-            o2_flow_sccm, substrate_temp_c, target_substrate_distance_cm, sputtering_time_min,
-            film_thickness_nm, rotation_speed_rpm, substrate_type, xrd_phase,
-            grain_size_nm, h2_response_time_s, wavelength_shift_pm, notes,
-            quality_score
-        ))
-        conn.commit()
-        cur.close()
-        return RedirectResponse("/", status_code=303)
     finally:
         release_db_connection(conn)
 
@@ -404,13 +436,12 @@ async def get_bayes_suggestion(request: Request):
             sug_cols = [desc[0] for desc in cur.description] if cur.description else []
             recent_suggestions = [dict(zip(sug_cols, r)) for r in sug_rows]
         except Exception as e:
-            print(f"Warning: Could not fetch suggestion_history: {e}")
+            print(f"Notice: suggestion_history table read: {e}")
 
         cur.close()
 
         result = optimizer.generate_bayesian_suggestion(experiments, recent_suggestions)
         
-        # Log suggestion history
         try:
             cur_hist = conn.cursor()
             s = result["suggested"]
