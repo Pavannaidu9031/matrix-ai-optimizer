@@ -41,29 +41,45 @@ app.add_middleware(
 templates = Jinja2Templates(directory="templates")
 
 # ==============================================================================
-# SUPABASE POSTGRESQL CONNECTION POOLING
+# SUPABASE POSTGRESQL LAZY CONNECTION POOLING
 # ==============================================================================
 DATABASE_URL = os.getenv("DATABASE_URL")
-
-if DATABASE_URL:
-    connection_pool = pool.SimpleConnectionPool(1, 10, dsn=DATABASE_URL)
-else:
-    connection_pool = None
+connection_pool = None
 
 def get_db_connection():
-    if connection_pool:
-        return connection_pool.getconn()
-    elif DATABASE_URL:
-        return psycopg2.connect(DATABASE_URL)
-    else:
+    global connection_pool
+    if not DATABASE_URL:
         raise HTTPException(
             status_code=500, 
             detail="DATABASE_URL environment variable is missing in Render settings."
         )
+    
+    # Lazily initialize connection pool on first API request to prevent startup crash
+    if connection_pool is None:
+        try:
+            connection_pool = pool.SimpleConnectionPool(
+                minconn=1,
+                maxconn=10,
+                dsn=DATABASE_URL,
+                sslmode="require"
+            )
+        except Exception as e:
+            print(f"Connection pool creation warning: {e}. Falling back to direct connection.")
+            return psycopg2.connect(DATABASE_URL, sslmode="require")
+            
+    try:
+        return connection_pool.getconn()
+    except Exception as pool_err:
+        print(f"Pool retrieval error: {pool_err}. Connecting directly.")
+        return psycopg2.connect(DATABASE_URL, sslmode="require")
 
 def release_db_connection(conn):
+    global connection_pool
     if connection_pool and conn:
-        connection_pool.putconn(conn)
+        try:
+            connection_pool.putconn(conn)
+        except Exception:
+            conn.close()
     elif conn:
         conn.close()
 
