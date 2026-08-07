@@ -27,7 +27,6 @@ import optimizer
 # ==============================================================================
 app = FastAPI(title="MatrixAI — Intelligent Materials Optimizer")
 
-# Permanent SECRET_KEY ensures user session cookies survive Render redeployments
 SECRET_KEY = os.getenv("SECRET_KEY", "matrix-ai-permanent-production-secret-key-2026")
 
 app.add_middleware(
@@ -35,13 +34,13 @@ app.add_middleware(
     secret_key=SECRET_KEY,
     max_age=86400 * 30,  # 30-day session duration
     same_site="lax",
-    https_only=True      # Enforce HTTPS on Render
+    https_only=True
 )
 
 templates = Jinja2Templates(directory="templates")
 
 # ==============================================================================
-# SUPABASE POSTGRESQL LAZY CONNECTION POOLING
+# SUPABASE POSTGRESQL CONNECTION POOLING (WITH SAFE FALLBACKS)
 # ==============================================================================
 DATABASE_URL = os.getenv("DATABASE_URL")
 connection_pool = None
@@ -49,29 +48,29 @@ connection_pool = None
 def get_db_connection():
     global connection_pool
     if not DATABASE_URL:
-        raise HTTPException(
-            status_code=500, 
-            detail="DATABASE_URL environment variable is missing in Render settings."
-        )
+        raise Exception("DATABASE_URL environment variable is missing in Render settings.")
     
-    # Lazily initialize connection pool on first API request to prevent startup crash
     if connection_pool is None:
         try:
+            # Ensure sslmode is passed
+            dsn = DATABASE_URL
+            if "sslmode=" not in dsn:
+                dsn += "?sslmode=require" if "?" not in dsn else "&sslmode=require"
+            
             connection_pool = pool.SimpleConnectionPool(
                 minconn=1,
                 maxconn=10,
-                dsn=DATABASE_URL,
-                sslmode="require"
+                dsn=dsn
             )
         except Exception as e:
-            print(f"Connection pool creation warning: {e}. Falling back to direct connection.")
-            return psycopg2.connect(DATABASE_URL, sslmode="require")
+            print(f"Pool creation error: {e}. Opening direct connection.")
+            return psycopg2.connect(DATABASE_URL)
             
     try:
         return connection_pool.getconn()
     except Exception as pool_err:
-        print(f"Pool retrieval error: {pool_err}. Connecting directly.")
-        return psycopg2.connect(DATABASE_URL, sslmode="require")
+        print(f"Pool getconn error: {pool_err}. Opening direct connection.")
+        return psycopg2.connect(DATABASE_URL)
 
 def release_db_connection(conn):
     global connection_pool
@@ -79,9 +78,15 @@ def release_db_connection(conn):
         try:
             connection_pool.putconn(conn)
         except Exception:
-            conn.close()
+            try:
+                conn.close()
+            except Exception:
+                pass
     elif conn:
-        conn.close()
+        try:
+            conn.close()
+        except Exception:
+            pass
 
 # ==============================================================================
 # OAUTH CONFIGURATION
@@ -120,7 +125,7 @@ class ExperimentModel(BaseModel):
     batch_notes: Optional[str] = None
 
 # ==============================================================================
-# DASHBOARD ROUTE (FETCHES PERMANENT SUPABASE DATA)
+# DASHBOARD ROUTE (SAFE & ROBUST)
 # ==============================================================================
 @app.get("/", response_class=HTMLResponse)
 def index(request: Request):
@@ -129,44 +134,60 @@ def index(request: Request):
         return templates.TemplateResponse(request, "index.html", {"user": None, "experiments": [], "stats": {}})
 
     user_email = user_session.get("email")
-    conn = get_db_connection()
+    experiments = []
+    
     try:
-        cur = conn.cursor()
-        cur.execute("""
-            SELECT id, user_email, rf_power, working_pressure, ar_flow, o2_flow,
-                   substrate_temp, target_distance, sputter_time, film_thickness,
-                   rotation_speed, substrate_type, xrd_phase, grain_size,
-                   h2_response_time, wavelength_shift, batch_notes, quality_score, created_at
-            FROM experiments
-            WHERE user_email = %s
-            ORDER BY created_at DESC
-        """, (user_email,))
-        
-        rows = cur.fetchall()
-        columns = [desc[0] for desc in cur.description]
-        experiments = [dict(zip(columns, row)) for row in rows]
-        cur.close()
+        conn = get_db_connection()
+        try:
+            cur = conn.cursor()
+            cur.execute("""
+                SELECT id, user_email, rf_power, working_pressure, ar_flow, o2_flow,
+                       substrate_temp, target_distance, sputter_time, film_thickness,
+                       rotation_speed, substrate_type, xrd_phase, grain_size,
+                       h2_response_time, wavelength_shift, batch_notes, quality_score, created_at
+                FROM experiments
+                WHERE user_email = %s
+                ORDER BY created_at DESC
+            """, (user_email,))
+            
+            rows = cur.fetchall()
+            columns = [desc[0] for desc in cur.description]
+            experiments = [dict(zip(columns, row)) for row in rows]
+            cur.close()
+        finally:
+            release_db_connection(conn)
+    except Exception as err:
+        print(f"Error loading index page experiments: {err}")
+        experiments = []
 
-        total_runs = len(experiments)
-        monoclinic_runs = sum(1 for e in experiments if e.get("xrd_phase") == "Monoclinic")
-        shifts = [float(e["wavelength_shift"]) for e in experiments if e.get("wavelength_shift") is not None]
-        best_shift = max(shifts) if shifts else 0.0
-        runs_remaining = max(0, 25 - total_runs)
+    # Safe KPI Calculations (Handles missing/renamed keys)
+    total_runs = len(experiments)
+    monoclinic_runs = sum(1 for e in experiments if str(e.get("xrd_phase", "")).strip() == "Monoclinic")
+    
+    shifts = []
+    for e in experiments:
+        w_val = e.get("wavelength_shift") if e.get("wavelength_shift") is not None else e.get("wavelength_shift_pm")
+        if w_val is not None:
+            try:
+                shifts.append(float(w_val))
+            except (ValueError, TypeError):
+                pass
 
-        stats = {
-            "total_runs": total_runs,
-            "monoclinic_runs": monoclinic_runs,
-            "best_shift": round(best_shift, 1),
-            "runs_remaining": runs_remaining
-        }
+    best_shift = max(shifts) if shifts else 0.0
+    runs_remaining = max(0, 25 - total_runs)
 
-        return templates.TemplateResponse(request, "index.html", {
-            "user": user_session,
-            "experiments": experiments,
-            "stats": stats
-        })
-    finally:
-        release_db_connection(conn)
+    stats = {
+        "total_runs": total_runs,
+        "monoclinic_runs": monoclinic_runs,
+        "best_shift": round(best_shift, 1),
+        "runs_remaining": runs_remaining
+    }
+
+    return templates.TemplateResponse(request, "index.html", {
+        "user": user_session,
+        "experiments": experiments,
+        "stats": stats
+    })
 
 # ==============================================================================
 # PERMANENT EXPERIMENT SAVE (WRITE TO SUPABASE)
@@ -182,7 +203,6 @@ async def save_experiment_json(request: Request, data: ExperimentModel):
     try:
         cur = conn.cursor()
         
-        # Get existing user data to calculate normalized quality score
         cur.execute("SELECT * FROM experiments WHERE user_email = %s", (user_email,))
         existing_rows = cur.fetchall()
         cols = [desc[0] for desc in cur.description] if cur.description else []
@@ -227,7 +247,6 @@ async def save_experiment_json(request: Request, data: ExperimentModel):
     finally:
         release_db_connection(conn)
 
-# Legacy Form POST endpoint compatibility
 @app.post("/add")
 def add_experiment_form(
     request: Request,
@@ -378,34 +397,42 @@ async def get_bayes_suggestion(request: Request):
         cols = [desc[0] for desc in cur.description] if cur.description else []
         experiments = [dict(zip(cols, r)) for r in rows]
 
-        cur.execute("SELECT * FROM suggestion_history WHERE user_email = %s ORDER BY id DESC LIMIT 3", (user_email,))
-        sug_rows = cur.fetchall()
-        sug_cols = [desc[0] for desc in cur.description] if cur.description else []
-        recent_suggestions = [dict(zip(sug_cols, r)) for r in sug_rows]
+        recent_suggestions = []
+        try:
+            cur.execute("SELECT * FROM suggestion_history WHERE user_email = %s ORDER BY id DESC LIMIT 3", (user_email,))
+            sug_rows = cur.fetchall()
+            sug_cols = [desc[0] for desc in cur.description] if cur.description else []
+            recent_suggestions = [dict(zip(sug_cols, r)) for r in sug_rows]
+        except Exception as e:
+            print(f"Warning: Could not fetch suggestion_history: {e}")
+
         cur.close()
 
         result = optimizer.generate_bayesian_suggestion(experiments, recent_suggestions)
         
-        # Save suggestion history to Supabase
-        cur_hist = conn.cursor()
-        s = result["suggested"]
-        cur_hist.execute("""
-            INSERT INTO suggestion_history (
-                user_email, suggested_rf_power, suggested_pressure,
-                suggested_distance, suggested_thickness, suggested_rotation,
-                suggested_ar_flow, predicted_xrd_score, predicted_wavelength,
-                confidence_score, converged, kappa_used, created_at
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
-        """, (
-            user_email, s["rf_power"], s["working_pressure"],
-            s["target_distance"], s["film_thickness"], s["rotation_speed"],
-            s["ar_flow"], result["expected"]["xrd_score"],
-            result["expected"]["wavelength_shift_estimate"],
-            result["confidence"]["score"], result["convergence"]["converged"],
-            result["kappa_used"]
-        ))
-        conn.commit()
-        cur_hist.close()
+        # Log suggestion history
+        try:
+            cur_hist = conn.cursor()
+            s = result["suggested"]
+            cur_hist.execute("""
+                INSERT INTO suggestion_history (
+                    user_email, suggested_rf_power, suggested_pressure,
+                    suggested_distance, suggested_thickness, suggested_rotation,
+                    suggested_ar_flow, predicted_xrd_score, predicted_wavelength,
+                    confidence_score, converged, kappa_used, created_at
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
+            """, (
+                user_email, s["rf_power"], s["working_pressure"],
+                s["target_distance"], s["film_thickness"], s["rotation_speed"],
+                s["ar_flow"], result["expected"]["xrd_score"],
+                result["expected"]["wavelength_shift_estimate"],
+                result["confidence"]["score"], result["convergence"]["converged"],
+                result["kappa_used"]
+            ))
+            conn.commit()
+            cur_hist.close()
+        except Exception as hist_err:
+            print(f"History log notice: {hist_err}")
 
         return JSONResponse(content=result)
     except Exception as e:
