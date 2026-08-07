@@ -205,7 +205,7 @@ def index(request: Request):
     })
 
 # ==============================================================================
-# OAUTH AUTHENTICATION ROUTES (ROBUST FIX)
+# OAUTH ROUTING
 # ==============================================================================
 @app.get("/login/google")
 async def login_google(request: Request):
@@ -219,7 +219,6 @@ async def auth_callback(request: Request):
         user_info = token.get("userinfo")
         
         if not user_info:
-            # Fallback if userinfo isn't populated automatically in token
             user_info = await oauth.google.userinfo(token=token)
 
         if not user_info:
@@ -444,75 +443,51 @@ async def get_experiments(request: Request):
     finally:
         release_db_connection(conn)
 
-@app.get("/experiments/count")
-async def count_experiments(request: Request):
-    user = request.session.get("user")
-    if not user:
-        return JSONResponse({"count": 0, "user": None})
-    
-    user_email = user.get("email")
-    conn = get_db_connection()
-    try:
-        cur = conn.cursor()
-        cur.execute("SELECT COUNT(*) FROM experiments WHERE user_email = %s", (user_email,))
-        count = cur.fetchone()[0]
-        cur.close()
-        return JSONResponse({"count": count, "user": user_email})
-    finally:
-        release_db_connection(conn)
-
-@app.post("/delete/{exp_id}")
-async def delete_experiment(exp_id: int, request: Request):
-    user = request.session.get("user")
-    if not user:
-        raise HTTPException(status_code=401, detail="Unauthorized")
-
-    user_email = user.get("email")
-    conn = get_db_connection()
-    try:
-        cur = conn.cursor()
-        cur.execute("DELETE FROM experiments WHERE id = %s AND user_email = %s", (exp_id, user_email))
-        conn.commit()
-        cur.close()
-        return RedirectResponse("/", status_code=303)
-    finally:
-        release_db_connection(conn)
-
 # ==============================================================================
-# BAYESIAN OPTIMIZER ENDPOINT
+# BAYESIAN OPTIMIZER ENDPOINT (RESILLIENT)
 # ==============================================================================
 @app.get("/suggest")
 @app.post("/suggest")
 async def get_bayes_suggestion(request: Request):
     user_session = request.session.get("user")
     if not user_session:
-        raise HTTPException(status_code=401, detail="Unauthorized")
+        return JSONResponse(status_code=401, content={"message": "Unauthorized"})
 
     user_email = user_session.get("email")
-    conn = get_db_connection()
+    conn = None
     try:
+        conn = get_db_connection()
         cur = conn.cursor()
-        cur.execute("SELECT * FROM experiments WHERE user_email = %s ORDER BY created_at DESC", (user_email,))
-        rows = cur.fetchall()
-        cols = [desc[0] for desc in cur.description] if cur.description else []
-        experiments = [dict(zip(cols, r)) for r in rows]
+        
+        # Safely read experiments
+        experiments = []
+        try:
+            cur.execute("SELECT * FROM experiments WHERE user_email = %s ORDER BY created_at DESC", (user_email,))
+            rows = cur.fetchall()
+            cols = [desc[0] for desc in cur.description] if cur.description else []
+            experiments = [dict(zip(cols, r)) for r in rows]
+        except Exception as exp_err:
+            print(f"Exps fetch notice in suggest: {exp_err}")
 
+        # Safely read suggestion history
         recent_suggestions = []
         try:
             cur.execute("SELECT * FROM suggestion_history WHERE user_email = %s ORDER BY id DESC LIMIT 3", (user_email,))
             sug_rows = cur.fetchall()
             sug_cols = [desc[0] for desc in cur.description] if cur.description else []
             recent_suggestions = [dict(zip(sug_cols, r)) for r in sug_rows]
-        except Exception as e:
-            print(f"Notice: suggestion_history table read: {e}")
+        except Exception as sug_err:
+            print(f"Suggestion history fetch notice: {sug_err}")
 
         cur.close()
 
+        # Run Bayesian Suggestion calculation
         result = optimizer.generate_bayesian_suggestion(experiments, recent_suggestions)
         
+        # Try logging history, ignore error if table schema varies
         try:
             cur_hist = conn.cursor()
-            s = result["suggested"]
+            s = result.get("suggested", {})
             cur_hist.execute("""
                 INSERT INTO suggestion_history (
                     user_email, suggested_rf_power, suggested_pressure,
@@ -521,12 +496,12 @@ async def get_bayes_suggestion(request: Request):
                     confidence_score, converged, kappa_used, created_at
                 ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
             """, (
-                user_email, s["rf_power"], s["working_pressure"],
-                s["target_distance"], s["film_thickness"], s["rotation_speed"],
-                s["ar_flow"], result["expected"]["xrd_score"],
-                result["expected"]["wavelength_shift_estimate"],
-                result["confidence"]["score"], result["convergence"]["converged"],
-                result["kappa_used"]
+                user_email, s.get("rf_power"), s.get("working_pressure"),
+                s.get("target_distance"), s.get("film_thickness"), s.get("rotation_speed"),
+                s.get("ar_flow"), result.get("expected", {}).get("xrd_score"),
+                result.get("expected", {}).get("wavelength_shift_estimate"),
+                result.get("confidence", {}).get("score"), result.get("convergence", {}).get("converged"),
+                result.get("kappa_used")
             ))
             conn.commit()
             cur_hist.close()
@@ -538,7 +513,8 @@ async def get_bayes_suggestion(request: Request):
         print(f"MatrixAI Engine Error: {e}")
         return JSONResponse(status_code=500, content={"message": f"Optimization engine error: {str(e)}"})
     finally:
-        release_db_connection(conn)
+        if conn:
+            release_db_connection(conn)
 
 # ==============================================================================
 # CSV EXPORT
