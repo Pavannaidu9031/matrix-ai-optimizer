@@ -1,4 +1,5 @@
 import sqlite3
+import os
 
 DB_NAME = "experiments.db"
 
@@ -18,7 +19,7 @@ def init_db():
         )
     """)
     
-    # Create experiments table with all existing and new fields
+    # Create experiments table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS experiments (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -37,30 +38,44 @@ def init_db():
             grain_size_nm REAL,
             h2_response_time_s REAL,
             wavelength_shift_pm REAL,
+            quality_score REAL DEFAULT 50.0,
             notes TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (user_id) REFERENCES users (id)
         )
     """)
 
-    # Auto-migration for existing SQLite database files
+    # Create suggestion_history table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS suggestion_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT NOT NULL,
+            user_email TEXT,
+            suggested_rf_power REAL,
+            suggested_pressure REAL,
+            suggested_distance REAL,
+            suggested_thickness REAL,
+            suggested_rotation REAL,
+            suggested_ar_flow REAL,
+            predicted_xrd_score REAL,
+            predicted_wavelength REAL,
+            confidence_score INTEGER,
+            converged BOOLEAN DEFAULT 0,
+            kappa_used REAL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    # PRAGMA Auto-migrations
     cursor.execute("PRAGMA table_info(experiments)")
     columns = [column[1] for column in cursor.fetchall()]
     
-    if "target_substrate_distance_mm" in columns and "target_substrate_distance_cm" not in columns:
+    if "quality_score" not in columns:
+        cursor.execute("ALTER TABLE experiments ADD COLUMN quality_score REAL DEFAULT 50.0")
+    if "target_substrate_distance_cm" not in columns and "target_substrate_distance_mm" in columns:
         cursor.execute("ALTER TABLE experiments RENAME COLUMN target_substrate_distance_mm TO target_substrate_distance_cm")
     if "target_substrate_distance_cm" not in columns:
-        cursor.execute("ALTER TABLE experiments ADD COLUMN target_substrate_distance_cm REAL")
-    if "rotation_speed_rpm" not in columns:
-        cursor.execute("ALTER TABLE experiments ADD COLUMN rotation_speed_rpm REAL DEFAULT 5.0")
-    if "substrate_type" not in columns:
-        cursor.execute("ALTER TABLE experiments ADD COLUMN substrate_type TEXT DEFAULT 'Si Wafer'")
-    if "xrd_phase" not in columns:
-        cursor.execute("ALTER TABLE experiments ADD COLUMN xrd_phase TEXT DEFAULT 'Amorphous'")
-    if "grain_size_nm" not in columns:
-        cursor.execute("ALTER TABLE experiments ADD COLUMN grain_size_nm REAL")
-    if "wavelength_shift_pm" not in columns:
-        cursor.execute("ALTER TABLE experiments ADD COLUMN wavelength_shift_pm REAL")
+        cursor.execute("ALTER TABLE experiments ADD COLUMN target_substrate_distance_cm REAL DEFAULT 7.0")
 
     conn.commit()
     conn.close()
@@ -123,7 +138,7 @@ def get_user_by_id(user_id):
 def add_experiment(user_id, rf_power_w, working_pressure_mtorr, ar_flow_sccm, o2_flow_sccm, 
                    substrate_temp_c, target_substrate_distance_cm, sputtering_time_min, 
                    film_thickness_nm, rotation_speed_rpm, substrate_type, xrd_phase,
-                   grain_size_nm, h2_response_time_s, wavelength_shift_pm, notes):
+                   grain_size_nm, h2_response_time_s, wavelength_shift_pm, quality_score, notes):
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     cursor.execute("""
@@ -131,12 +146,12 @@ def add_experiment(user_id, rf_power_w, working_pressure_mtorr, ar_flow_sccm, o2
             user_id, rf_power_w, working_pressure_mtorr, ar_flow_sccm, o2_flow_sccm,
             substrate_temp_c, target_substrate_distance_cm, sputtering_time_min,
             film_thickness_nm, rotation_speed_rpm, substrate_type, xrd_phase,
-            grain_size_nm, h2_response_time_s, wavelength_shift_pm, notes
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            grain_size_nm, h2_response_time_s, wavelength_shift_pm, quality_score, notes
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (user_id, rf_power_w, working_pressure_mtorr, ar_flow_sccm, o2_flow_sccm,
           substrate_temp_c, target_substrate_distance_cm, sputtering_time_min,
           film_thickness_nm, rotation_speed_rpm, substrate_type, xrd_phase,
-          grain_size_nm, h2_response_time_s, wavelength_shift_pm, notes))
+          grain_size_nm, h2_response_time_s, wavelength_shift_pm, quality_score, notes))
     conn.commit()
     conn.close()
 
@@ -144,7 +159,8 @@ def get_experiments_by_user(user_id):
     conn = sqlite3.connect(DB_NAME)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM experiments WHERE user_id = ? ORDER BY id DESC", (user_id,))
+    # Sorted by quality_score DESC by default
+    cursor.execute("SELECT * FROM experiments WHERE user_id = ? ORDER BY quality_score DESC, id DESC", (user_id,))
     rows = cursor.fetchall()
     conn.close()
     return rows
@@ -155,3 +171,35 @@ def delete_experiment(exp_id, user_id):
     cursor.execute("DELETE FROM experiments WHERE id = ? AND user_id = ?", (exp_id, user_id))
     conn.commit()
     conn.close()
+
+def save_suggestion_history(user_id, user_email, suggestion):
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    s = suggestion["suggested"]
+    cursor.execute("""
+        INSERT INTO suggestion_history (
+            user_id, user_email, suggested_rf_power, suggested_pressure,
+            suggested_distance, suggested_thickness, suggested_rotation,
+            suggested_ar_flow, predicted_xrd_score, predicted_wavelength,
+            confidence_score, converged, kappa_used
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        user_id, user_email, s["rf_power"], s["working_pressure"],
+        s["target_distance"], s["film_thickness"], s["rotation_speed"],
+        s["ar_flow"], suggestion["expected"]["xrd_score"],
+        suggestion["expected"]["wavelength_shift_estimate"],
+        suggestion["confidence"]["score"],
+        1 if suggestion["convergence"]["converged"] else 0,
+        suggestion["kappa_used"]
+    ))
+    conn.commit()
+    conn.close()
+
+def get_recent_suggestions(user_id, limit=3):
+    conn = sqlite3.connect(DB_NAME)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM suggestion_history WHERE user_id = ? ORDER BY id DESC LIMIT ?", (user_id, limit))
+    rows = cursor.fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
