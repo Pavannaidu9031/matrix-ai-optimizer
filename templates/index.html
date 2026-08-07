@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rock AI — WO₃ Sputtering Optimizer</title>
+    <title>MatrixAI — Materials Optimizer</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
         tailwind.config = {
             darkMode: 'class',
@@ -15,6 +16,10 @@
                             850: '#0f172a',
                             900: '#0b0f19',
                             950: '#030712',
+                        },
+                        brand: {
+                            blue: '#3B82F6',
+                            purple: '#7C3AED'
                         }
                     }
                 }
@@ -24,15 +29,15 @@
     <style>
         @keyframes pulse-glow {
             0%, 100% {
-                box-shadow: 0 0 12px rgba(0, 212, 255, 0.4), 0 0 24px rgba(124, 58, 237, 0.2);
+                box-shadow: 0 0 12px rgba(59, 130, 246, 0.4), 0 0 24px rgba(124, 58, 237, 0.2);
             }
             50% {
-                box-shadow: 0 0 24px rgba(0, 212, 255, 0.8), 0 0 40px rgba(124, 58, 237, 0.5);
+                box-shadow: 0 0 24px rgba(59, 130, 246, 0.8), 0 0 40px rgba(124, 58, 237, 0.5);
             }
         }
 
         .btn-glow {
-            background: linear-gradient(135deg, #00D4FF, #7C3AED);
+            background: linear-gradient(135deg, #3B82F6, #7C3AED);
             animation: pulse-glow 3s infinite ease-in-out;
         }
 
@@ -45,7 +50,7 @@
         }
 
         @keyframes flash-fill {
-            0% { background-color: rgba(0, 212, 255, 0.4); }
+            0% { background-color: rgba(59, 130, 246, 0.4); }
             100% { background-color: #1e293b; }
         }
 
@@ -54,25 +59,25 @@
         }
     </style>
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen font-sans antialiased selection:bg-sky-500 selection:text-white">
+<body class="bg-slate-950 text-slate-100 min-h-screen font-sans antialiased selection:bg-blue-500 selection:text-white">
 
     <!-- NAVIGATION BAR -->
     <nav class="border-b border-slate-800/80 bg-slate-900/60 backdrop-blur-md sticky top-0 z-50">
         <div class="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
             <div class="flex items-center space-x-3">
-                <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-sky-500 to-indigo-500 flex items-center justify-center font-bold text-white shadow-lg shadow-sky-500/20">
-                    R
+                <div class="w-9 h-9 rounded-lg bg-gradient-to-tr from-blue-500 to-purple-600 flex items-center justify-center font-extrabold text-white text-lg shadow-lg shadow-blue-500/20">
+                    M
                 </div>
                 <div>
-                    <span class="font-bold text-lg tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white via-slate-200 to-slate-400">Rock AI</span>
-                    <span class="text-xs text-sky-400 font-medium px-2 py-0.5 rounded-full bg-sky-500/10 border border-sky-500/20 ml-2">WO₃ Sputtering</span>
+                    <span class="font-bold text-lg tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white via-slate-200 to-slate-400">MatrixAI</span>
+                    <span class="text-xs text-blue-400 font-semibold px-2.5 py-0.5 rounded-full bg-blue-500/10 border border-blue-500/20 ml-2">Materials Science</span>
                 </div>
             </div>
 
             <div class="flex items-center space-x-4">
                 {% if user %}
                     {% if user.email.lower() == 'pavannaidu9031@gmail.com' %}
-                        <a href="/admin/users" class="text-xs font-semibold px-3 py-1.5 rounded-lg bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 hover:bg-indigo-500/20 transition">
+                        <a href="/admin/users" class="text-xs font-semibold px-3 py-1.5 rounded-lg bg-purple-500/10 text-purple-400 border border-purple-500/20 hover:bg-purple-500/20 transition">
                             Admin Panel
                         </a>
                     {% endif %}
@@ -85,7 +90,6 @@
                     <a href="/logout" class="text-xs font-semibold text-slate-400 hover:text-red-400 transition">Logout</a>
                 {% else %}
                     <a href="/login/google" class="flex items-center space-x-2 bg-white text-slate-900 hover:bg-slate-100 font-semibold text-xs px-4 py-2 rounded-xl transition shadow-sm">
-                        <svg class="w-4 h-4" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/></svg>
                         <span>Sign in with Google</span>
                     </a>
                 {% endif %}
@@ -99,17 +103,24 @@
         {% if not user %}
             <!-- LANDING HERO FOR UNAUTHENTICATED USERS -->
             <div class="text-center py-20 space-y-6 max-w-3xl mx-auto">
-                <div class="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-sky-500/10 border border-sky-500/20 text-sky-400 text-xs font-semibold">
-                    <span>✨ Bayesian Optimization Engine</span>
+                <div class="inline-flex items-center space-x-2 px-3.5 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-semibold">
+                    <span>✨ Intelligent Materials Science Engine</span>
                 </div>
                 <h1 class="text-4xl md:text-5xl font-extrabold text-white tracking-tight leading-tight">
-                    Accelerate WO₃ Thin-Film Research with AI
+                    From first experiment to optimal parameters — intelligently.
                 </h1>
                 <p class="text-slate-400 text-base leading-relaxed">
-                    Log sputtering parameters, analyze XRD phase transitions, and generate optimal Gaussian Process suggestions for maximum sensitivity and response time.
+                    MatrixAI uses Gaussian Process Bayesian optimization to intelligently guide your thin-film deposition experiments. Compatible with any PVD or CVD process — WO₃, TiO₂, ZnO, Pd, SnO₂, and beyond.
                 </p>
+                
+                <div class="flex flex-wrap justify-center gap-3 pt-2">
+                    <span class="px-3 py-1 rounded-lg bg-slate-900 border border-slate-800 text-xs text-blue-400 font-semibold">⚡ Bayesian Optimization</span>
+                    <span class="px-3 py-1 rounded-lg bg-slate-900 border border-slate-800 text-xs text-purple-400 font-semibold">🎯 Multi-Objective</span>
+                    <span class="px-3 py-1 rounded-lg bg-slate-900 border border-slate-800 text-xs text-emerald-400 font-semibold">📊 Convergence Detection</span>
+                </div>
+
                 <div class="pt-4">
-                    <a href="/login/google" class="inline-flex items-center space-x-2 bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold px-6 py-3 rounded-xl transition shadow-lg shadow-sky-500/25">
+                    <a href="/login/google" class="inline-flex items-center space-x-2 bg-blue-500 hover:bg-blue-400 text-slate-950 font-bold px-6 py-3 rounded-xl transition shadow-lg shadow-blue-500/25">
                         <span>Get Started with Google</span>
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
                     </a>
@@ -117,30 +128,50 @@
             </div>
         {% else %}
 
+            <!-- HERO STATS BAR -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="bg-slate-900/80 p-5 rounded-2xl border border-slate-800 border-l-4 border-l-blue-500 shadow-xl">
+                    <div class="text-3xl font-extrabold text-white">{{ stats.total_runs }}</div>
+                    <div class="text-xs font-medium text-slate-400 mt-1">Total Experiments Logged</div>
+                </div>
+
+                <div class="bg-slate-900/80 p-5 rounded-2xl border border-slate-800 border-l-4 border-l-emerald-500 shadow-xl">
+                    <div class="text-3xl font-extrabold text-emerald-400">{{ stats.monoclinic_runs }}</div>
+                    <div class="text-xs font-medium text-slate-400 mt-1">Monoclinic Phase Runs</div>
+                </div>
+
+                <div class="bg-slate-900/80 p-5 rounded-2xl border border-slate-800 border-l-4 border-l-purple-500 shadow-xl">
+                    <div class="text-3xl font-extrabold text-purple-400">{{ stats.best_shift }} <span class="text-sm font-normal text-slate-400">pm</span></div>
+                    <div class="text-xs font-medium text-slate-400 mt-1">Best Wavelength Shift</div>
+                </div>
+
+                <div class="bg-slate-900/80 p-5 rounded-2xl border border-slate-800 border-l-4 border-l-amber-500 shadow-xl">
+                    <div class="text-3xl font-extrabold text-amber-400">{{ stats.runs_remaining }}</div>
+                    <div class="text-xs font-medium text-slate-400 mt-1">Optimization Runs Remaining</div>
+                </div>
+            </div>
+
             <!-- AI SUGGESTION SECTION -->
-            <section class="bg-slate-900/80 p-6 rounded-2xl border border-slate-800 shadow-xl relative overflow-hidden" style="box-shadow: 0 0 0 1px rgba(0, 212, 255, 0.25), 0 0 32px rgba(0, 212, 255, 0.08);">
+            <section class="bg-slate-900/80 p-6 rounded-2xl border border-slate-800 shadow-xl relative overflow-hidden" style="box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.25), 0 0 32px rgba(59, 130, 246, 0.08);">
                 <div class="grid grid-cols-1 lg:grid-cols-10 gap-6 items-center">
-                    
-                    <!-- Left Column -->
                     <div class="lg:col-span-4 space-y-2">
-                        <div class="text-xs font-bold tracking-wider text-sky-400 uppercase">BAYESIAN OPTIMIZER</div>
+                        <div class="text-xs font-bold tracking-wider text-blue-400 uppercase">BAYESIAN OPTIMIZER</div>
                         <h2 class="text-2xl font-extrabold text-white">Suggest Next Parameters</h2>
                         <p class="text-xs text-slate-400 leading-relaxed">
-                            Generate optimal next-run parameters from your experiment history using Gaussian Process regression.
+                            AI-powered process parameter optimization for advanced materials science research using multi-objective Gaussian Process regression.
                         </p>
                     </div>
 
-                    <!-- Right Column with Button -->
                     <div class="lg:col-span-6 flex flex-col items-start lg:items-end space-y-2">
                         <button id="btnSuggest" class="btn-glow text-white font-bold text-base px-8 py-4 rounded-xl transition flex items-center space-x-3">
                             <span id="btnText">✦ Suggest Next Parameters</span>
                             <div id="btnSpinner" class="hidden w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                         </button>
-                        <span class="text-[11px] text-slate-400">Powered by Gaussian Process · Scikit-learn</span>
+                        <span class="text-[11px] text-slate-400">Powered by Pareto Gaussian Process · Scikit-learn</span>
                     </div>
                 </div>
 
-                <!-- Hidden Suggestion Output Panel -->
+                <!-- SUGGESTION OUTPUT PANEL -->
                 <div id="resultCard" class="hidden mt-8 pt-6 border-t border-slate-800 space-y-6">
                     <div class="flex items-center justify-between">
                         <h3 class="text-lg font-bold text-white">🎯 Recommended Next Run #<span id="runNum">X</span></h3>
@@ -149,21 +180,58 @@
 
                     <!-- Parameter Pills Grid -->
                     <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                        <div class="bg-sky-950/40 border border-sky-800/40 p-3 rounded-xl"><div class="text-[11px] text-slate-400">RF Power</div><div class="text-sm font-bold text-white" id="p_rf">-</div></div>
-                        <div class="bg-sky-950/40 border border-sky-800/40 p-3 rounded-xl"><div class="text-[11px] text-slate-400">Pressure</div><div class="text-sm font-bold text-white" id="p_press">-</div></div>
-                        <div class="bg-sky-950/40 border border-sky-800/40 p-3 rounded-xl"><div class="text-[11px] text-slate-400">Target Distance</div><div class="text-sm font-bold text-white" id="p_dist">-</div></div>
-                        <div class="bg-sky-950/40 border border-sky-800/40 p-3 rounded-xl"><div class="text-[11px] text-slate-400">Film Thickness</div><div class="text-sm font-bold text-white" id="p_thick">-</div></div>
-                        <div class="bg-sky-950/40 border border-sky-800/40 p-3 rounded-xl"><div class="text-[11px] text-slate-400">Rotation Speed</div><div class="text-sm font-bold text-white" id="p_rot">-</div></div>
-                        <div class="bg-sky-950/40 border border-sky-800/40 p-3 rounded-xl"><div class="text-[11px] text-slate-400">Ar Flow</div><div class="text-sm font-bold text-white" id="p_ar">-</div></div>
+                        <div class="bg-blue-950/40 border border-blue-800/40 p-3 rounded-xl"><div class="text-[11px] text-slate-400">RF Power</div><div class="text-sm font-bold text-white" id="p_rf">-</div></div>
+                        <div class="bg-blue-950/40 border border-blue-800/40 p-3 rounded-xl"><div class="text-[11px] text-slate-400">Pressure</div><div class="text-sm font-bold text-white" id="p_press">-</div></div>
+                        <div class="bg-blue-950/40 border border-blue-800/40 p-3 rounded-xl"><div class="text-[11px] text-slate-400">Target Distance</div><div class="text-sm font-bold text-white" id="p_dist">-</div></div>
+                        <div class="bg-blue-950/40 border border-blue-800/40 p-3 rounded-xl"><div class="text-[11px] text-slate-400">Film Thickness</div><div class="text-sm font-bold text-white" id="p_thick">-</div></div>
+                        <div class="bg-blue-950/40 border border-blue-800/40 p-3 rounded-xl"><div class="text-[11px] text-slate-400">Rotation Speed</div><div class="text-sm font-bold text-white" id="p_rot">-</div></div>
+                        <div class="bg-blue-950/40 border border-blue-800/40 p-3 rounded-xl"><div class="text-[11px] text-slate-400">Ar Flow</div><div class="text-sm font-bold text-white" id="p_ar">-</div></div>
                         <div class="bg-emerald-950/40 border border-emerald-800/40 p-3 rounded-xl"><div class="text-[11px] text-emerald-400">Expected XRD</div><div class="text-sm font-bold text-emerald-300" id="p_xrd">-</div></div>
                         <div class="bg-emerald-950/40 border border-emerald-800/40 p-3 rounded-xl"><div class="text-[11px] text-emerald-400">Expected Shift</div><div class="text-sm font-bold text-emerald-300" id="p_shift">-</div></div>
                     </div>
 
-                    <button id="btnApply" type="button" class="border border-sky-400 text-sky-400 hover:bg-sky-400/10 font-bold text-sm px-6 py-2.5 rounded-xl transition">
+                    <!-- CONVERGENCE PROGRESS BAR -->
+                    <div class="space-y-2 bg-slate-950/50 p-4 rounded-xl border border-slate-800">
+                        <div class="flex justify-between items-center text-xs">
+                            <span class="font-bold text-slate-300 uppercase tracking-wider">Optimization Progress & Convergence</span>
+                            <span id="convText" class="font-semibold text-blue-400">0%</span>
+                        </div>
+                        <div class="w-full bg-slate-800 h-2.5 rounded-full overflow-hidden">
+                            <div id="convBar" class="bg-gradient-to-r from-blue-500 to-emerald-400 h-full transition-all duration-700" style="width: 0%;"></div>
+                        </div>
+                        <div id="convBanner" class="text-xs text-slate-400">Evaluating multi-run parameter variance...</div>
+                    </div>
+
+                    <!-- PARAMETER UNCERTAINTIES MINI BARS -->
+                    <div class="space-y-3 bg-slate-950/50 p-4 rounded-xl border border-slate-800">
+                        <div class="text-xs font-bold text-slate-300 uppercase tracking-wider">Model Uncertainty by Parameter</div>
+                        <div id="uncertaintyBars" class="grid grid-cols-1 sm:grid-cols-2 gap-3"></div>
+                    </div>
+
+                    <!-- SCIENTIFIC EXPLANATION -->
+                    <div class="bg-slate-950/50 rounded-xl p-4 border border-slate-800 space-y-1">
+                        <div class="text-xs font-bold text-blue-400 uppercase tracking-wider">Scientific Rationale</div>
+                        <p id="expText" class="text-xs text-slate-300 leading-relaxed"></p>
+                    </div>
+
+                    <button id="btnApply" type="button" class="border border-blue-400 text-blue-400 hover:bg-blue-400/10 font-bold text-sm px-6 py-2.5 rounded-xl transition">
                         ⬇ Apply to Form
                     </button>
                 </div>
             </section>
+
+            <!-- OPTIMIZATION HISTORY LEARNING CURVE CHART -->
+            {% if experiments %}
+            <section class="bg-slate-900/80 p-6 rounded-2xl border border-slate-800 shadow-xl space-y-4">
+                <div>
+                    <h2 class="text-xl font-bold text-white">Optimization Learning Curve</h2>
+                    <p class="text-xs text-slate-400">Calculated quality score trajectory across logged experiments</p>
+                </div>
+                <div class="h-64">
+                    <canvas id="qualityChart"></canvas>
+                </div>
+            </section>
+            {% endif %}
 
             <!-- EXPERIMENT INPUT FORM SECTION -->
             <section id="formSection" class="space-y-4">
@@ -175,72 +243,66 @@
                 </div>
 
                 <form action="/add" method="POST" class="grid grid-cols-1 md:grid-cols-3 gap-4 bg-slate-900/80 p-6 rounded-2xl border border-slate-800 text-white shadow-xl">
-                    
-                    <!-- PROCESS PARAMETERS -->
                     <div>
                         <label class="block text-xs font-semibold text-slate-400 mb-1">RF Power (W)</label>
-                        <input type="number" step="0.1" name="rf_power_w" id="rf_power_w" required placeholder="e.g. 150" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-sky-500 transition">
+                        <input type="number" step="0.1" name="rf_power_w" id="rf_power_w" required placeholder="e.g. 150" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-blue-500 transition">
                     </div>
 
                     <div>
                         <label class="block text-xs font-semibold text-slate-400 mb-1">Working Pressure (mTorr)</label>
-                        <input type="number" step="0.01" name="working_pressure_mtorr" id="working_pressure_mtorr" required placeholder="e.g. 5.0" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-sky-500 transition">
+                        <input type="number" step="0.01" name="working_pressure_mtorr" id="working_pressure_mtorr" required placeholder="e.g. 5.0" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-blue-500 transition">
                     </div>
 
                     <div>
                         <label class="block text-xs font-semibold text-slate-400 mb-1">Ar Flow (sccm)</label>
-                        <input type="number" step="0.1" name="ar_flow_sccm" id="ar_flow_sccm" required placeholder="e.g. 30" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-sky-500 transition">
+                        <input type="number" step="0.1" name="ar_flow_sccm" id="ar_flow_sccm" required placeholder="e.g. 30" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-blue-500 transition">
                     </div>
 
                     <div>
                         <label class="block text-xs font-semibold text-slate-400 mb-1">O₂ Flow (sccm)</label>
-                        <input type="number" step="0.1" name="o2_flow_sccm" id="o2_flow_sccm" required placeholder="e.g. 5" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-sky-500 transition">
+                        <input type="number" step="0.1" name="o2_flow_sccm" id="o2_flow_sccm" required placeholder="e.g. 5" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-blue-500 transition">
                     </div>
 
                     <div>
                         <label class="block text-xs font-semibold text-slate-400 mb-1">Substrate Temp (°C)</label>
-                        <input type="number" step="0.1" name="substrate_temp_c" id="substrate_temp_c" required placeholder="e.g. 300" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-sky-500 transition">
+                        <input type="number" step="0.1" name="substrate_temp_c" id="substrate_temp_c" required placeholder="e.g. 300" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-blue-500 transition">
                     </div>
 
-                    <!-- TARGET DISTANCE (CM) -->
                     <div>
                         <label class="block text-xs font-semibold text-slate-400 mb-1">Target Distance (cm)</label>
-                        <input type="number" step="0.1" name="target_substrate_distance_cm" id="target_substrate_distance_cm" required placeholder="e.g. 7" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-sky-500 transition">
+                        <input type="number" step="0.1" name="target_substrate_distance_cm" id="target_substrate_distance_cm" required placeholder="e.g. 7" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-blue-500 transition">
                     </div>
 
                     <div>
                         <label class="block text-xs font-semibold text-slate-400 mb-1">Sputter Time (min)</label>
-                        <input type="number" step="0.1" name="sputtering_time_min" id="sputtering_time_min" required placeholder="e.g. 30" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-sky-500 transition">
+                        <input type="number" step="0.1" name="sputtering_time_min" id="sputtering_time_min" required placeholder="e.g. 30" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-blue-500 transition">
                     </div>
 
                     <div>
                         <label class="block text-xs font-semibold text-slate-400 mb-1">Film Thickness (nm)</label>
-                        <input type="number" step="0.1" name="film_thickness_nm" id="film_thickness_nm" placeholder="e.g. 100" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-sky-500 transition">
+                        <input type="number" step="0.1" name="film_thickness_nm" id="film_thickness_nm" placeholder="e.g. 100" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-blue-500 transition">
                     </div>
 
-                    <!-- ROTATION SPEED (RPM) -->
                     <div>
                         <label class="block text-xs font-semibold text-slate-400 mb-1">Rotation Speed (rpm)</label>
-                        <select name="rotation_speed_rpm" id="rotation_speed_rpm" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-sky-500 transition">
+                        <select name="rotation_speed_rpm" id="rotation_speed_rpm" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-blue-500 transition">
                             <option value="1">1 rpm</option>
                             <option value="5" selected>5 rpm</option>
                             <option value="10">10 rpm</option>
                         </select>
                     </div>
 
-                    <!-- SUBSTRATE TYPE -->
                     <div>
                         <label class="block text-xs font-semibold text-slate-400 mb-1">Substrate Type</label>
-                        <select name="substrate_type" id="substrate_type" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-sky-500 transition">
+                        <select name="substrate_type" id="substrate_type" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-blue-500 transition">
                             <option value="Si Wafer">Si Wafer</option>
                             <option value="Optical Fiber">Optical Fiber</option>
                         </select>
                     </div>
 
-                    <!-- CHARACTERIZATION RESULTS -->
                     <div>
                         <label class="block text-xs font-semibold text-slate-400 mb-1">XRD Phase Target</label>
-                        <select name="xrd_phase" id="xrd_phase" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-sky-500 transition">
+                        <select name="xrd_phase" id="xrd_phase" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-blue-500 transition">
                             <option value="Monoclinic">Monoclinic</option>
                             <option value="Partial">Partial</option>
                             <option value="Amorphous" selected>Amorphous</option>
@@ -249,31 +311,30 @@
 
                     <div>
                         <label class="block text-xs font-semibold text-slate-400 mb-1">Grain Size (nm) <span class="text-slate-500">(FESEM)</span></label>
-                        <input type="number" step="0.1" name="grain_size_nm" placeholder="e.g. 25.4" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-sky-500 transition">
+                        <input type="number" step="0.1" name="grain_size_nm" placeholder="e.g. 25.4" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-blue-500 transition">
                     </div>
 
                     <div>
                         <label class="block text-xs font-semibold text-slate-400 mb-1">H₂ Response Time (s)</label>
-                        <input type="number" step="0.1" name="h2_response_time_s" required placeholder="e.g. 12" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-sky-500 transition">
+                        <input type="number" step="0.1" name="h2_response_time_s" required placeholder="e.g. 12" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-blue-500 transition">
                     </div>
 
                     <div>
                         <label class="block text-xs font-semibold text-slate-400 mb-1">Wavelength Shift (pm) <span class="text-slate-500">(FBG)</span></label>
-                        <input type="number" step="0.1" name="wavelength_shift_pm" placeholder="e.g. 150" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-sky-500 transition">
+                        <input type="number" step="0.1" name="wavelength_shift_pm" placeholder="e.g. 150" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-blue-500 transition">
                     </div>
 
                     <div>
                         <label class="block text-xs font-semibold text-slate-400 mb-1">Batch / Sample Notes</label>
-                        <input type="text" name="notes" placeholder="e.g. BATCH-2026-A" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-sky-500 transition">
+                        <input type="text" name="notes" placeholder="e.g. BATCH-2026-A" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-blue-500 transition">
                     </div>
 
                     <div class="md:col-span-3 flex flex-wrap gap-4 mt-2">
-                        <button type="submit" class="bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold py-2.5 px-6 rounded-xl transition shadow-lg shadow-sky-500/20 text-sm">
+                        <button type="submit" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-2.5 px-6 rounded-xl transition shadow-lg shadow-blue-500/20 text-sm">
                             Save Experiment
                         </button>
                         
                         <a href="/export/csv" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-semibold py-2.5 px-5 rounded-xl transition text-sm flex items-center space-x-2">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                             <span>Export CSV</span>
                         </a>
                     </div>
@@ -285,7 +346,7 @@
                 <div class="flex items-center justify-between">
                     <div>
                         <h2 class="text-xl font-bold text-white">Logged Experiments</h2>
-                        <p class="text-xs text-slate-400">Recorded sputtering parameter trials and measurements</p>
+                        <p class="text-xs text-slate-400">Sorted by Quality Score descending</p>
                     </div>
                 </div>
 
@@ -293,6 +354,7 @@
                     <table class="w-full text-left border-collapse">
                         <thead>
                             <tr class="text-slate-400 border-b border-slate-800 text-xs uppercase tracking-wider bg-slate-850/50">
+                                <th class="p-3">Quality</th>
                                 <th class="p-3">Batch / Notes</th>
                                 <th class="p-3">RF Power</th>
                                 <th class="p-3">Pressure</th>
@@ -308,6 +370,18 @@
                         <tbody class="divide-y divide-slate-800/60 text-xs">
                             {% for exp in experiments %}
                             <tr class="hover:bg-slate-800/40 transition">
+                                <td class="p-3">
+                                    {% set q = exp.quality_score or 50.0 %}
+                                    {% if q >= 80 %}
+                                        <span class="px-2 py-1 rounded-md text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">Excellent ({{ q }})</span>
+                                    {% elif q >= 60 %}
+                                        <span class="px-2 py-1 rounded-md text-[10px] font-bold bg-blue-500/20 text-blue-400 border border-blue-500/30">Good ({{ q }})</span>
+                                    {% elif q >= 40 %}
+                                        <span class="px-2 py-1 rounded-md text-[10px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">Moderate ({{ q }})</span>
+                                    {% else %}
+                                        <span class="px-2 py-1 rounded-md text-[10px] font-bold bg-red-500/20 text-red-400 border border-red-500/30">Poor ({{ q }})</span>
+                                    {% endif %}
+                                </td>
                                 <td class="p-3 text-slate-400 font-medium">{{ exp.notes or '-' }}</td>
                                 <td class="p-3">{{ exp.rf_power_w }} W</td>
                                 <td class="p-3">{{ exp.working_pressure_mtorr }} mTorr</td>
@@ -316,20 +390,20 @@
                                 <td class="p-3">{{ exp.substrate_type }}</td>
                                 <td class="p-3">
                                     {% if exp.xrd_phase == 'Monoclinic' %}
-                                        <span class="px-2 py-1 rounded-md text-[10px] font-bold bg-green-500/10 text-green-400 border border-green-500/20">Monoclinic</span>
+                                        <span class="px-2 py-1 rounded-md text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Monoclinic</span>
                                     {% elif exp.xrd_phase == 'Partial' %}
-                                        <span class="px-2 py-1 rounded-md text-[10px] font-bold bg-yellow-500/10 text-yellow-400 border border-yellow-500/20">Partial</span>
+                                        <span class="px-2 py-1 rounded-md text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">Partial</span>
                                     {% else %}
                                         <span class="px-2 py-1 rounded-md text-[10px] font-bold bg-red-500/10 text-red-400 border border-red-500/20">Amorphous</span>
                                     {% endif %}
                                 </td>
                                 <td class="p-3">{{ exp.grain_size_nm if exp.grain_size_nm is not none else '-' }}</td>
-                                <td class="p-3 font-semibold text-sky-400">{{ exp.h2_response_time_s }}s</td>
+                                <td class="p-3 font-semibold text-blue-400">{{ exp.h2_response_time_s }}s</td>
                                 <td class="p-3">{{ exp.wavelength_shift_pm if exp.wavelength_shift_pm is not none else '-' }}</td>
                             </tr>
                             {% else %}
                             <tr>
-                                <td colspan="10" class="p-8 text-center text-slate-500">
+                                <td colspan="11" class="p-8 text-center text-slate-500">
                                     No experiments logged yet. Fill out the form above to record your first run.
                                 </td>
                             </tr>
@@ -343,9 +417,44 @@
 
     </main>
 
-    <!-- JS TRIGGER & AUTOFILL SCRIPT -->
+    <!-- JS TRIGGER, CHART.JS & AUTOFILL SCRIPT -->
     <script>
         let latestSuggestion = null;
+
+        // Render Learning Curve Chart
+        {% if experiments %}
+        const expData = {{ experiments | tojson }};
+        const ctx = document.getElementById('qualityChart')?.getContext('2d');
+        if (ctx) {
+            const labels = expData.map((e, idx) => `Run #${expData.length - idx}`);
+            const scores = expData.map(e => e.quality_score || 50.0).reverse();
+            labels.reverse();
+
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Quality Score',
+                        data: scores,
+                        borderColor: '#3B82F6',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        borderWidth: 3,
+                        fill: true,
+                        tension: 0.3
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: { min: 0, max: 100, grid: { color: 'rgba(255,255,255,0.05)' } },
+                        x: { grid: { color: 'rgba(255,255,255,0.05)' } }
+                    }
+                }
+            });
+        }
+        {% endif %}
 
         document.getElementById('btnSuggest')?.addEventListener('click', async () => {
             const btn = document.getElementById('btnSuggest');
@@ -372,14 +481,44 @@
                     document.getElementById('p_ar').innerText = data.suggested.ar_flow + " sccm";
                     document.getElementById('p_xrd').innerText = data.expected.xrd_phase;
                     document.getElementById('p_shift').innerText = data.expected.wavelength_shift_estimate + " pm";
+                    document.getElementById('expText').innerText = data.explanation;
 
                     const badge = document.getElementById('confBadge');
                     badge.innerText = (data.confidence?.label || 'READY') + " CONFIDENCE";
-                    badge.className = "px-3 py-1 rounded-full text-xs font-bold bg-sky-500/20 text-sky-400 border border-sky-500/30";
+                    badge.className = "px-3 py-1 rounded-full text-xs font-bold bg-blue-500/20 text-blue-400 border border-blue-500/30";
+
+                    // Render Convergence Progress Bar
+                    const c = data.convergence;
+                    document.getElementById('convText').innerText = c.convergence_score + "%";
+                    document.getElementById('convBar').style.width = c.convergence_score + "%";
+                    if (c.converged) {
+                        document.getElementById('convBanner').innerHTML = '<span class="text-emerald-400 font-bold">✓ Optimization converged — run 3 confirmation experiments at these parameters</span>';
+                    } else {
+                        document.getElementById('convBanner').innerText = `Estimated ${c.runs_to_convergence_estimate} more runs to convergence`;
+                    }
+
+                    // Render Parameter Uncertainty Bars
+                    const uContainer = document.getElementById('uncertaintyBars');
+                    uContainer.innerHTML = '';
+                    for (const [pName, uVal] of Object.entries(data.parameter_uncertainties)) {
+                        const pct = Math.round(uVal * 100);
+                        const barColor = pct > 60 ? 'bg-amber-500' : 'bg-emerald-500';
+                        uContainer.innerHTML += `
+                            <div class="space-y-1">
+                                <div class="flex justify-between text-[11px] text-slate-400">
+                                    <span>${pName}</span>
+                                    <span>${pct}%</span>
+                                </div>
+                                <div class="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                                    <div class="${barColor} h-full" style="width: ${pct}%"></div>
+                                </div>
+                            </div>
+                        `;
+                    }
 
                     document.getElementById('resultCard').classList.remove('hidden');
                 } else {
-                    alert(data.message || "Log at least 3 experiments to enable AI suggestions.");
+                    alert(data.message || "Error calculating suggestion.");
                 }
             } catch (err) {
                 alert("Error connecting to optimization service.");
