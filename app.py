@@ -40,7 +40,7 @@ app.add_middleware(
 templates = Jinja2Templates(directory="templates")
 
 # ==============================================================================
-# SUPABASE POSTGRESQL CONNECTION POOLING (WITH SAFE FALLBACKS)
+# SUPABASE POSTGRESQL CONNECTION POOLING
 # ==============================================================================
 DATABASE_URL = os.getenv("DATABASE_URL")
 connection_pool = None
@@ -87,7 +87,6 @@ def release_db_connection(conn):
         except Exception:
             pass
 
-# Helper to calculate quality score safely without throwing exceptions
 def safe_calculate_quality_score(xrd_phase, wavelength_shift, h2_response_time, grain_size, existing_exps):
     try:
         formatted_exps = []
@@ -102,7 +101,7 @@ def safe_calculate_quality_score(xrd_phase, wavelength_shift, h2_response_time, 
             xrd_phase, wavelength_shift, h2_response_time, grain_size, formatted_exps
         )
     except Exception as err:
-        print(f"Quality score fallback triggered: {err}")
+        print(f"Quality score fallback: {err}")
         return 50.0
 
 # ==============================================================================
@@ -206,7 +205,50 @@ def index(request: Request):
     })
 
 # ==============================================================================
-# FORM SUBMISSION ROUTE (/add) — FULLY CATCH-ALL & RESILIENT
+# OAUTH AUTHENTICATION ROUTES (ROBUST FIX)
+# ==============================================================================
+@app.get("/login/google")
+async def login_google(request: Request):
+    redirect_uri = request.url_for("auth_callback")
+    return await oauth.google.authorize_redirect(request, redirect_uri)
+
+@app.get("/auth/callback")
+async def auth_callback(request: Request):
+    try:
+        token = await oauth.google.authorize_access_token(request)
+        user_info = token.get("userinfo")
+        
+        if not user_info:
+            # Fallback if userinfo isn't populated automatically in token
+            user_info = await oauth.google.userinfo(token=token)
+
+        if not user_info:
+            return RedirectResponse("/login/google")
+
+        email = user_info.get("email")
+        name = user_info.get("name", "Researcher")
+        picture = user_info.get("picture", "")
+        sub_id = user_info.get("sub") or user_info.get("id", "user_1")
+
+        request.session["user"] = {
+            "id": sub_id,
+            "email": email,
+            "name": name,
+            "picture": picture
+        }
+        return RedirectResponse("/", status_code=303)
+        
+    except Exception as auth_err:
+        print(f"OAuth Callback Error: {auth_err}")
+        return RedirectResponse("/login/google")
+
+@app.get("/logout")
+def logout(request: Request):
+    request.session.clear()
+    return RedirectResponse("/")
+
+# ==============================================================================
+# FORM SUBMISSION ROUTE (/add)
 # ==============================================================================
 @app.post("/add")
 async def add_experiment_form(request: Request):
@@ -216,7 +258,6 @@ async def add_experiment_form(request: Request):
 
     user_email = user.get("email")
     
-    # Safely parse form data regardless of field name variations
     try:
         form = await request.form()
         
@@ -262,7 +303,6 @@ async def add_experiment_form(request: Request):
         conn = get_db_connection()
         cur = conn.cursor()
         
-        # Safely fetch existing experiments for quality score calculation
         existing_rows = []
         try:
             cur.execute("SELECT * FROM experiments WHERE user_email = %s", (user_email,))
@@ -501,7 +541,7 @@ async def get_bayes_suggestion(request: Request):
         release_db_connection(conn)
 
 # ==============================================================================
-# CSV EXPORT & AUTHENTICATION
+# CSV EXPORT
 # ==============================================================================
 @app.get("/export/csv")
 def export_csv(request: Request):
@@ -531,28 +571,3 @@ def export_csv(request: Request):
         return response
     finally:
         release_db_connection(conn)
-
-@app.get("/login/google")
-async def login_google(request: Request):
-    redirect_uri = request.url_for("auth_callback")
-    return await oauth.google.authorize_redirect(request, redirect_uri)
-
-@app.get("/auth/callback")
-async def auth_callback(request: Request):
-    token = await oauth.google.authorize_access_token(request)
-    user_info = token.get("userinfo")
-    if not user_info:
-        return RedirectResponse("/")
-
-    request.session["user"] = {
-        "id": user_info.get("sub") or user_info.get("id"),
-        "email": user_info.get("email"),
-        "name": user_info.get("name", "Researcher"),
-        "picture": user_info.get("picture", "")
-    }
-    return RedirectResponse("/")
-
-@app.get("/logout")
-def logout(request: Request):
-    request.session.clear()
-    return RedirectResponse("/")
