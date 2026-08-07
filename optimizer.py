@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 from sklearn.gaussian_process import GaussianProcessRegressor
-from sklearn.gaussian_process.kernels import RBF, WhiteKernel
+from sklearn.gaussian_process.kernels import RBF, WhiteKernel, ConstantKernel
 
 # ------------------------------------------------------------------------------
 # UPGRADE 3: Literature Pre-Seeding Prior Knowledge
@@ -19,14 +19,12 @@ LITERATURE_PRIORS = [
 XRD_MAP = {"Monoclinic": 1.0, "Partial": 0.5, "Amorphous": 0.0}
 PARAM_NAMES = ["RF Power", "Pressure", "Target Distance", "Film Thickness", "Rotation Speed", "Ar Flow"]
 
-
 # ------------------------------------------------------------------------------
 # UPGRADE 7: Experiment Quality Score Calculation
 # ------------------------------------------------------------------------------
 def calculate_quality_score(xrd_phase, wavelength_shift_pm, h2_response_s, grain_size_nm, all_experiments):
     xrd_score = XRD_MAP.get(str(xrd_phase).strip(), 0.0)
 
-    # Helper function for min-max normalization with default neutral fallback
     def normalize(val, key, default=0.5, invert=False):
         if val is None:
             return default
@@ -43,7 +41,6 @@ def calculate_quality_score(xrd_phase, wavelength_shift_pm, h2_response_s, grain
     quality = (xrd_score * 40.0) + (wave_norm * 30.0) + (h2_norm * 20.0) + (grain_norm * 10.0)
     return round(float(np.clip(quality, 0.0, 100.0)), 1)
 
-
 # ------------------------------------------------------------------------------
 # MAIN OPTIMIZATION LOGIC
 # ------------------------------------------------------------------------------
@@ -54,26 +51,24 @@ def generate_bayesian_suggestion(user_experiments: list, recent_suggestions: lis
     # UPGRADE 1: Dynamic Kappa UCB Schedule
     # --------------------------------------------------------------------------
     if real_count <= 7:
-        kappa = 2.5  # High exploration
+        kappa = 1.5  # Lowered from 2.5 to reduce over-exploration in Phase 1
     elif real_count <= 15:
-        kappa = 1.5  # Balanced
+        kappa = 1.5  
     else:
-        kappa = 0.5  # Pure exploitation
+        kappa = 0.5  
 
-    # Prepare datasets (Literature Priors + User Real Data)
+    # Prepare datasets
     X_list, y_xrd_list, y_wave_list = [], [], []
 
-    # Add 7 Literature Priors
     for p in LITERATURE_PRIORS:
         X_list.append(p[:6])
         y_xrd_list.append(p[6])
         y_wave_list.append(p[7])
 
-    # Add User Real Data
     for exp in user_experiments:
         rf = float(exp.get("rf_power") or exp.get("rf_power_w") or 120.0)
         press = float(exp.get("working_pressure") or exp.get("working_pressure_mtorr") or 5.0)
-        dist = float(exp.get("target_distance") or exp.get("target_substrate_distance_cm") or exp.get("target_substrate_distance_mm") or 7.0)
+        dist = float(exp.get("target_distance") or exp.get("target_substrate_distance_cm") or 7.0)
         thick = float(exp.get("film_thickness") or exp.get("film_thickness_nm") or 200.0)
         rot = float(exp.get("rotation_speed") or exp.get("rotation_speed_rpm") or 5.0)
         ar = float(exp.get("ar_flow") or exp.get("ar_flow_sccm") or 30.0)
@@ -81,7 +76,6 @@ def generate_bayesian_suggestion(user_experiments: list, recent_suggestions: lis
         phase = str(exp.get("xrd_phase") or "Amorphous").strip()
         xrd_val = XRD_MAP.get(phase, 0.0)
         
-        # Safely handle wavelength shift key from Supabase
         wave_key = "wavelength_shift" if "wavelength_shift" in exp else "wavelength_shift_pm"
         wave_val = float(exp[wave_key]) if exp.get(wave_key) is not None else None
 
@@ -92,7 +86,6 @@ def generate_bayesian_suggestion(user_experiments: list, recent_suggestions: lis
     X = np.array(X_list)
     y_xrd = np.array(y_xrd_list)
 
-    # Handle Wavelength Normalization
     valid_waves = [v for v in y_wave_list if v is not None]
     min_w = min(valid_waves) if valid_waves else 0.0
     max_w = max(valid_waves) if valid_waves else 200.0
@@ -103,21 +96,47 @@ def generate_bayesian_suggestion(user_experiments: list, recent_suggestions: lis
     ])
 
     # --------------------------------------------------------------------------
-    # UPGRADE 2: Fit Two Separate Gaussian Processes (Pareto Multi-Objective)
+    # UPGRADE 2: Anisotropic Gaussian Processes with Physical Intuition
     # --------------------------------------------------------------------------
-    kernel_xrd = RBF(length_scale=np.ones(6), length_scale_bounds=(1e-1, 1e2)) + WhiteKernel(noise_level=1e-2)
-    gp_xrd = GaussianProcessRegressor(kernel=kernel_xrd, n_restarts_optimizer=5, random_state=42)
-    gp_xrd.fit(X, y_xrd) # Removed sample_weight parameter
+    physical_length_scales = [10.0, 1.0, 1.0, 50.0, 2.0, 5.0]
 
-    kernel_wave = RBF(length_scale=np.ones(6), length_scale_bounds=(1e-1, 1e2)) + WhiteKernel(noise_level=1e-2)
-    gp_wave = GaussianProcessRegressor(kernel=kernel_wave, n_restarts_optimizer=5, random_state=42)
-    gp_wave.fit(X, y_wave_norm) # Removed sample_weight parameter
+    kernel_xrd = ConstantKernel(1.0) * RBF(
+        length_scale=physical_length_scales,
+        length_scale_bounds=(0.1, 1000)
+    ) + WhiteKernel(noise_level=0.1)
+
+    gp_xrd = GaussianProcessRegressor(
+        kernel=kernel_xrd, 
+        n_restarts_optimizer=10, 
+        normalize_y=True,
+        random_state=42
+    )
+    gp_xrd.fit(X, y_xrd)
+
+    kernel_wave = ConstantKernel(1.0) * RBF(
+        length_scale=physical_length_scales,
+        length_scale_bounds=(0.1, 1000)
+    ) + WhiteKernel(noise_level=0.1)
+    
+    gp_wave = GaussianProcessRegressor(
+        kernel=kernel_wave, 
+        n_restarts_optimizer=10, 
+        normalize_y=True,
+        random_state=42
+    )
+    gp_wave.fit(X, y_wave_norm)
+
+    # --------------------------------------------------------------------------
+    # SANITY CHECK (Test known Monoclinic parameters)
+    # --------------------------------------------------------------------------
+    test_point = np.array([[150.0, 3.0, 3.0, 200.0, 10.0, 30.0]])
+    sanity_pred, _ = gp_xrd.predict(test_point, return_std=True)
+    model_sanity_check = round(float(sanity_pred[0]), 3)
 
     # --------------------------------------------------------------------------
     # UPGRADE 6: Adaptive Parameter Bounds
     # --------------------------------------------------------------------------
     if user_experiments:
-        # Find current best real run by quality score or XRD score
         best_run = max(user_experiments, key=lambda e: float(e.get("quality_score") or 0.0))
         b_rf = float(best_run.get("rf_power") or best_run.get("rf_power_w") or 120.0)
         b_press = float(best_run.get("working_pressure") or best_run.get("working_pressure_mtorr") or 5.0)
@@ -128,10 +147,8 @@ def generate_bayesian_suggestion(user_experiments: list, recent_suggestions: lis
         b_rf, b_press, b_dist, b_thick, b_ar = 120.0, 5.0, 5.0, 200.0, 30.0
 
     if real_count <= 8:
-        # Phase 1: Full Bounds
         bounds = [(80.0, 150.0), (3.0, 10.0), (3.0, 7.0), (100.0, 500.0), [1.0, 5.0, 10.0], (20.0, 40.0)]
     elif real_count <= 15:
-        # Phase 2: ±30% around best
         bounds = [
             (max(80.0, b_rf * 0.7), min(150.0, b_rf * 1.3)),
             (max(3.0, b_press * 0.7), min(10.0, b_press * 1.3)),
@@ -141,7 +158,6 @@ def generate_bayesian_suggestion(user_experiments: list, recent_suggestions: lis
             (max(20.0, b_ar * 0.7), min(40.0, b_ar * 1.3))
         ]
     else:
-        # Phase 3: ±15% around best
         bounds = [
             (max(80.0, b_rf * 0.85), min(150.0, b_rf * 1.15)),
             (max(3.0, b_press * 0.85), min(10.0, b_press * 1.15)),
@@ -163,11 +179,9 @@ def generate_bayesian_suggestion(user_experiments: list, recent_suggestions: lis
 
     candidates = np.column_stack([c_rf, c_press, c_dist, c_thick, c_rot, c_ar])
 
-    # GP Predictions
     mean_xrd, std_xrd = gp_xrd.predict(candidates, return_std=True)
     mean_wave, std_wave = gp_wave.predict(candidates, return_std=True)
 
-    # Combined Multi-Objective UCB Acquisition
     mean_combined = 0.7 * mean_xrd + 0.3 * mean_wave
     std_combined = 0.7 * std_xrd + 0.3 * std_wave
     acquisition = mean_combined + (kappa * std_combined)
@@ -191,12 +205,17 @@ def generate_bayesian_suggestion(user_experiments: list, recent_suggestions: lis
     # UPGRADE 4: Per-Parameter Length Scale Uncertainty Display
     # --------------------------------------------------------------------------
     try:
-        rbf_k = gp_xrd.kernel_.k1
+        # Extract RBF length scales from the nested ConstantKernel * RBF structure
+        rbf_k = gp_xrd.kernel_.k1.k2
         l_scales = rbf_k.length_scale
-        # Normalize length scales to 0.0-1.0 (larger scale = model knows less = higher uncertainty)
         scaled_ls = (l_scales - np.min(l_scales)) / (np.max(l_scales) - np.min(l_scales) + 1e-6)
     except Exception:
-        scaled_ls = np.ones(6) * 0.5
+        try:
+            # Fallback if structure varies slightly
+            l_scales = gp_xrd.kernel_.k1.length_scale
+            scaled_ls = (l_scales - np.min(l_scales)) / (np.max(l_scales) - np.min(l_scales) + 1e-6)
+        except Exception:
+            scaled_ls = np.ones(6) * 0.5
 
     uncertainties = {}
     for idx, name in enumerate(PARAM_NAMES):
@@ -228,7 +247,6 @@ def generate_bayesian_suggestion(user_experiments: list, recent_suggestions: lis
 
         variances = np.var(last3, axis=0)
 
-        # Check thresholds: RF < 5W, Pressure < 0.5mTorr, Distance < 0.3cm, Thick < 15nm, Rot < 1rpm
         if (
             variances[0] < 25.0
             and variances[1] < 0.25
@@ -270,6 +288,7 @@ def generate_bayesian_suggestion(user_experiments: list, recent_suggestions: lis
         "app_name": "MatrixAI",
         "run_number": real_count + 1,
         "kappa_used": round(float(kappa), 2),
+        "model_sanity_check": model_sanity_check,
         "suggested": {
             "rf_power": round(float(s_rf), 1),
             "working_pressure": round(float(s_press), 1),
