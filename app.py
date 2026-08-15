@@ -731,7 +731,7 @@ def admin_dashboard(request: Request):
         release_db_connection(conn)
 
 @app.post("/admin/users/{email}/approve")
-def approve_user(request: Request, email: str):
+def approve_user(request: Request, email: str, background_tasks: BackgroundTasks):
     user = request.session.get("user")
     if not user or user.get("email", "").lower() != FOUNDER_EMAIL.lower():
         return RedirectResponse("/")
@@ -743,29 +743,9 @@ def approve_user(request: Request, email: str):
         conn.commit()
         cur.close()
         
-        # Fire off the automated email directly after successful DB update
-        send_approval_email(email)
+        # Fire off the automated email in the background so the UI doesn't hang!
+        background_tasks.add_task(send_approval_email, email)
         
-    finally:
-        release_db_connection(conn)
-    return RedirectResponse("/admin/users", status_code=303)
-
-@app.post("/admin/users/{email}/revoke")
-def revoke_user(request: Request, email: str):
-    user = request.session.get("user")
-    if not user or user.get("email", "").lower() != FOUNDER_EMAIL.lower():
-        return RedirectResponse("/")
-        
-    # Prevent founder from accidentally revoking themselves
-    if email.lower() == FOUNDER_EMAIL.lower():
-        return RedirectResponse("/admin/users", status_code=303) 
-        
-    conn = get_db_connection()
-    try:
-        cur = conn.cursor()
-        cur.execute("UPDATE users SET is_approved = FALSE WHERE email = %s", (email,))
-        conn.commit()
-        cur.close()
     finally:
         release_db_connection(conn)
     return RedirectResponse("/admin/users", status_code=303)
