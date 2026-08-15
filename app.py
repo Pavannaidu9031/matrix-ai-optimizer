@@ -669,9 +669,8 @@ def send_approval_email(recipient_email: str):
         """
         msg.attach(MIMEText(body, 'html'))
 
-        # Standard Gmail SMTP configuration
-        server = smtplib.SMTP('smtp.gmail.com', 587)
-        server.starttls()
+        # Switched to SMTP_SSL on Port 465 to bypass free-tier port blocking
+        server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
         server.login(sender_email, sender_password)
         server.sendmail(sender_email, recipient_email, msg.as_string())
         server.quit()
