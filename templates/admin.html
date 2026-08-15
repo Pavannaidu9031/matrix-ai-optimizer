@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel — MatrixAI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        slate: { 850: '#0f172a', 900: '#0b0f19', 950: '#030712' }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen font-sans antialiased selection:bg-blue-500 selection:text-white">
+
+    <!-- NAVIGATION BAR -->
+    <nav class="border-b border-slate-800/80 bg-slate-900/60 backdrop-blur-md sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="w-9 h-9 rounded-lg bg-gradient-to-tr from-purple-500 to-pink-600 flex items-center justify-center font-extrabold text-white text-lg shadow-lg shadow-purple-500/20">
+                    A
+                </div>
+                <div>
+                    <span class="font-bold text-lg tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white via-slate-200 to-slate-400">Admin Control</span>
+                    <span class="text-xs text-purple-400 font-semibold px-2.5 py-0.5 rounded-full bg-purple-500/10 border border-purple-500/20 ml-2">Founder Access</span>
+                </div>
+            </div>
+
+            <div class="flex items-center space-x-4">
+                <a href="/" class="text-xs font-semibold px-4 py-2 rounded-xl bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white transition shadow-sm">
+                    &larr; Back to Optimizer
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- MAIN CONTENT -->
+    <main class="max-w-7xl mx-auto px-6 py-8 space-y-6">
+        
+        <div>
+            <h2 class="text-2xl font-extrabold text-white tracking-tight">User Management</h2>
+            <p class="text-sm text-slate-400 mt-1">Approve or revoke researcher access to the MatrixAI platform.</p>
+        </div>
+
+        <div class="bg-slate-900/80 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="text-slate-400 border-b border-slate-800 text-xs uppercase tracking-wider bg-slate-850/50">
+                            <th class="p-4 font-semibold">User Profile</th>
+                            <th class="p-4 font-semibold">Status</th>
+                            <th class="p-4 font-semibold text-center">Experiments Logged</th>
+                            <th class="p-4 font-semibold">Joined Date</th>
+                            <th class="p-4 font-semibold text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-800/60 text-sm">
+                        {% for u in users_list %}
+                        <tr class="hover:bg-slate-800/40 transition group">
+                            <td class="p-4">
+                                <div class="flex items-center space-x-3">
+                                    {% if u.picture %}
+                                        <img src="{{ u.picture }}" alt="Avatar" class="w-8 h-8 rounded-full border border-slate-700">
+                                    {% else %}
+                                        <div class="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-xs font-bold text-slate-400 border border-slate-700">
+                                            {{ u.name[:1] }}
+                                        </div>
+                                    {% endif %}
+                                    <div>
+                                        <div class="font-medium text-slate-200">{{ u.name }}</div>
+                                        <div class="text-xs text-slate-500 font-mono">{{ u.email }}</div>
+                                    </div>
+                                </div>
+                            </td>
+                            
+                            <td class="p-4">
+                                {% if u.is_approved %}
+                                    <span class="inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1.5 animate-pulse"></span>
+                                        Approved
+                                    </span>
+                                {% else %}
+                                    <span class="inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-amber-400 mr-1.5"></span>
+                                        Pending
+                                    </span>
+                                {% endif %}
+                            </td>
+                            
+                            <td class="p-4 text-center">
+                                <span class="font-mono text-slate-300 bg-slate-800 px-2 py-1 rounded-md text-xs border border-slate-700">{{ u.exp_count }}</span>
+                            </td>
+                            
+                            <td class="p-4 text-slate-400 text-xs">
+                                {{ u.created_at }}
+                            </td>
+                            
+                            <td class="p-4 text-right">
+                                {% if u.email.lower() == user.email.lower() %}
+                                    <span class="text-xs text-slate-500 font-medium italic mr-2">Founder (You)</span>
+                                {% else %}
+                                    {% if not u.is_approved %}
+                                    <form action="/admin/users/{{ u.email }}/approve" method="POST" class="inline">
+                                        <button type="submit" class="text-xs font-semibold px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white transition shadow-sm">
+                                            Approve Access
+                                        </button>
+                                    </form>
+                                    {% else %}
+                                    <form action="/admin/users/{{ u.email }}/revoke" method="POST" class="inline">
+                                        <button type="submit" class="text-xs font-semibold px-3 py-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 transition opacity-0 group-hover:opacity-100">
+                                            Revoke
+                                        </button>
+                                    </form>
+                                    {% endif %}
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                
+                {% if not users_list %}
+                <div class="p-8 text-center text-slate-500 text-sm">
+                    No users found in the database yet.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+    </main>
+
+</body>
+</html>
