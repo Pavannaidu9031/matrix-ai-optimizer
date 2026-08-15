@@ -1,7 +1,7 @@
 import io
 import os
 import smtplib
-import datetime  # ADDED: To handle timestamp conversions
+import datetime
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from typing import Optional
@@ -137,7 +137,7 @@ class ExperimentModel(BaseModel):
     batch_notes: Optional[str] = None
 
 # ==============================================================================
-# DASHBOARD ROUTE
+# DASHBOARD ROUTE (With Pending Approval Check)
 # ==============================================================================
 @app.get("/", response_class=HTMLResponse)
 def index(request: Request):
@@ -145,9 +145,32 @@ def index(request: Request):
     if not user_session:
         return templates.TemplateResponse(request, "index.html", {"user": None, "experiments": [], "stats": {}})
 
-    user_email = user_session.get("email")
-    experiments = []
+    user_email = user_session.get("email", "")
     
+    # Check if user is approved (Founders bypass this)
+    is_approved = user_session.get("is_approved", False)
+    if not is_approved and user_email.lower() != FOUNDER_EMAIL.lower():
+        # Double check DB in case Admin just approved them while they were on the pending page
+        conn = get_db_connection()
+        try:
+            cur = conn.cursor()
+            cur.execute("SELECT is_approved FROM users WHERE email = %s", (user_email,))
+            row = cur.fetchone()
+            if row and row[0]:
+                is_approved = True
+                user_session["is_approved"] = True
+                request.session["user"] = user_session
+            cur.close()
+        except Exception:
+            pass
+        finally:
+            release_db_connection(conn)
+            
+        if not is_approved:
+            return templates.TemplateResponse(request, "pending.html", {"user": user_session})
+
+    # Load Dashboard Data
+    experiments = []
     try:
         conn = get_db_connection()
         try:
@@ -165,7 +188,6 @@ def index(request: Request):
             rows = cur.fetchall()
             columns = [desc[0] for desc in cur.description]
             
-            # FIXED: Convert datetime to string for JSON serialization in the template
             for row in rows:
                 row_dict = dict(zip(columns, row))
                 if isinstance(row_dict.get("created_at"), datetime.datetime):
@@ -207,6 +229,9 @@ def index(request: Request):
         "stats": stats
     })
 
+# ==============================================================================
+# AUTH ROUTING (Creates Users Table Automatically)
+# ==============================================================================
 @app.get("/login/google")
 async def login_google(request: Request):
     redirect_uri = request.url_for("auth_callback")
@@ -229,11 +254,51 @@ async def auth_callback(request: Request):
         picture = user_info.get("picture", "")
         sub_id = user_info.get("sub") or user_info.get("id", "user_1")
 
+        is_approved = (email.lower() == FOUNDER_EMAIL.lower())
+
+        # Sync user with database and manage approvals
+        conn = get_db_connection()
+        try:
+            cur = conn.cursor()
+            # Ensure users table exists
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS users (
+                    email VARCHAR PRIMARY KEY,
+                    name VARCHAR,
+                    picture VARCHAR,
+                    is_approved BOOLEAN DEFAULT FALSE,
+                    created_at TIMESTAMP DEFAULT NOW()
+                )
+            """)
+            conn.commit()
+
+            cur.execute("SELECT is_approved FROM users WHERE email = %s", (email,))
+            user_row = cur.fetchone()
+
+            if not user_row:
+                cur.execute(
+                    "INSERT INTO users (email, name, picture, is_approved) VALUES (%s, %s, %s, %s)",
+                    (email, name, picture, is_approved)
+                )
+                conn.commit()
+            else:
+                is_approved = user_row[0]
+
+            cur.close()
+        except Exception as db_err:
+            print(f"Auth DB Sync Error: {db_err}")
+            # Fallback allow founder if DB is temporarily down
+            if email.lower() == FOUNDER_EMAIL.lower():
+                is_approved = True
+        finally:
+            release_db_connection(conn)
+
         request.session["user"] = {
             "id": sub_id,
             "email": email,
             "name": name,
-            "picture": picture
+            "picture": picture,
+            "is_approved": is_approved
         }
         return RedirectResponse("/", status_code=303)
         
@@ -252,7 +317,7 @@ def logout(request: Request):
 @app.post("/add")
 async def add_experiment_form(request: Request):
     user = request.session.get("user")
-    if not user:
+    if not user or (not user.get("is_approved") and user.get("email", "").lower() != FOUNDER_EMAIL.lower()):
         return RedirectResponse("/login/google", status_code=303)
 
     user_email = user.get("email")
@@ -570,3 +635,78 @@ def export_csv(request: Request):
         return response
     finally:
         release_db_connection(conn)
+
+# ==============================================================================
+# ADMIN PANEL ROUTES
+# ==============================================================================
+@app.get("/admin/users", response_class=HTMLResponse)
+def admin_dashboard(request: Request):
+    user = request.session.get("user")
+    # Strictly enforce that only the Founder can access this route
+    if not user or user.get("email", "").lower() != FOUNDER_EMAIL.lower():
+        return RedirectResponse("/")
+
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+        # Fetch all users and calculate how many experiments they have logged
+        cur.execute("""
+            SELECT u.email, u.name, u.picture, u.is_approved, u.created_at,
+                   COUNT(e.id) as exp_count
+            FROM users u
+            LEFT JOIN experiments e ON u.email = e.user_email
+            GROUP BY u.email, u.name, u.picture, u.is_approved, u.created_at
+            ORDER BY u.created_at DESC
+        """)
+        rows = cur.fetchall()
+        cols = [desc[0] for desc in cur.description]
+        users_list = []
+        
+        for r in rows:
+            row_dict = dict(zip(cols, r))
+            if isinstance(row_dict.get("created_at"), datetime.datetime):
+                row_dict["created_at"] = row_dict["created_at"].strftime("%Y-%m-%d")
+            users_list.append(row_dict)
+            
+        cur.close()
+        return templates.TemplateResponse(request, "admin.html", {"user": user, "users_list": users_list})
+    except Exception as e:
+        return HTMLResponse(f"Error loading admin panel. Make sure a user has logged in first so the table exists. Details: {e}")
+    finally:
+        release_db_connection(conn)
+
+@app.post("/admin/users/{email}/approve")
+def approve_user(request: Request, email: str):
+    user = request.session.get("user")
+    if not user or user.get("email", "").lower() != FOUNDER_EMAIL.lower():
+        return RedirectResponse("/")
+        
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute("UPDATE users SET is_approved = TRUE WHERE email = %s", (email,))
+        conn.commit()
+        cur.close()
+    finally:
+        release_db_connection(conn)
+    return RedirectResponse("/admin/users", status_code=303)
+
+@app.post("/admin/users/{email}/revoke")
+def revoke_user(request: Request, email: str):
+    user = request.session.get("user")
+    if not user or user.get("email", "").lower() != FOUNDER_EMAIL.lower():
+        return RedirectResponse("/")
+        
+    # Prevent founder from accidentally revoking themselves
+    if email.lower() == FOUNDER_EMAIL.lower():
+        return RedirectResponse("/admin/users", status_code=303) 
+        
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute("UPDATE users SET is_approved = FALSE WHERE email = %s", (email,))
+        conn.commit()
+        cur.close()
+    finally:
+        release_db_connection(conn)
+    return RedirectResponse("/admin/users", status_code=303)
