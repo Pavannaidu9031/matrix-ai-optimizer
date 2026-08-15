@@ -637,6 +637,48 @@ def export_csv(request: Request):
         release_db_connection(conn)
 
 # ==============================================================================
+# EMAIL NOTIFICATION HELPER
+# ==============================================================================
+def send_approval_email(recipient_email: str):
+    """Sends a welcome email to the newly approved user via SMTP."""
+    sender_email = os.getenv("SMTP_EMAIL")
+    sender_password = os.getenv("SMTP_PASSWORD")
+    
+    if not sender_email or not sender_password:
+        print("SMTP_EMAIL or SMTP_PASSWORD not set in environment. Email skipped.")
+        return
+
+    try:
+        msg = MIMEMultipart()
+        msg['From'] = sender_email
+        msg['To'] = recipient_email
+        msg['Subject'] = "Access Granted: Welcome to MatrixAI"
+
+        body = """
+        <div style="font-family: Arial, sans-serif; padding: 20px; color: #1e293b; line-height: 1.6;">
+            <h2 style="color: #3b82f6;">Welcome to MatrixAI</h2>
+            <p>Hello,</p>
+            <p>Your access request for the MatrixAI Research Laboratory has been <strong>approved</strong> by the founder.</p>
+            <p>You can now log in, access the dashboard, and begin optimizing your thin-film deposition experiments.</p>
+            <br>
+            <a href="https://rock-ai-optimizer.onrender.com/" style="display: inline-block; padding: 12px 24px; background-color: #3b82f6; color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: bold;">Access Dashboard</a>
+            <br><br>
+            <p>Happy experimenting!</p>
+        </div>
+        """
+        msg.attach(MIMEText(body, 'html'))
+
+        # Standard Gmail SMTP configuration
+        server = smtplib.SMTP('smtp.gmail.com', 587)
+        server.starttls()
+        server.login(sender_email, sender_password)
+        server.sendmail(sender_email, recipient_email, msg.as_string())
+        server.quit()
+        print(f"Approval email sent successfully to {recipient_email}")
+    except Exception as e:
+        print(f"Failed to send email to {recipient_email}: {e}")
+
+# ==============================================================================
 # ADMIN PANEL ROUTES
 # ==============================================================================
 @app.get("/admin/users", response_class=HTMLResponse)
@@ -649,6 +691,19 @@ def admin_dashboard(request: Request):
     conn = get_db_connection()
     try:
         cur = conn.cursor()
+        
+        # Force create the users table if the Admin accesses the panel before anyone logs in
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                email VARCHAR PRIMARY KEY,
+                name VARCHAR,
+                picture VARCHAR,
+                is_approved BOOLEAN DEFAULT FALSE,
+                created_at TIMESTAMP DEFAULT NOW()
+            )
+        """)
+        conn.commit()
+
         # Fetch all users and calculate how many experiments they have logged
         cur.execute("""
             SELECT u.email, u.name, u.picture, u.is_approved, u.created_at,
@@ -671,7 +726,7 @@ def admin_dashboard(request: Request):
         cur.close()
         return templates.TemplateResponse(request, "admin.html", {"user": user, "users_list": users_list})
     except Exception as e:
-        return HTMLResponse(f"Error loading admin panel. Make sure a user has logged in first so the table exists. Details: {e}")
+        return HTMLResponse(f"Error loading admin panel. Details: {e}")
     finally:
         release_db_connection(conn)
 
@@ -687,6 +742,10 @@ def approve_user(request: Request, email: str):
         cur.execute("UPDATE users SET is_approved = TRUE WHERE email = %s", (email,))
         conn.commit()
         cur.close()
+        
+        # Fire off the automated email directly after successful DB update
+        send_approval_email(email)
+        
     finally:
         release_db_connection(conn)
     return RedirectResponse("/admin/users", status_code=303)
