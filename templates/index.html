@@ -171,12 +171,12 @@
                         <span id="confBadge" class="px-3 py-1 rounded-full text-xs font-bold"></span>
                     </div>
 
-                    <!-- REPLACED: BATCH OPTIONS GRID -->
+                    <!-- BATCH OPTIONS GRID -->
                     <div id="batchOptionsGrid" class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <!-- Will be injected by Javascript -->
+                        <!-- Injected by Javascript -->
                     </div>
                     
-                    <!-- DIGITAL TWIN SANDBOX -->
+                    <!-- DIGITAL TWIN SANDBOX (STATIC PLOTLY CURVES) -->
                     <div id="digitalTwinSection" class="bg-slate-950/50 rounded-xl p-4 border border-slate-800 space-y-4">
                         <div class="text-xs font-bold text-purple-400 uppercase tracking-wider flex items-center space-x-2">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
@@ -222,6 +222,77 @@
                 </div>
             </section>
 
+            <!-- DIGITAL TWIN INTERACTIVE PARAMETER SANDBOX (LIVE SLIDERS) -->
+            <section class="bg-slate-900/80 p-6 rounded-2xl border border-slate-800 shadow-xl space-y-6">
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center">
+                    <div>
+                        <div class="text-xs font-bold tracking-wider text-purple-400 uppercase">DIGITAL CHAMBER TWIN</div>
+                        <h2 class="text-2xl font-extrabold text-white">Interactive Parameter Sandbox</h2>
+                        <p class="text-xs text-slate-400 mt-1">Drag the sliders to virtually simulate chamber conditions and predict outcomes in real-time.</p>
+                    </div>
+                    <div class="mt-4 md:mt-0 bg-slate-950 px-4 py-3 rounded-xl border border-slate-800 flex items-center space-x-6">
+                        <div>
+                            <div class="text-[10px] text-slate-400 uppercase">Predicted Shift</div>
+                            <div class="text-lg font-extrabold text-blue-400" id="simShift">-- pm</div>
+                        </div>
+                        <div>
+                            <div class="text-[10px] text-slate-400 uppercase">Expected Phase</div>
+                            <div class="text-lg font-extrabold text-emerald-400" id="simPhase">--</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 bg-slate-950/50 p-6 rounded-xl border border-slate-800">
+                    <div class="space-y-2">
+                        <div class="flex justify-between text-xs font-semibold">
+                            <span class="text-slate-300">RF Power</span>
+                            <span class="text-blue-400 font-mono" id="valRf">120 W</span>
+                        </div>
+                        <input type="range" id="sliderRf" min="80" max="150" step="1" value="120" class="w-full accent-blue-500 cursor-pointer">
+                    </div>
+                    
+                    <div class="space-y-2">
+                        <div class="flex justify-between text-xs font-semibold">
+                            <span class="text-slate-300">Working Pressure</span>
+                            <span class="text-blue-400 font-mono" id="valPress">5.0 mTorr</span>
+                        </div>
+                        <input type="range" id="sliderPress" min="3" max="10" step="0.1" value="5.0" class="w-full accent-blue-500 cursor-pointer">
+                    </div>
+
+                    <div class="space-y-2">
+                        <div class="flex justify-between text-xs font-semibold">
+                            <span class="text-slate-300">Target Distance</span>
+                            <span class="text-blue-400 font-mono" id="valDist">7.0 cm</span>
+                        </div>
+                        <input type="range" id="sliderDist" min="3" max="7" step="0.1" value="7.0" class="w-full accent-blue-500 cursor-pointer">
+                    </div>
+
+                    <div class="space-y-2">
+                        <div class="flex justify-between text-xs font-semibold">
+                            <span class="text-slate-300">Film Thickness</span>
+                            <span class="text-blue-400 font-mono" id="valThick">200 nm</span>
+                        </div>
+                        <input type="range" id="sliderThick" min="100" max="500" step="10" value="200" class="w-full accent-blue-500 cursor-pointer">
+                    </div>
+
+                    <div class="space-y-2">
+                        <div class="flex justify-between text-xs font-semibold">
+                            <span class="text-slate-300">Rotation Speed</span>
+                            <span class="text-blue-400 font-mono" id="valRot">5 rpm</span>
+                        </div>
+                        <input type="range" id="sliderRot" min="1" max="10" step="1" value="5" class="w-full accent-blue-500 cursor-pointer">
+                    </div>
+
+                    <div class="space-y-2">
+                        <div class="flex justify-between text-xs font-semibold">
+                            <span class="text-slate-300">Ar Flow</span>
+                            <span class="text-blue-400 font-mono" id="valAr">30 sccm</span>
+                        </div>
+                        <input type="range" id="sliderAr" min="20" max="40" step="1" value="30" class="w-full accent-blue-500 cursor-pointer">
+                    </div>
+                </div>
+            </section>
+
             <!-- OPTIMIZATION HISTORY LEARNING CURVE CHART -->
             {% if experiments %}
             <section class="bg-slate-900/80 p-6 rounded-2xl border border-slate-800 shadow-xl space-y-4">
@@ -258,7 +329,7 @@
 
                 <form action="/add" method="POST" class="grid grid-cols-1 md:grid-cols-3 gap-4 bg-slate-900/80 p-6 rounded-2xl border border-slate-800 text-white shadow-xl">
                     
-                    <!-- NEW: Target Material Dropdown -->
+                    <!-- Target Material Dropdown -->
                     <div class="md:col-span-3 pb-2 border-b border-slate-800 mb-2">
                         <label class="block text-xs font-semibold text-slate-400 mb-1">Target Material Domain</label>
                         <select name="target_material" id="target_material" class="w-full md:w-1/3 bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-blue-500 transition">
@@ -923,7 +994,56 @@
             e.target.value = '';
         });
 
-        // 8. CHAT DRAWER LOGIC
+        // 8. DIGITAL TWIN SANDBOX SLIDER HANDLER
+        const sliders = ['Rf', 'Press', 'Dist', 'Thick', 'Rot', 'Ar'].map(name => document.getElementById('slider' + name));
+
+        function triggerSimulation() {
+            if (!document.getElementById('sliderRf')) return;
+
+            const params = [
+                parseFloat(document.getElementById('sliderRf').value),
+                parseFloat(document.getElementById('sliderPress').value),
+                parseFloat(document.getElementById('sliderDist').value),
+                parseFloat(document.getElementById('sliderThick').value),
+                parseFloat(document.getElementById('sliderRot').value),
+                parseFloat(document.getElementById('sliderAr').value)
+            ];
+
+            // Update text labels
+            document.getElementById('valRf').innerText = params[0] + " W";
+            document.getElementById('valPress').innerText = params[1] + " mTorr";
+            document.getElementById('valDist').innerText = params[2] + " cm";
+            document.getElementById('valThick').innerText = params[3] + " nm";
+            document.getElementById('valRot').innerText = params[4] + " rpm";
+            document.getElementById('valAr').innerText = params[5] + " sccm";
+
+            const targetMaterial = document.getElementById('targetMaterialSuggest')?.value || 'Generic';
+
+            fetch('/api/sandbox/simulate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ target_material: targetMaterial, params: params })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if(data.success) {
+                    document.getElementById('simShift').innerText = data.simulation.predicted_wavelength_shift + " pm (±" + data.simulation.uncertainty + ")";
+                    document.getElementById('simPhase').innerText = data.simulation.expected_phase;
+                }
+            })
+            .catch(err => console.error("Sandbox simulation error:", err));
+        }
+
+        sliders.forEach(slider => {
+            if(slider) {
+                slider.addEventListener('input', triggerSimulation);
+            }
+        });
+
+        // Run initial simulation on load
+        setTimeout(triggerSimulation, 500);
+
+        // 9. CHAT DRAWER LOGIC
         const chatDrawer = document.getElementById('chatDrawer');
         const btnChatToggle = document.getElementById('btnChatToggle');
         const btnCloseChat = document.getElementById('btnCloseChat');
