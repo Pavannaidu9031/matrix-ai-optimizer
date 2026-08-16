@@ -387,6 +387,32 @@ async def get_phase_map(request: Request):
         return JSONResponse({"error": str(e)}, status_code=500)
 
 # ==============================================================================
+# AUTOMATED NOISE CALIBRATION ENDPOINT
+# ==============================================================================
+@app.post("/api/optimizer/calibrate-noise")
+async def calibrate_noise(request: Request):
+    user = request.session.get("user")
+    if not user:
+        return JSONResponse({"error": "not_authenticated"}, status_code=401)
+        
+    try:
+        conn = get_db_connection()
+        try:
+            cur = conn.cursor()
+            cur.execute("SELECT * FROM experiments WHERE user_email = %s", (user.get("email"),))
+            rows = cur.fetchall()
+            cols = [desc[0] for desc in cur.description] if cur.description else []
+            experiments = [dict(zip(cols, r)) for r in rows]
+            cur.close()
+        finally:
+            release_db_connection(conn)
+            
+        calibration = optimizer.calibrate_noise_variance(experiments)
+        return JSONResponse({"success": True, "calibration": calibration})
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+# ==============================================================================
 # FORM SUBMISSION ROUTE (/add)
 # ==============================================================================
 @app.post("/add")
