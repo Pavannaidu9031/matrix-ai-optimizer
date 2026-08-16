@@ -6,6 +6,10 @@
     <title>MatrixAI — Materials Optimizer</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- ADDED: jsPDF for Lab Reports -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <!-- ADDED: Plotly for Correlation Heatmap -->
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
     <script>
         tailwind.config = {
             darkMode: 'class',
@@ -28,19 +32,13 @@
     </script>
     <style>
         @keyframes pulse-glow {
-            0%, 100% {
-                box-shadow: 0 0 12px rgba(59, 130, 246, 0.4), 0 0 24px rgba(124, 58, 237, 0.2);
-            }
-            50% {
-                box-shadow: 0 0 24px rgba(59, 130, 246, 0.8), 0 0 40px rgba(124, 58, 237, 0.5);
-            }
+            0%, 100% { box-shadow: 0 0 12px rgba(59, 130, 246, 0.4), 0 0 24px rgba(124, 58, 237, 0.2); }
+            50% { box-shadow: 0 0 24px rgba(59, 130, 246, 0.8), 0 0 40px rgba(124, 58, 237, 0.5); }
         }
-
         .btn-glow {
             background: linear-gradient(135deg, #3B82F6, #7C3AED);
             animation: pulse-glow 3s infinite ease-in-out;
         }
-
         .btn-glow:disabled {
             animation: none;
             background: #374151;
@@ -48,15 +46,11 @@
             cursor: not-allowed;
             opacity: 0.6;
         }
-
         @keyframes flash-fill {
             0% { background-color: rgba(59, 130, 246, 0.4); }
             100% { background-color: #1e293b; }
         }
-
-        .flash-highlight {
-            animation: flash-fill 1.2s ease-out;
-        }
+        .flash-highlight { animation: flash-fill 1.2s ease-out; }
     </style>
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen font-sans antialiased selection:bg-blue-500 selection:text-white">
@@ -65,9 +59,7 @@
     <nav class="border-b border-slate-800/80 bg-slate-900/60 backdrop-blur-md sticky top-0 z-50">
         <div class="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
             <div class="flex items-center space-x-3">
-                <div class="w-9 h-9 rounded-lg bg-gradient-to-tr from-blue-500 to-purple-600 flex items-center justify-center font-extrabold text-white text-lg shadow-lg shadow-blue-500/20">
-                    M
-                </div>
+                <div class="w-9 h-9 rounded-lg bg-gradient-to-tr from-blue-500 to-purple-600 flex items-center justify-center font-extrabold text-white text-lg shadow-lg shadow-blue-500/20">M</div>
                 <div>
                     <span class="font-bold text-lg tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white via-slate-200 to-slate-400">MatrixAI</span>
                     <span class="text-xs text-blue-400 font-semibold px-2.5 py-0.5 rounded-full bg-blue-500/10 border border-blue-500/20 ml-2">Materials Science</span>
@@ -77,9 +69,7 @@
             <div class="flex items-center space-x-4">
                 {% if user %}
                     {% if user.email.lower() == 'pavannaidu9031@gmail.com' %}
-                        <a href="/admin/users" class="text-xs font-semibold px-3 py-1.5 rounded-lg bg-purple-500/10 text-purple-400 border border-purple-500/20 hover:bg-purple-500/20 transition">
-                            Admin Panel
-                        </a>
+                        <a href="/admin/users" class="text-xs font-semibold px-3 py-1.5 rounded-lg bg-purple-500/10 text-purple-400 border border-purple-500/20 hover:bg-purple-500/20 transition">Admin Panel</a>
                     {% endif %}
                     <div class="flex items-center space-x-3 bg-slate-850 px-3 py-1.5 rounded-xl border border-slate-800">
                         {% if user.picture %}
@@ -122,7 +112,6 @@
                 <div class="pt-4">
                     <a href="/login/google" class="inline-flex items-center space-x-2 bg-blue-500 hover:bg-blue-400 text-slate-950 font-bold px-6 py-3 rounded-xl transition shadow-lg shadow-blue-500/25">
                         <span>Get Started with Google</span>
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
                     </a>
                 </div>
             </div>
@@ -134,17 +123,14 @@
                     <div class="text-3xl font-extrabold text-white">{{ stats.total_runs }}</div>
                     <div class="text-xs font-medium text-slate-400 mt-1">Total Experiments Logged</div>
                 </div>
-
                 <div class="bg-slate-900/80 p-5 rounded-2xl border border-slate-800 border-l-4 border-l-emerald-500 shadow-xl">
                     <div class="text-3xl font-extrabold text-emerald-400">{{ stats.monoclinic_runs }}</div>
                     <div class="text-xs font-medium text-slate-400 mt-1">Monoclinic Phase Runs</div>
                 </div>
-
                 <div class="bg-slate-900/80 p-5 rounded-2xl border border-slate-800 border-l-4 border-l-purple-500 shadow-xl">
                     <div class="text-3xl font-extrabold text-purple-400">{{ stats.best_shift }} <span class="text-sm font-normal text-slate-400">pm</span></div>
                     <div class="text-xs font-medium text-slate-400 mt-1">Best Wavelength Shift</div>
                 </div>
-
                 <div class="bg-slate-900/80 p-5 rounded-2xl border border-slate-800 border-l-4 border-l-amber-500 shadow-xl">
                     <div class="text-3xl font-extrabold text-amber-400">{{ stats.runs_remaining }}</div>
                     <div class="text-xs font-medium text-slate-400 mt-1">Optimization Runs Remaining</div>
@@ -213,9 +199,16 @@
                         <p id="expText" class="text-xs text-slate-300 leading-relaxed"></p>
                     </div>
 
-                    <button id="btnApply" type="button" class="border border-blue-400 text-blue-400 hover:bg-blue-400/10 font-bold text-sm px-6 py-2.5 rounded-xl transition">
-                        ⬇ Apply to Form
-                    </button>
+                    <!-- ACTION BUTTONS -->
+                    <div class="flex space-x-3">
+                        <button id="btnApply" type="button" class="border border-blue-400 text-blue-400 hover:bg-blue-400/10 font-bold text-sm px-6 py-2.5 rounded-xl transition">
+                            ⬇ Apply to Form
+                        </button>
+                        <!-- ADDED: PDF Lab Report Button -->
+                        <button id="btnPdf" type="button" class="border border-purple-400 text-purple-400 hover:bg-purple-400/10 font-bold text-sm px-6 py-2.5 rounded-xl transition flex items-center">
+                            📄 Download PDF Report
+                        </button>
+                    </div>
                 </div>
             </section>
 
@@ -230,6 +223,18 @@
                     <canvas id="qualityChart"></canvas>
                 </div>
             </section>
+            
+            <!-- ADDED: PLOTLY HEATMAP INSIGHTS SECTION -->
+            {% if experiments|length > 2 %}
+            <section class="bg-slate-900/80 p-6 rounded-2xl border border-slate-800 shadow-xl space-y-4">
+                <div>
+                    <h2 class="text-xl font-bold text-white">Parameter Correlation Insights</h2>
+                    <p class="text-xs text-slate-400">Mathematical impact of input parameters on experimental outcomes.</p>
+                </div>
+                <div id="heatmapChart" class="w-full h-[400px]"></div>
+            </section>
+            {% endif %}
+            
             {% endif %}
 
             <!-- EXPERIMENT INPUT FORM SECTION -->
@@ -246,42 +251,34 @@
                         <label class="block text-xs font-semibold text-slate-400 mb-1">RF Power (W)</label>
                         <input type="number" step="0.1" name="rf_power_w" id="rf_power_w" required placeholder="e.g. 150" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-blue-500 transition">
                     </div>
-
                     <div>
                         <label class="block text-xs font-semibold text-slate-400 mb-1">Working Pressure (mTorr)</label>
                         <input type="number" step="0.01" name="working_pressure_mtorr" id="working_pressure_mtorr" required placeholder="e.g. 5.0" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-blue-500 transition">
                     </div>
-
                     <div>
                         <label class="block text-xs font-semibold text-slate-400 mb-1">Ar Flow (sccm)</label>
                         <input type="number" step="0.1" name="ar_flow_sccm" id="ar_flow_sccm" required placeholder="e.g. 30" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-blue-500 transition">
                     </div>
-
                     <div>
                         <label class="block text-xs font-semibold text-slate-400 mb-1">O₂ Flow (sccm)</label>
                         <input type="number" step="0.1" name="o2_flow_sccm" id="o2_flow_sccm" required placeholder="e.g. 5" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-blue-500 transition">
                     </div>
-
                     <div>
                         <label class="block text-xs font-semibold text-slate-400 mb-1">Substrate Temp (°C)</label>
                         <input type="number" step="0.1" name="substrate_temp_c" id="substrate_temp_c" required placeholder="e.g. 300" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-blue-500 transition">
                     </div>
-
                     <div>
                         <label class="block text-xs font-semibold text-slate-400 mb-1">Target Distance (cm)</label>
                         <input type="number" step="0.1" name="target_substrate_distance_cm" id="target_substrate_distance_cm" required placeholder="e.g. 7" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-blue-500 transition">
                     </div>
-
                     <div>
                         <label class="block text-xs font-semibold text-slate-400 mb-1">Sputter Time (min)</label>
                         <input type="number" step="0.1" name="sputtering_time_min" id="sputtering_time_min" required placeholder="e.g. 30" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-blue-500 transition">
                     </div>
-
                     <div>
                         <label class="block text-xs font-semibold text-slate-400 mb-1">Film Thickness (nm)</label>
                         <input type="number" step="0.1" name="film_thickness_nm" id="film_thickness_nm" placeholder="e.g. 100" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-blue-500 transition">
                     </div>
-
                     <div>
                         <label class="block text-xs font-semibold text-slate-400 mb-1">Rotation Speed (rpm)</label>
                         <select name="rotation_speed_rpm" id="rotation_speed_rpm" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-blue-500 transition">
@@ -290,7 +287,6 @@
                             <option value="10">10 rpm</option>
                         </select>
                     </div>
-
                     <div>
                         <label class="block text-xs font-semibold text-slate-400 mb-1">Substrate Type</label>
                         <select name="substrate_type" id="substrate_type" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-blue-500 transition">
@@ -298,7 +294,6 @@
                             <option value="Optical Fiber">Optical Fiber</option>
                         </select>
                     </div>
-
                     <div>
                         <label class="block text-xs font-semibold text-slate-400 mb-1">XRD Phase Target</label>
                         <select name="xrd_phase" id="xrd_phase" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-blue-500 transition">
@@ -307,22 +302,18 @@
                             <option value="Amorphous" selected>Amorphous</option>
                         </select>
                     </div>
-
                     <div>
                         <label class="block text-xs font-semibold text-slate-400 mb-1">Grain Size (nm) <span class="text-slate-500">(FESEM)</span></label>
                         <input type="number" step="0.1" name="grain_size_nm" placeholder="e.g. 25.4" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-blue-500 transition">
                     </div>
-
                     <div>
                         <label class="block text-xs font-semibold text-slate-400 mb-1">H₂ Response Time (s)</label>
                         <input type="number" step="0.1" name="h2_response_time_s" required placeholder="e.g. 12" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-blue-500 transition">
                     </div>
-
                     <div>
                         <label class="block text-xs font-semibold text-slate-400 mb-1">Wavelength Shift (pm) <span class="text-slate-500">(FBG)</span></label>
                         <input type="number" step="0.1" name="wavelength_shift_pm" placeholder="e.g. 150" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-blue-500 transition">
                     </div>
-
                     <div>
                         <label class="block text-xs font-semibold text-slate-400 mb-1">Batch / Sample Notes</label>
                         <input type="text" name="notes" placeholder="e.g. BATCH-2026-A" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-blue-500 transition">
@@ -332,7 +323,6 @@
                         <button type="submit" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-2.5 px-6 rounded-xl transition shadow-lg shadow-blue-500/20 text-sm">
                             Save Experiment
                         </button>
-                        
                         <a href="/export/csv" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-semibold py-2.5 px-5 rounded-xl transition text-sm flex items-center space-x-2">
                             <span>Export CSV</span>
                         </a>
@@ -349,10 +339,12 @@
                     </div>
                 </div>
 
-                <div class="bg-slate-900/80 border border-slate-800 rounded-2xl overflow-x-auto shadow-xl">
+                <div class="bg-slate-900/80 border border-slate-800 rounded-2xl overflow-x-auto shadow-xl relative pb-16">
                     <table class="w-full text-left border-collapse">
                         <thead>
                             <tr class="text-slate-400 border-b border-slate-800 text-xs uppercase tracking-wider bg-slate-850/50">
+                                <!-- ADDED: Checkbox column for radar compare -->
+                                <th class="p-3 text-center">Compare</th>
                                 <th class="p-3">Quality</th>
                                 <th class="p-3">Batch / Notes</th>
                                 <th class="p-3">RF Power</th>
@@ -369,6 +361,10 @@
                         <tbody class="divide-y divide-slate-800/60 text-xs">
                             {% for exp in experiments %}
                             <tr class="hover:bg-slate-800/40 transition">
+                                <!-- ADDED: Checkbox input mapping to experiment index -->
+                                <td class="p-3 text-center">
+                                    <input type="checkbox" class="compare-cbk w-4 h-4 rounded border-slate-700 bg-slate-800 text-blue-500 focus:ring-blue-500 cursor-pointer" value="{{ loop.index0 }}">
+                                </td>
                                 <td class="p-3">
                                     {% set q = exp.quality_score or 50.0 %}
                                     {% if q >= 80 %}
@@ -402,29 +398,54 @@
                             </tr>
                             {% else %}
                             <tr>
-                                <td colspan="11" class="p-8 text-center text-slate-500">
+                                <td colspan="12" class="p-8 text-center text-slate-500">
                                     No experiments logged yet. Fill out the form above to record your first run.
                                 </td>
                             </tr>
                             {% endfor %}
                         </tbody>
                     </table>
+                    
+                    <!-- ADDED: Floating Compare Actions Bar -->
+                    <div id="compareBar" class="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-slate-800 border border-slate-600 px-5 py-3 rounded-2xl shadow-2xl hidden z-40 flex items-center space-x-4">
+                        <span class="text-sm font-bold text-white">2 Selected</span>
+                        <button id="btnCompare" class="bg-purple-600 hover:bg-purple-500 text-white font-bold py-1.5 px-4 rounded-xl text-xs transition">Compare on Radar</button>
+                        <button id="btnClearCompare" class="text-slate-400 hover:text-white transition text-xs font-semibold">Clear</button>
+                    </div>
                 </div>
             </section>
 
         {% endif %}
-
     </main>
 
-    <!-- JS TRIGGER, CHART.JS & AUTOFILL SCRIPT -->
+    <!-- ADDED: Radar Chart Modal -->
+    <div id="radarModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden z-[60] flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-700 p-6 rounded-3xl shadow-2xl w-full max-w-2xl relative">
+            <button id="btnCloseRadar" class="absolute top-4 right-4 text-slate-400 hover:text-white transition bg-slate-800 rounded-full p-1">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+            <h3 class="text-2xl font-bold text-white mb-2">Parameter Comparison</h3>
+            <p class="text-xs text-slate-400 mb-6">Visual overlap of two selected experimental runs.</p>
+            <div class="h-80 w-full relative">
+                <canvas id="radarCanvas"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- JS TRIGGER, CHARTS & AUTOFILL SCRIPT -->
     <script>
         let latestSuggestion = null;
-
-        // Render Learning Curve Chart
+        let radarChartObj = null;
+        
         {% if experiments %}
         const expData = {{ experiments | tojson }};
+        {% else %}
+        const expData = [];
+        {% endif %}
+
+        // 1. LEARNING CURVE CHART
         const ctx = document.getElementById('qualityChart')?.getContext('2d');
-        if (ctx) {
+        if (ctx && expData.length > 0) {
             const labels = expData.map((e, idx) => `Run #${expData.length - idx}`);
             const scores = expData.map(e => e.quality_score || 50.0).reverse();
             labels.reverse();
@@ -453,8 +474,8 @@
                 }
             });
         }
-        {% endif %}
 
+        // 2. BAYESIAN SUGGEST BUTTON TRIGGER
         document.getElementById('btnSuggest')?.addEventListener('click', async () => {
             const btn = document.getElementById('btnSuggest');
             const btnText = document.getElementById('btnText');
@@ -486,7 +507,6 @@
                     badge.innerText = (data.confidence?.label || 'READY') + " CONFIDENCE";
                     badge.className = "px-3 py-1 rounded-full text-xs font-bold bg-blue-500/20 text-blue-400 border border-blue-500/30";
 
-                    // Render Convergence Progress Bar
                     const c = data.convergence;
                     document.getElementById('convText').innerText = c.convergence_score + "%";
                     document.getElementById('convBar').style.width = c.convergence_score + "%";
@@ -496,7 +516,6 @@
                         document.getElementById('convBanner').innerText = `Estimated ${c.runs_to_convergence_estimate} more runs to convergence`;
                     }
 
-                    // Render Parameter Uncertainty Bars
                     const uContainer = document.getElementById('uncertaintyBars');
                     uContainer.innerHTML = '';
                     for (const [pName, uVal] of Object.entries(data.parameter_uncertainties)) {
@@ -528,9 +547,9 @@
             }
         });
 
+        // 3. APPLY PARAMETERS TO FORM
         document.getElementById('btnApply')?.addEventListener('click', () => {
             if (!latestSuggestion) return;
-
             const s = latestSuggestion.suggested;
             const fields = [
                 { id: 'rf_power_w', val: s.rf_power },
@@ -540,7 +559,6 @@
                 { id: 'rotation_speed_rpm', val: s.rotation_speed },
                 { id: 'ar_flow_sccm', val: s.ar_flow }
             ];
-
             fields.forEach(f => {
                 const el = document.getElementById(f.id);
                 if (el) {
@@ -549,10 +567,203 @@
                     setTimeout(() => el.classList.remove('flash-highlight'), 1200);
                 }
             });
-
             document.getElementById('formSection')?.scrollIntoView({ behavior: 'smooth' });
         });
-    </script>
 
+        // 4. GENERATE PDF LAB REPORT
+        document.getElementById('btnPdf')?.addEventListener('click', () => {
+            if (!latestSuggestion) return;
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            const s = latestSuggestion;
+            
+            // Background & Theme styling
+            doc.setFillColor(15, 23, 42); 
+            doc.rect(0, 0, 210, 297, 'F');
+            doc.setTextColor(255, 255, 255);
+            
+            // Header
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(22);
+            doc.text("MatrixAI Lab Report", 20, 30);
+            
+            // Meta Info
+            doc.setFontSize(12);
+            doc.setFont("helvetica", "normal");
+            doc.text(`Run Number: #${s.run_number}`, 20, 45);
+            doc.text(`Date: ${new Date().toLocaleDateString()}`, 20, 52);
+            
+            // Parameters Section
+            doc.setFont("helvetica", "bold");
+            doc.text("Suggested Processing Parameters:", 20, 70);
+            doc.setFont("helvetica", "normal");
+            const p = s.suggested;
+            let y = 80;
+            const params = [
+                `RF Power: ${p.rf_power} W`,
+                `Working Pressure: ${p.working_pressure} mTorr`,
+                `Target Distance: ${p.target_distance} cm`,
+                `Film Thickness: ${p.film_thickness} nm`,
+                `Rotation Speed: ${p.rotation_speed} rpm`,
+                `Ar Flow: ${p.ar_flow} sccm`
+            ];
+            params.forEach(param => { doc.text(param, 25, y); y += 8; });
+            
+            // Outcomes Section
+            doc.setFont("helvetica", "bold");
+            doc.text("Expected Material Outcomes:", 20, y + 10);
+            doc.setFont("helvetica", "normal");
+            y += 20;
+            doc.text(`Target XRD Phase: ${s.expected.xrd_phase}`, 25, y);
+            doc.text(`Expected Wavelength Shift: ${s.expected.wavelength_shift_estimate} pm`, 25, y+8);
+            
+            // AI Rationale Section
+            doc.setFont("helvetica", "bold");
+            doc.text("Scientific Rationale:", 20, y + 25);
+            doc.setFont("helvetica", "normal");
+            const lines = doc.splitTextToSize(s.explanation, 170);
+            doc.text(lines, 20, y + 35);
+            
+            // Save Trigger
+            doc.save(`MatrixAI_Lab_Report_Run${s.run_number}.pdf`);
+        });
+
+        // 5. RADAR CHART COMPARATOR LOGIC
+        const compareCbks = document.querySelectorAll('.compare-cbk');
+        const compareBar = document.getElementById('compareBar');
+        
+        function updateCompareBar() {
+            const checked = document.querySelectorAll('.compare-cbk:checked');
+            if (checked.length === 2) {
+                compareBar.classList.remove('hidden');
+                compareCbks.forEach(cb => { if(!cb.checked) cb.disabled = true; }); // lock others
+            } else {
+                compareBar.classList.add('hidden');
+                compareCbks.forEach(cb => cb.disabled = false); // unlock
+            }
+        }
+
+        compareCbks.forEach(cb => cb.addEventListener('change', updateCompareBar));
+
+        document.getElementById('btnClearCompare')?.addEventListener('click', () => {
+            compareCbks.forEach(cb => cb.checked = false);
+            updateCompareBar();
+        });
+
+        document.getElementById('btnCompare')?.addEventListener('click', () => {
+            const checked = document.querySelectorAll('.compare-cbk:checked');
+            if (checked.length !== 2) return;
+            
+            // Map the selected checkboxes to our JS array via index
+            const exp1 = expData[parseInt(checked[0].value)];
+            const exp2 = expData[parseInt(checked[1].value)];
+            
+            document.getElementById('radarModal').classList.remove('hidden');
+            
+            const ctxRadar = document.getElementById('radarCanvas').getContext('2d');
+            if (radarChartObj) radarChartObj.destroy();
+            
+            // Normalizing some data so the radar chart shape looks visually balanced
+            const getVals = (e) => [
+                e.rf_power, 
+                e.working_pressure * 10,  
+                e.target_distance, 
+                e.sputter_time, 
+                (e.film_thickness || 100) * 0.1, 
+                e.ar_flow
+            ];
+
+            radarChartObj = new Chart(ctxRadar, {
+                type: 'radar',
+                data: {
+                    labels: ['RF Power', 'Pressure (x10)', 'Target Dist', 'Sputter Time', 'Thickness (x0.1)', 'Ar Flow'],
+                    datasets: [
+                        {
+                            label: `Run (Score: ${exp1.quality_score || 50})`,
+                            data: getVals(exp1),
+                            backgroundColor: 'rgba(59, 130, 246, 0.3)',
+                            borderColor: '#3B82F6',
+                            pointBackgroundColor: '#3B82F6'
+                        },
+                        {
+                            label: `Run (Score: ${exp2.quality_score || 50})`,
+                            data: getVals(exp2),
+                            backgroundColor: 'rgba(16, 185, 129, 0.3)',
+                            borderColor: '#10B981',
+                            pointBackgroundColor: '#10B981'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        r: {
+                            grid: { color: 'rgba(255,255,255,0.1)' },
+                            angleLines: { color: 'rgba(255,255,255,0.1)' },
+                            pointLabels: { color: '#94a3b8', font: { size: 12 } },
+                            ticks: { display: false }
+                        }
+                    },
+                    plugins: {
+                        legend: { labels: { color: '#ffffff' } }
+                    }
+                }
+            });
+        });
+
+        document.getElementById('btnCloseRadar')?.addEventListener('click', () => {
+            document.getElementById('radarModal').classList.add('hidden');
+        });
+
+        // 6. PLOTLY PARAMETER CORRELATION HEATMAP
+        {% if experiments|length > 2 %}
+        function calcCorrelation(x, y) {
+            const n = x.length;
+            const sum_x = x.reduce((a, b) => a + b, 0);
+            const sum_y = y.reduce((a, b) => a + b, 0);
+            const sum_xy = x.reduce((a, b, i) => a + (b * y[i]), 0);
+            const sum_x2 = x.reduce((a, b) => a + (b * b), 0);
+            const sum_y2 = y.reduce((a, b) => a + (b * b), 0);
+            
+            const num = (n * sum_xy) - (sum_x * sum_y);
+            const den = Math.sqrt((n * sum_x2 - sum_x * sum_x) * (n * sum_y2 - sum_y * sum_y));
+            if (den === 0) return 0;
+            return num / den;
+        }
+
+        const features = ['rf_power', 'working_pressure', 'target_distance', 'sputter_time', 'ar_flow', 'quality_score', 'wavelength_shift'];
+        const labels = ['RF Power', 'Pressure', 'Distance', 'Time', 'Ar Flow', 'Quality Score', 'Wave Shift'];
+        
+        const matrix = [];
+        for (let i = 0; i < features.length; i++) {
+            matrix[i] = [];
+            for (let j = 0; j < features.length; j++) {
+                const arr1 = expData.map(e => Number(e[features[i]]) || 0);
+                const arr2 = expData.map(e => Number(e[features[j]]) || 0);
+                matrix[i][j] = calcCorrelation(arr1, arr2);
+            }
+        }
+
+        const plotData = [{
+            z: matrix,
+            x: labels,
+            y: labels,
+            type: 'heatmap',
+            colorscale: 'RdBu',
+            zmin: -1,
+            zmax: 1
+        }];
+
+        const plotLayout = {
+            paper_bgcolor: 'transparent',
+            plot_bgcolor: 'transparent',
+            font: { color: '#94a3b8' },
+            margin: { t: 20, l: 100, r: 20, b: 60 }
+        };
+
+        Plotly.newPlot('heatmapChart', plotData, plotLayout, {responsive: true, displayModeBar: false});
+        {% endif %}
+    </script>
 </body>
 </html>
