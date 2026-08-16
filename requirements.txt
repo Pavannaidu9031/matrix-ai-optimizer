@@ -13,3 +13,5 @@ requests
 starlette
 itsdangerous
 psycopg2-binary
+google-genai
+groq
