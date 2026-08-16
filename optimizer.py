@@ -4,17 +4,32 @@ from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import RBF, WhiteKernel, ConstantKernel
 
 # ------------------------------------------------------------------------------
-# UPGRADE 3: Literature Pre-Seeding Prior Knowledge
+# UPGRADE 3: Literature Pre-Seeding (Now Multi-Material)
 # ------------------------------------------------------------------------------
-LITERATURE_PRIORS = [
-    [100.0, 5.0, 7.0, 200.0, 5.0, 30.0, 0.0, 45.0],
-    [120.0, 4.0, 5.0, 200.0, 5.0, 30.0, 0.5, 78.0],
-    [80.0,  8.0, 7.0, 300.0, 1.0, 25.0, 0.0, 22.0],
-    [150.0, 3.0, 3.0, 200.0, 10.0, 30.0, 1.0, 142.0],
-    [100.0, 5.0, 5.0, 100.0, 5.0, 30.0, 0.0, 18.0],
-    [130.0, 4.0, 4.0, 300.0, 10.0, 35.0, 0.5, 95.0],
-    [150.0, 3.0, 3.0, 250.0, 10.0, 40.0, 1.0, 168.0],
-]
+MATERIAL_PRIORS = {
+    "Generic": [
+        [100.0, 5.0, 7.0, 200.0, 5.0, 30.0, 0.0, 45.0],
+        [120.0, 4.0, 5.0, 200.0, 5.0, 30.0, 0.5, 78.0],
+        [80.0,  8.0, 7.0, 300.0, 1.0, 25.0, 0.0, 22.0],
+        [150.0, 3.0, 3.0, 200.0, 10.0, 30.0, 1.0, 142.0],
+        [100.0, 5.0, 5.0, 100.0, 5.0, 30.0, 0.0, 18.0],
+        [130.0, 4.0, 4.0, 300.0, 10.0, 35.0, 0.5, 95.0],
+        [150.0, 3.0, 3.0, 250.0, 10.0, 40.0, 1.0, 168.0],
+    ],
+    "WO3": [
+        [100.0, 5.0, 7.0, 200.0, 5.0, 30.0, 0.0, 45.0],
+        [130.0, 4.0, 4.0, 300.0, 10.0, 35.0, 0.5, 95.0],
+        [150.0, 3.0, 3.0, 250.0, 10.0, 40.0, 1.0, 168.0],
+    ],
+    "TiO2": [
+        [150.0, 3.0, 5.0, 150.0, 5.0, 40.0, 0.5, 60.0],
+        [200.0, 2.0, 4.0, 150.0, 10.0, 50.0, 1.0, 110.0],
+    ],
+    "ZnO": [
+        [80.0, 6.0, 6.0, 300.0, 5.0, 20.0, 0.0, 30.0],
+        [100.0, 4.0, 5.0, 250.0, 5.0, 25.0, 1.0, 85.0],
+    ]
+}
 
 XRD_MAP = {"Monoclinic": 1.0, "Partial": 0.5, "Amorphous": 0.0}
 PARAM_NAMES = ["RF Power", "Pressure", "Target Distance", "Film Thickness", "Rotation Speed", "Ar Flow"]
@@ -44,14 +59,14 @@ def calculate_quality_score(xrd_phase, wavelength_shift_pm, h2_response_s, grain
 # ------------------------------------------------------------------------------
 # MAIN OPTIMIZATION LOGIC
 # ------------------------------------------------------------------------------
-def generate_bayesian_suggestion(user_experiments: list, recent_suggestions: list = None) -> dict:
+def generate_bayesian_suggestion(user_experiments: list, recent_suggestions: list = None, target_material: str = "Generic") -> dict:
     real_count = len(user_experiments)
 
     # --------------------------------------------------------------------------
     # UPGRADE 1: Dynamic Kappa UCB Schedule
     # --------------------------------------------------------------------------
     if real_count <= 7:
-        kappa = 1.5  # Lowered from 2.5 to reduce over-exploration in Phase 1
+        kappa = 1.5  
     elif real_count <= 15:
         kappa = 1.5  
     else:
@@ -60,12 +75,18 @@ def generate_bayesian_suggestion(user_experiments: list, recent_suggestions: lis
     # Prepare datasets
     X_list, y_xrd_list, y_wave_list = [], [], []
 
-    for p in LITERATURE_PRIORS:
+    # Domain adaptation: Load specific material priors
+    priors = MATERIAL_PRIORS.get(target_material, MATERIAL_PRIORS["Generic"])
+    for p in priors:
         X_list.append(p[:6])
         y_xrd_list.append(p[6])
         y_wave_list.append(p[7])
 
     for exp in user_experiments:
+        # Domain adaptation: filter by material if available in data
+        if exp.get("target_material", target_material) != target_material and target_material != "Generic":
+            continue
+            
         rf = float(exp.get("rf_power") or exp.get("rf_power_w") or 120.0)
         press = float(exp.get("working_pressure") or exp.get("working_pressure_mtorr") or 5.0)
         dist = float(exp.get("target_distance") or exp.get("target_substrate_distance_cm") or 7.0)
@@ -125,9 +146,38 @@ def generate_bayesian_suggestion(user_experiments: list, recent_suggestions: lis
         random_state=42
     )
     gp_wave.fit(X, y_wave_norm)
+    
+    # --------------------------------------------------------------------------
+    # HARDWARE ANOMALY DETECTION
+    # --------------------------------------------------------------------------
+    anomaly_detected = False
+    if real_count > 0:
+        last_exp = X_list[-1]
+        pred_last, _ = gp_wave.predict([last_exp], return_std=True)
+        actual_last = y_wave_norm[-1]
+        # If actual value deviates massively from GP mathematical prediction, flag hardware
+        if abs(pred_last[0] - actual_last) > 0.4:  
+            anomaly_detected = True
 
     # --------------------------------------------------------------------------
-    # SANITY CHECK (Test known Monoclinic parameters)
+    # DIGITAL TWIN SANDBOX GENERATOR
+    # --------------------------------------------------------------------------
+    def generate_sandbox_curve(param_index, base_params, bounds_tuple):
+        sandbox_X = []
+        test_vals = np.linspace(bounds_tuple[0], bounds_tuple[1], 20)
+        for val in test_vals:
+            pt = list(base_params)
+            pt[param_index] = val
+            sandbox_X.append(pt)
+        mean_w, std_w = gp_wave.predict(np.array(sandbox_X), return_std=True)
+        return {
+            "x": test_vals.tolist(),
+            "y": (mean_w * denom + min_w).tolist(),
+            "std": (std_w * denom).tolist()
+        }
+
+    # --------------------------------------------------------------------------
+    # SANITY CHECK
     # --------------------------------------------------------------------------
     test_point = np.array([[150.0, 3.0, 3.0, 200.0, 10.0, 30.0]])
     sanity_pred, _ = gp_xrd.predict(test_point, return_std=True)
@@ -205,13 +255,11 @@ def generate_bayesian_suggestion(user_experiments: list, recent_suggestions: lis
     # UPGRADE 4: Per-Parameter Length Scale Uncertainty Display
     # --------------------------------------------------------------------------
     try:
-        # Extract RBF length scales from the nested ConstantKernel * RBF structure
         rbf_k = gp_xrd.kernel_.k1.k2
         l_scales = rbf_k.length_scale
         scaled_ls = (l_scales - np.min(l_scales)) / (np.max(l_scales) - np.min(l_scales) + 1e-6)
     except Exception:
         try:
-            # Fallback if structure varies slightly
             l_scales = gp_xrd.kernel_.k1.length_scale
             scaled_ls = (l_scales - np.min(l_scales)) / (np.max(l_scales) - np.min(l_scales) + 1e-6)
         except Exception:
@@ -258,14 +306,20 @@ def generate_bayesian_suggestion(user_experiments: list, recent_suggestions: lis
             convergence_score = 100
             runs_to_conv = 0
 
+    # Generate Digital Twin plot curves for the two most sensitive parameters
+    s_rf, s_press, s_dist, s_thick, s_rot, s_ar = best_candidate
+    sandbox_data = {
+        "rf_curve": generate_sandbox_curve(0, best_candidate, bounds[0]),
+        "pressure_curve": generate_sandbox_curve(1, best_candidate, bounds[1])
+    }
+
     # --------------------------------------------------------------------------
     # UPGRADE 8: Smart Scientific Explanation Generator
     # --------------------------------------------------------------------------
-    s_rf, s_press, s_dist, s_thick, s_rot, s_ar = best_candidate
     sentences = []
 
     if s_rf > b_rf + 5.0:
-        sentences.append(f"Increasing RF power to {round(s_rf, 1)}W to provide higher adatom energy for monoclinic phase nucleation.")
+        sentences.append(f"Increasing RF power to {round(s_rf, 1)}W to provide higher adatom energy for {target_material} phase nucleation.")
     elif s_rf < b_rf - 5.0:
         sentences.append(f"Lowering RF power to {round(s_rf, 1)}W to reduce plasma damage during film growth.")
 
@@ -274,6 +328,9 @@ def generate_bayesian_suggestion(user_experiments: list, recent_suggestions: lis
 
     if s_rot >= 5.0:
         sentences.append(f"Substrate rotation at {int(s_rot)} rpm ensures circumferential coating uniformity across non-planar surfaces.")
+        
+    if anomaly_detected:
+        sentences.append("WARNING: High residual variance detected in recent runs. Check target wear or vacuum seal integrity.")
 
     if not sentences:
         sentences.append(f"Balancing working pressure at {round(s_press, 1)} mTorr and Ar flow at {round(s_ar, 1)} sccm to maintain optimal stoichiometry.")
@@ -288,6 +345,8 @@ def generate_bayesian_suggestion(user_experiments: list, recent_suggestions: lis
         "app_name": "MatrixAI",
         "run_number": real_count + 1,
         "kappa_used": round(float(kappa), 2),
+        "target_material": target_material,
+        "hardware_anomaly": anomaly_detected,
         "model_sanity_check": model_sanity_check,
         "suggested": {
             "rf_power": round(float(s_rf), 1),
@@ -306,8 +365,8 @@ def generate_bayesian_suggestion(user_experiments: list, recent_suggestions: lis
         "confidence": {
             "score": conf_score,
             "label": conf_label,
-            "data_points_used": real_count + len(LITERATURE_PRIORS),
-            "literature_points": len(LITERATURE_PRIORS),
+            "data_points_used": real_count + len(priors),
+            "literature_points": len(priors),
             "real_points": real_count,
         },
         "convergence": {
@@ -319,4 +378,5 @@ def generate_bayesian_suggestion(user_experiments: list, recent_suggestions: lis
         "most_uncertain_parameter": most_unc,
         "most_certain_parameter": most_cert,
         "explanation": explanation,
+        "digital_twin": sandbox_data
     }
