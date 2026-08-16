@@ -173,9 +173,6 @@ def generate_bayesian_suggestion(user_experiments: list, recent_suggestions: lis
     std_combined = 0.7 * std_xrd + 0.3 * std_wave
     acquisition = mean_combined + (kappa * std_combined)
 
-    # --------------------------------------------------------------------------
-    # PARETO BATCH GENERATION (3 Distinct Options)
-    # --------------------------------------------------------------------------
     idx_1 = int(np.argmax(acquisition))
     opt1 = candidates[idx_1]
     
@@ -418,4 +415,22 @@ def generate_phase_map(user_experiments: list, target_material: str, param_x: st
         "z": grid_z,
         "param_x": param_x,
         "param_y": param_y
+    }
+
+# ------------------------------------------------------------------------------
+# AUTOMATED NOISE CALIBRATION (REPETITIVE RUN VARIANCE TESTING)
+# ------------------------------------------------------------------------------
+def calibrate_noise_variance(user_experiments: list) -> dict:
+    """Calculates instrument noise variance from user's logged experiments."""
+    if not user_experiments or len(user_experiments) < 3:
+        return {"calibrated_noise": 0.1, "message": "Insufficient experiments for robust calibration (need at least 3). Defaulting to 0.1."}
+    
+    shifts = [float(e.get("wavelength_shift") or e.get("wavelength_shift_pm") or 0.0) for e in user_experiments]
+    variance = float(np.var(shifts))
+    calibrated_noise = round(float(np.clip(variance / (np.mean(shifts) + 1e-6), 0.01, 0.5)), 4)
+    
+    return {
+        "calibrated_noise": calibrated_noise,
+        "sample_variance": round(variance, 2),
+        "message": f"Successfully calibrated WhiteKernel noise level to {calibrated_noise} based on experimental variance."
     }
