@@ -174,25 +174,19 @@ def generate_bayesian_suggestion(user_experiments: list, recent_suggestions: lis
     acquisition = mean_combined + (kappa * std_combined)
 
     # --------------------------------------------------------------------------
-    # FEATURE 1 & 2: PARETO BATCH GENERATION (3 Distinct Options)
+    # PARETO BATCH GENERATION (3 Distinct Options)
     # --------------------------------------------------------------------------
-    
-    # Option 1: Max Quality (Standard UCB)
     idx_1 = int(np.argmax(acquisition))
     opt1 = candidates[idx_1]
     
-    # Option 2: High Efficiency / Low Cost (Pareto Optimized)
-    # Cost function C(x) penalizes high thickness (time) and high Ar flow
     cost_penalty = 0.5 * (candidates[:, 3] / bounds[3][1]) + 0.5 * (candidates[:, 5] / bounds[5][1])
     acq_eff = acquisition - (1.2 * cost_penalty) 
     
-    # Force physical diversity constraint (Delta > 10.0)
     dist_to_opt1 = np.linalg.norm(candidates - opt1, axis=1)
     acq_eff[dist_to_opt1 < 10.0] = -9999.0 
     idx_2 = int(np.argmax(acq_eff))
     opt2 = candidates[idx_2]
     
-    # Option 3: Pure Exploration (Max Uncertainty)
     acq_exp = np.copy(std_combined)
     dist_to_opt2 = np.linalg.norm(candidates - opt2, axis=1)
     acq_exp[(dist_to_opt1 < 10.0) | (dist_to_opt2 < 10.0)] = -9999.0
@@ -205,7 +199,6 @@ def generate_bayesian_suggestion(user_experiments: list, recent_suggestions: lis
         {"type": "Pure Exploration", "data": format_candidate(opt3, mean_xrd[idx_3], mean_wave[idx_3], min_w, denom)}
     ]
 
-    # Map Option 1 as primary for legacy UI compatibility
     best_candidate = opt1
     s_rf, s_press, s_dist, s_thick, s_rot, s_ar = best_candidate
     pred_xrd = float(mean_xrd[idx_1])
@@ -288,7 +281,11 @@ def generate_bayesian_suggestion(user_experiments: list, recent_suggestions: lis
         "explanation": " ".join(sentences),
         "digital_twin": sandbox_data
     }
-    def simulate_sandbox_point(user_experiments: list, target_material: str, slider_params: list) -> dict:
+
+# ------------------------------------------------------------------------------
+# DIGITAL TWIN SANDBOX SIMULATOR
+# ------------------------------------------------------------------------------
+def simulate_sandbox_point(user_experiments: list, target_material: str, slider_params: list) -> dict:
     """Simulates model output for arbitrary manual slider adjustments."""
     X_list, y_xrd_list, y_wave_list = [], [], []
 
