@@ -6,9 +6,7 @@
     <title>MatrixAI — Materials Optimizer</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- ADDED: jsPDF for Lab Reports -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <!-- ADDED: Plotly for Correlation Heatmap -->
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
     <script>
         tailwind.config = {
@@ -149,7 +147,17 @@
                     </div>
 
                     <div class="lg:col-span-6 flex flex-col items-start lg:items-end space-y-2">
-                        <button id="btnSuggest" class="btn-glow text-white font-bold text-base px-8 py-4 rounded-xl transition flex items-center space-x-3">
+                        <!-- DOMAIN ADAPTATION DROPDOWN -->
+                        <div class="flex items-center space-x-3 mb-2">
+                            <label class="text-xs text-slate-400 font-semibold">Target Material Domain:</label>
+                            <select id="targetMaterialSuggest" class="bg-slate-850 border border-slate-700 text-xs text-white rounded-lg px-3 py-1.5 focus:outline-none focus:border-blue-500">
+                                <option value="Generic">Generic / Mixed</option>
+                                <option value="WO3">WO₃ (Tungsten Trioxide)</option>
+                                <option value="TiO2">TiO₂ (Titanium Dioxide)</option>
+                                <option value="ZnO">ZnO (Zinc Oxide)</option>
+                            </select>
+                        </div>
+                        <button id="btnSuggest" class="btn-glow text-white font-bold text-base px-8 py-4 rounded-xl transition flex items-center space-x-3 w-full sm:w-auto justify-center">
                             <span id="btnText">✦ Suggest Next Parameters</span>
                             <div id="btnSpinner" class="hidden w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                         </button>
@@ -173,6 +181,19 @@
                         <div class="bg-blue-950/40 border border-blue-800/40 p-3 rounded-xl"><div class="text-[11px] text-slate-400">Ar Flow</div><div class="text-sm font-bold text-white" id="p_ar">-</div></div>
                         <div class="bg-emerald-950/40 border border-emerald-800/40 p-3 rounded-xl"><div class="text-[11px] text-emerald-400">Expected XRD</div><div class="text-sm font-bold text-emerald-300" id="p_xrd">-</div></div>
                         <div class="bg-emerald-950/40 border border-emerald-800/40 p-3 rounded-xl"><div class="text-[11px] text-emerald-400">Expected Shift</div><div class="text-sm font-bold text-emerald-300" id="p_shift">-</div></div>
+                    </div>
+                    
+                    <!-- DIGITAL TWIN SANDBOX -->
+                    <div id="digitalTwinSection" class="bg-slate-950/50 rounded-xl p-4 border border-slate-800 space-y-4">
+                        <div class="text-xs font-bold text-purple-400 uppercase tracking-wider flex items-center space-x-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
+                            <span>Digital Twin Simulation</span>
+                        </div>
+                        <p class="text-xs text-slate-400">Simulated wavelength shift response ±1σ uncertainty for the most sensitive parameters.</p>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div id="plotRfCurve" class="w-full h-48 bg-slate-900 rounded-lg border border-slate-800"></div>
+                            <div id="plotPressCurve" class="w-full h-48 bg-slate-900 rounded-lg border border-slate-800"></div>
+                        </div>
                     </div>
 
                     <!-- CONVERGENCE PROGRESS BAR -->
@@ -204,7 +225,6 @@
                         <button id="btnApply" type="button" class="border border-blue-400 text-blue-400 hover:bg-blue-400/10 font-bold text-sm px-6 py-2.5 rounded-xl transition">
                             ⬇ Apply to Form
                         </button>
-                        <!-- ADDED: PDF Lab Report Button -->
                         <button id="btnPdf" type="button" class="border border-purple-400 text-purple-400 hover:bg-purple-400/10 font-bold text-sm px-6 py-2.5 rounded-xl transition flex items-center">
                             📄 Download PDF Report
                         </button>
@@ -224,7 +244,7 @@
                 </div>
             </section>
             
-            <!-- ADDED: PLOTLY HEATMAP INSIGHTS SECTION -->
+            <!-- PLOTLY HEATMAP INSIGHTS SECTION -->
             {% if experiments|length > 2 %}
             <section class="bg-slate-900/80 p-6 rounded-2xl border border-slate-800 shadow-xl space-y-4">
                 <div>
@@ -247,6 +267,18 @@
                 </div>
 
                 <form action="/add" method="POST" class="grid grid-cols-1 md:grid-cols-3 gap-4 bg-slate-900/80 p-6 rounded-2xl border border-slate-800 text-white shadow-xl">
+                    
+                    <!-- NEW: Target Material Dropdown -->
+                    <div class="md:col-span-3 pb-2 border-b border-slate-800 mb-2">
+                        <label class="block text-xs font-semibold text-slate-400 mb-1">Target Material Domain</label>
+                        <select name="target_material" id="target_material" class="w-full md:w-1/3 bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-blue-500 transition">
+                            <option value="Generic">Generic / Mixed</option>
+                            <option value="WO3">WO₃</option>
+                            <option value="TiO2">TiO₂</option>
+                            <option value="ZnO">ZnO</option>
+                        </select>
+                    </div>
+
                     <div>
                         <label class="block text-xs font-semibold text-slate-400 mb-1">RF Power (W)</label>
                         <input type="number" step="0.1" name="rf_power_w" id="rf_power_w" required placeholder="e.g. 150" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-blue-500 transition">
@@ -294,24 +326,37 @@
                             <option value="Optical Fiber">Optical Fiber</option>
                         </select>
                     </div>
+
+                    <!-- VISUAL SCIENTIST AUTO-DETECT ZONE 1 -->
                     <div>
-                        <label class="block text-xs font-semibold text-slate-400 mb-1">XRD Phase Target</label>
-                        <select name="xrd_phase" id="xrd_phase" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-blue-500 transition">
-                            <option value="Monoclinic">Monoclinic</option>
-                            <option value="Partial">Partial</option>
-                            <option value="Amorphous" selected>Amorphous</option>
-                        </select>
+                        <div class="flex justify-between items-center mb-1">
+                            <label class="block text-xs font-semibold text-slate-400">XRD Phase Target</label>
+                            <label class="text-[10px] text-purple-400 hover:text-purple-300 cursor-pointer flex items-center space-x-1 font-bold">
+                                <span>✨ Auto-Detect Image</span>
+                                <input type="file" id="uploadXRD" accept="image/*" class="hidden">
+                            </label>
+                        </div>
+                        <input type="text" name="xrd_phase" id="xrd_phase" placeholder="e.g. Monoclinic" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-blue-500 transition">
                     </div>
+
+                    <!-- VISUAL SCIENTIST AUTO-DETECT ZONE 2 -->
                     <div>
-                        <label class="block text-xs font-semibold text-slate-400 mb-1">Grain Size (nm) <span class="text-slate-500">(FESEM)</span></label>
-                        <input type="number" step="0.1" name="grain_size_nm" placeholder="e.g. 25.4" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-blue-500 transition">
+                        <div class="flex justify-between items-center mb-1">
+                            <label class="block text-xs font-semibold text-slate-400">Grain Size (nm)</label>
+                            <label class="text-[10px] text-purple-400 hover:text-purple-300 cursor-pointer flex items-center space-x-1 font-bold">
+                                <span>✨ Auto-Detect Image</span>
+                                <input type="file" id="uploadSEM" accept="image/*" class="hidden">
+                            </label>
+                        </div>
+                        <input type="number" step="0.1" name="grain_size_nm" id="grain_size_nm" placeholder="e.g. 25.4" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-blue-500 transition">
                     </div>
+
                     <div>
                         <label class="block text-xs font-semibold text-slate-400 mb-1">H₂ Response Time (s)</label>
                         <input type="number" step="0.1" name="h2_response_time_s" required placeholder="e.g. 12" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-blue-500 transition">
                     </div>
                     <div>
-                        <label class="block text-xs font-semibold text-slate-400 mb-1">Wavelength Shift (pm) <span class="text-slate-500">(FBG)</span></label>
+                        <label class="block text-xs font-semibold text-slate-400 mb-1">Wavelength Shift (pm)</label>
                         <input type="number" step="0.1" name="wavelength_shift_pm" placeholder="e.g. 150" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-blue-500 transition">
                     </div>
                     <div>
@@ -343,15 +388,14 @@
                     <table class="w-full text-left border-collapse">
                         <thead>
                             <tr class="text-slate-400 border-b border-slate-800 text-xs uppercase tracking-wider bg-slate-850/50">
-                                <!-- ADDED: Checkbox column for radar compare -->
                                 <th class="p-3 text-center">Compare</th>
+                                <th class="p-3">Material</th>
                                 <th class="p-3">Quality</th>
                                 <th class="p-3">Batch / Notes</th>
                                 <th class="p-3">RF Power</th>
                                 <th class="p-3">Pressure</th>
                                 <th class="p-3">Target Dist</th>
                                 <th class="p-3">Rotation</th>
-                                <th class="p-3">Substrate</th>
                                 <th class="p-3">XRD Phase</th>
                                 <th class="p-3">Grain Size</th>
                                 <th class="p-3">H₂ Response</th>
@@ -361,10 +405,10 @@
                         <tbody class="divide-y divide-slate-800/60 text-xs">
                             {% for exp in experiments %}
                             <tr class="hover:bg-slate-800/40 transition">
-                                <!-- ADDED: Checkbox input mapping to experiment index -->
                                 <td class="p-3 text-center">
                                     <input type="checkbox" class="compare-cbk w-4 h-4 rounded border-slate-700 bg-slate-800 text-blue-500 focus:ring-blue-500 cursor-pointer" value="{{ loop.index0 }}">
                                 </td>
+                                <td class="p-3 font-semibold text-purple-400">{{ exp.target_material or 'Generic' }}</td>
                                 <td class="p-3">
                                     {% set q = exp.quality_score or 50.0 %}
                                     {% if q >= 80 %}
@@ -382,7 +426,6 @@
                                 <td class="p-3">{{ exp.working_pressure }} mTorr</td>
                                 <td class="p-3">{{ exp.target_distance }} cm</td>
                                 <td class="p-3">{{ exp.rotation_speed }} rpm</td>
-                                <td class="p-3">{{ exp.substrate_type }}</td>
                                 <td class="p-3">
                                     {% if exp.xrd_phase == 'Monoclinic' %}
                                         <span class="px-2 py-1 rounded-md text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Monoclinic</span>
@@ -406,7 +449,6 @@
                         </tbody>
                     </table>
                     
-                    <!-- ADDED: Floating Compare Actions Bar -->
                     <div id="compareBar" class="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-slate-800 border border-slate-600 px-5 py-3 rounded-2xl shadow-2xl hidden z-40 flex items-center space-x-4">
                         <span class="text-sm font-bold text-white">2 Selected</span>
                         <button id="btnCompare" class="bg-purple-600 hover:bg-purple-500 text-white font-bold py-1.5 px-4 rounded-xl text-xs transition">Compare on Radar</button>
@@ -418,7 +460,7 @@
         {% endif %}
     </main>
 
-    <!-- ADDED: Radar Chart Modal -->
+    <!-- Radar Chart Modal -->
     <div id="radarModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden z-[60] flex items-center justify-center p-4">
         <div class="bg-slate-900 border border-slate-700 p-6 rounded-3xl shadow-2xl w-full max-w-2xl relative">
             <button id="btnCloseRadar" class="absolute top-4 right-4 text-slate-400 hover:text-white transition bg-slate-800 rounded-full p-1">
@@ -428,6 +470,46 @@
             <p class="text-xs text-slate-400 mb-6">Visual overlap of two selected experimental runs.</p>
             <div class="h-80 w-full relative">
                 <canvas id="radarCanvas"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI SCIENTIFIC CO-PILOT DRAWER -->
+    <button id="btnChatToggle" class="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-tr from-blue-600 to-purple-600 rounded-full shadow-lg shadow-purple-500/30 flex items-center justify-center text-white hover:scale-105 transition-transform z-50">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
+    </button>
+
+    <div id="chatDrawer" class="fixed top-0 right-0 w-full sm:w-[400px] h-full bg-slate-900 border-l border-slate-800 shadow-2xl transform translate-x-full transition-transform duration-300 ease-in-out z-[60] flex flex-col">
+        <div class="h-16 border-b border-slate-800 flex items-center justify-between px-4 bg-slate-850">
+            <div class="flex items-center space-x-2">
+                <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold">AI</div>
+                <span class="font-bold text-white">Scientific Co-Pilot</span>
+            </div>
+            <button id="btnCloseChat" class="text-slate-400 hover:text-white transition">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+        </div>
+        <div id="chatHistory" class="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-950/50">
+            <div class="flex items-start space-x-3">
+                <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-500 to-purple-600 flex-shrink-0 flex items-center justify-center text-xs text-white">AI</div>
+                <div class="bg-slate-800 border border-slate-700 rounded-2xl rounded-tl-none px-4 py-2.5 text-sm text-slate-200">
+                    Hello! I'm your MatrixAI Co-Pilot. I have access to your recent experiments. How can I help you optimize your process today?
+                </div>
+            </div>
+        </div>
+        <div class="p-4 bg-slate-850 border-t border-slate-800">
+            <div class="flex items-center space-x-2 mb-2">
+                <label class="text-xs text-slate-400 font-semibold">Model:</label>
+                <select id="aiProvider" class="bg-slate-900 border border-slate-700 text-xs text-white rounded px-2 py-1 focus:outline-none focus:border-blue-500">
+                    <option value="gemini">Google Gemini 2.5 (Deep Reasoning)</option>
+                    <option value="groq">Groq LLaMA 3 (Fast Responses)</option>
+                </select>
+            </div>
+            <div class="relative">
+                <textarea id="chatInput" rows="2" placeholder="Ask about physics, parameters, or outcomes..." class="w-full bg-slate-900 border border-slate-700 rounded-xl py-2 px-3 pr-12 text-sm text-white focus:outline-none focus:border-blue-500 resize-none transition"></textarea>
+                <button id="btnSendChat" class="absolute right-2 bottom-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg p-1.5 transition">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
+                </button>
             </div>
         </div>
     </div>
@@ -475,18 +557,23 @@
             });
         }
 
-        // 2. BAYESIAN SUGGEST BUTTON TRIGGER
+        // 2. BAYESIAN SUGGEST BUTTON TRIGGER (Now with Domain Adaptation)
         document.getElementById('btnSuggest')?.addEventListener('click', async () => {
             const btn = document.getElementById('btnSuggest');
             const btnText = document.getElementById('btnText');
             const btnSpinner = document.getElementById('btnSpinner');
+            const targetMaterial = document.getElementById('targetMaterialSuggest')?.value || 'Generic';
 
             btn.disabled = true;
             btnText.innerText = "Analyzing experiments...";
             btnSpinner.classList.remove('hidden');
 
             try {
-                const response = await fetch('/suggest', { method: 'POST' });
+                const response = await fetch('/suggest', { 
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ target_material: targetMaterial })
+                });
                 const data = await response.json();
 
                 if (response.ok) {
@@ -511,7 +598,7 @@
                     document.getElementById('convText').innerText = c.convergence_score + "%";
                     document.getElementById('convBar').style.width = c.convergence_score + "%";
                     if (c.converged) {
-                        document.getElementById('convBanner').innerHTML = '<span class="text-emerald-400 font-bold">✓ Optimization converged — run 3 confirmation experiments at these parameters</span>';
+                        document.getElementById('convBanner').innerHTML = '<span class="text-emerald-400 font-bold">✓ Optimization converged — run confirmation experiments.</span>';
                     } else {
                         document.getElementById('convBanner').innerText = `Estimated ${c.runs_to_convergence_estimate} more runs to convergence`;
                     }
@@ -532,6 +619,34 @@
                                 </div>
                             </div>
                         `;
+                    }
+
+                    // Render Digital Twin Plotly Charts
+                    if (data.digital_twin) {
+                        const plotLayout = {
+                            paper_bgcolor: 'transparent', plot_bgcolor: 'transparent',
+                            margin: { t: 20, l: 40, r: 20, b: 40 },
+                            font: { color: '#94a3b8', size: 10 },
+                            showlegend: false,
+                            xaxis: { gridcolor: '#1e293b' },
+                            yaxis: { gridcolor: '#1e293b' }
+                        };
+
+                        const plotCurve = (divId, curveData, xLabel) => {
+                            const upper = curveData.y.map((val, i) => val + curveData.std[i]);
+                            const lower = curveData.y.map((val, i) => val - curveData.std[i]);
+                            
+                            const traces = [
+                                { x: curveData.x, y: curveData.y, type: 'scatter', mode: 'lines', line: {color: '#3b82f6', width: 2} },
+                                { x: curveData.x, y: upper, type: 'scatter', mode: 'lines', line: {color: 'transparent'}, showlegend: false },
+                                { x: curveData.x, y: lower, type: 'scatter', mode: 'lines', fill: 'tonexty', fillcolor: 'rgba(59, 130, 246, 0.1)', line: {color: 'transparent'}, showlegend: false }
+                            ];
+                            
+                            Plotly.newPlot(divId, traces, { ...plotLayout, xaxis: { ...plotLayout.xaxis, title: xLabel } }, {displayModeBar: false, responsive: true});
+                        };
+
+                        plotCurve('plotRfCurve', data.digital_twin.rf_curve, 'RF Power (W)');
+                        plotCurve('plotPressCurve', data.digital_twin.pressure_curve, 'Pressure (mTorr)');
                     }
 
                     document.getElementById('resultCard').classList.remove('hidden');
@@ -577,23 +692,19 @@
             const doc = new jsPDF();
             const s = latestSuggestion;
             
-            // Background & Theme styling
             doc.setFillColor(15, 23, 42); 
             doc.rect(0, 0, 210, 297, 'F');
             doc.setTextColor(255, 255, 255);
             
-            // Header
             doc.setFont("helvetica", "bold");
             doc.setFontSize(22);
             doc.text("MatrixAI Lab Report", 20, 30);
             
-            // Meta Info
             doc.setFontSize(12);
             doc.setFont("helvetica", "normal");
-            doc.text(`Run Number: #${s.run_number}`, 20, 45);
+            doc.text(`Run Number: #${s.run_number} (${s.target_material})`, 20, 45);
             doc.text(`Date: ${new Date().toLocaleDateString()}`, 20, 52);
             
-            // Parameters Section
             doc.setFont("helvetica", "bold");
             doc.text("Suggested Processing Parameters:", 20, 70);
             doc.setFont("helvetica", "normal");
@@ -609,7 +720,6 @@
             ];
             params.forEach(param => { doc.text(param, 25, y); y += 8; });
             
-            // Outcomes Section
             doc.setFont("helvetica", "bold");
             doc.text("Expected Material Outcomes:", 20, y + 10);
             doc.setFont("helvetica", "normal");
@@ -617,14 +727,12 @@
             doc.text(`Target XRD Phase: ${s.expected.xrd_phase}`, 25, y);
             doc.text(`Expected Wavelength Shift: ${s.expected.wavelength_shift_estimate} pm`, 25, y+8);
             
-            // AI Rationale Section
             doc.setFont("helvetica", "bold");
             doc.text("Scientific Rationale:", 20, y + 25);
             doc.setFont("helvetica", "normal");
             const lines = doc.splitTextToSize(s.explanation, 170);
             doc.text(lines, 20, y + 35);
             
-            // Save Trigger
             doc.save(`MatrixAI_Lab_Report_Run${s.run_number}.pdf`);
         });
 
@@ -636,10 +744,10 @@
             const checked = document.querySelectorAll('.compare-cbk:checked');
             if (checked.length === 2) {
                 compareBar.classList.remove('hidden');
-                compareCbks.forEach(cb => { if(!cb.checked) cb.disabled = true; }); // lock others
+                compareCbks.forEach(cb => { if(!cb.checked) cb.disabled = true; });
             } else {
                 compareBar.classList.add('hidden');
-                compareCbks.forEach(cb => cb.disabled = false); // unlock
+                compareCbks.forEach(cb => cb.disabled = false);
             }
         }
 
@@ -654,7 +762,6 @@
             const checked = document.querySelectorAll('.compare-cbk:checked');
             if (checked.length !== 2) return;
             
-            // Map the selected checkboxes to our JS array via index
             const exp1 = expData[parseInt(checked[0].value)];
             const exp2 = expData[parseInt(checked[1].value)];
             
@@ -663,14 +770,9 @@
             const ctxRadar = document.getElementById('radarCanvas').getContext('2d');
             if (radarChartObj) radarChartObj.destroy();
             
-            // Normalizing some data so the radar chart shape looks visually balanced
             const getVals = (e) => [
-                e.rf_power, 
-                e.working_pressure * 10,  
-                e.target_distance, 
-                e.sputter_time, 
-                (e.film_thickness || 100) * 0.1, 
-                e.ar_flow
+                e.rf_power, e.working_pressure * 10, e.target_distance, 
+                e.sputter_time, (e.film_thickness || 100) * 0.1, e.ar_flow
             ];
 
             radarChartObj = new Chart(ctxRadar, {
@@ -695,8 +797,7 @@
                     ]
                 },
                 options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
+                    responsive: true, maintainAspectRatio: false,
                     scales: {
                         r: {
                             grid: { color: 'rgba(255,255,255,0.1)' },
@@ -705,9 +806,7 @@
                             ticks: { display: false }
                         }
                     },
-                    plugins: {
-                        legend: { labels: { color: '#ffffff' } }
-                    }
+                    plugins: { legend: { labels: { color: '#ffffff' } } }
                 }
             });
         });
@@ -725,7 +824,6 @@
             const sum_xy = x.reduce((a, b, i) => a + (b * y[i]), 0);
             const sum_x2 = x.reduce((a, b) => a + (b * b), 0);
             const sum_y2 = y.reduce((a, b) => a + (b * b), 0);
-            
             const num = (n * sum_xy) - (sum_x * sum_y);
             const den = Math.sqrt((n * sum_x2 - sum_x * sum_x) * (n * sum_y2 - sum_y * sum_y));
             if (den === 0) return 0;
@@ -745,80 +843,71 @@
             }
         }
 
-        const plotData = [{
-            z: matrix,
-            x: labels,
-            y: labels,
-            type: 'heatmap',
-            colorscale: 'RdBu',
-            zmin: -1,
-            zmax: 1
+        const heatmapData = [{
+            z: matrix, x: labels, y: labels,
+            type: 'heatmap', colorscale: 'RdBu', zmin: -1, zmax: 1
         }];
 
-        const plotLayout = {
-            paper_bgcolor: 'transparent',
-            plot_bgcolor: 'transparent',
+        const heatmapLayout = {
+            paper_bgcolor: 'transparent', plot_bgcolor: 'transparent',
             font: { color: '#94a3b8' },
             margin: { t: 20, l: 100, r: 20, b: 60 }
         };
 
-        Plotly.newPlot('heatmapChart', plotData, plotLayout, {responsive: true, displayModeBar: false});
+        Plotly.newPlot('heatmapChart', heatmapData, heatmapLayout, {responsive: true, displayModeBar: false});
         {% endif %}
-    </script>
-    <!-- ============================================================================== -->
-    <!-- AI SCIENTIFIC CO-PILOT DRAWER -->
-    <!-- ============================================================================== -->
-    
-    <!-- Floating Action Button -->
-    <button id="btnChatToggle" class="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-tr from-blue-600 to-purple-600 rounded-full shadow-lg shadow-purple-500/30 flex items-center justify-center text-white hover:scale-105 transition-transform z-50">
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
-    </button>
 
-    <!-- Slide-Out Drawer -->
-    <div id="chatDrawer" class="fixed top-0 right-0 w-full sm:w-[400px] h-full bg-slate-900 border-l border-slate-800 shadow-2xl transform translate-x-full transition-transform duration-300 ease-in-out z-[60] flex flex-col">
-        
-        <!-- Header -->
-        <div class="h-16 border-b border-slate-800 flex items-center justify-between px-4 bg-slate-850">
-            <div class="flex items-center space-x-2">
-                <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold">AI</div>
-                <span class="font-bold text-white">Scientific Co-Pilot</span>
-            </div>
-            <button id="btnCloseChat" class="text-slate-400 hover:text-white transition">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-            </button>
-        </div>
+        // 7. VISUAL SCIENTIST AUTO-DETECT (VISION API)
+        async function handleVisionUpload(file, analysisType, targetInputId) {
+            if (!file) return;
+            const formData = new FormData();
+            formData.append('image', file);
+            formData.append('analysis_type', analysisType);
 
-        <!-- Chat History Area -->
-        <div id="chatHistory" class="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-950/50">
-            <!-- Initial AI Greeting -->
-            <div class="flex items-start space-x-3">
-                <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-500 to-purple-600 flex-shrink-0 flex items-center justify-center text-xs text-white">AI</div>
-                <div class="bg-slate-800 border border-slate-700 rounded-2xl rounded-tl-none px-4 py-2.5 text-sm text-slate-200">
-                    Hello! I'm your MatrixAI Co-Pilot. I have access to your recent experiments. How can I help you optimize your process today?
-                </div>
-            </div>
-        </div>
+            const targetInput = document.getElementById(targetInputId);
+            const originalValue = targetInput.value;
+            targetInput.disabled = true;
+            targetInput.value = 'Analyzing image...';
+            targetInput.classList.add('animate-pulse', 'bg-purple-900/40', 'border-purple-500');
 
-        <!-- Input Area -->
-        <div class="p-4 bg-slate-850 border-t border-slate-800">
-            <div class="flex items-center space-x-2 mb-2">
-                <label class="text-xs text-slate-400 font-semibold">Model:</label>
-                <select id="aiProvider" class="bg-slate-900 border border-slate-700 text-xs text-white rounded px-2 py-1 focus:outline-none focus:border-blue-500">
-                    <option value="gemini">Google Gemini 2.5 (Deep Reasoning)</option>
-                    <option value="groq">Groq LLaMA 3 (Fast Responses)</option>
-                </select>
-            </div>
-            <div class="relative">
-                <textarea id="chatInput" rows="2" placeholder="Ask about physics, parameters, or outcomes..." class="w-full bg-slate-900 border border-slate-700 rounded-xl py-2 px-3 pr-12 text-sm text-white focus:outline-none focus:border-blue-500 resize-none transition"></textarea>
-                <button id="btnSendChat" class="absolute right-2 bottom-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg p-1.5 transition">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
-                </button>
-            </div>
-        </div>
-    </div>
+            try {
+                const response = await fetch('/api/vision', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+                
+                if (data.success && data.extracted_value) {
+                    targetInput.value = data.extracted_value;
+                    targetInput.classList.remove('bg-purple-900/40', 'animate-pulse');
+                    targetInput.classList.add('bg-emerald-900/40', 'border-emerald-500');
+                    setTimeout(() => {
+                        targetInput.classList.remove('bg-emerald-900/40', 'border-emerald-500');
+                    }, 2000);
+                } else {
+                    alert('AI could not extract the value: ' + (data.message || data.error));
+                    targetInput.value = originalValue;
+                }
+            } catch (err) {
+                alert('Error connecting to Vision API.');
+                targetInput.value = originalValue;
+            } finally {
+                targetInput.disabled = false;
+                targetInput.classList.remove('animate-pulse', 'bg-purple-900/40', 'border-purple-500');
+            }
+        }
 
-    <!-- Script for Chat Logic -->
-    <script>
+        document.getElementById('uploadXRD')?.addEventListener('change', (e) => {
+            handleVisionUpload(e.target.files[0], 'XRD plot', 'xrd_phase');
+            e.target.value = '';
+        });
+
+        document.getElementById('uploadSEM')?.addEventListener('change', (e) => {
+            handleVisionUpload(e.target.files[0], 'SEM/FESEM micrograph', 'grain_size_nm');
+            e.target.value = '';
+        });
+
+        // 8. CHAT DRAWER LOGIC
         const chatDrawer = document.getElementById('chatDrawer');
         const btnChatToggle = document.getElementById('btnChatToggle');
         const btnCloseChat = document.getElementById('btnCloseChat');
@@ -827,19 +916,16 @@
         const btnSendChat = document.getElementById('btnSendChat');
         const aiProvider = document.getElementById('aiProvider');
 
-        // Toggle Drawer
         const toggleDrawer = () => chatDrawer.classList.toggle('translate-x-full');
         btnChatToggle.addEventListener('click', toggleDrawer);
         btnCloseChat.addEventListener('click', toggleDrawer);
 
-        // Auto-resize textarea
         chatInput.addEventListener('input', function() {
             this.style.height = 'auto';
             this.style.height = (this.scrollHeight) + 'px';
             if (this.value === '') this.style.height = 'auto';
         });
 
-        // Append Message Helper
         function appendMessage(role, text) {
             const wrapper = document.createElement('div');
             wrapper.className = 'flex items-start space-x-3 ' + (role === 'user' ? 'flex-row-reverse space-x-reverse' : '');
@@ -855,7 +941,6 @@
                 ? 'bg-blue-600 text-white rounded-2xl rounded-tr-none px-4 py-2.5 text-sm'
                 : 'bg-slate-800 border border-slate-700 rounded-2xl rounded-tl-none px-4 py-2.5 text-sm text-slate-200';
             
-            // Format basic markdown (bolding and line breaks)
             let formattedText = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
             formattedText = formattedText.replace(/\n/g, '<br>');
             bubble.innerHTML = formattedText;
@@ -866,19 +951,15 @@
             chatHistory.scrollTop = chatHistory.scrollHeight;
         }
 
-        // Send Message Logic
         async function sendChatMessage() {
             const message = chatInput.value.trim();
             if (!message) return;
 
             const provider = aiProvider.value;
-            
-            // Render user message
             appendMessage('user', message);
             chatInput.value = '';
             chatInput.style.height = 'auto';
 
-            // Render loading bubble
             const loadingId = 'loading-' + Date.now();
             const loadingWrapper = document.createElement('div');
             loadingWrapper.id = loadingId;
