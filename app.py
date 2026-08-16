@@ -321,7 +321,11 @@ async def auth_callback(request: Request):
 def logout(request: Request):
     request.session.clear()
     return RedirectResponse("/")
-    @app.post("/api/sandbox/simulate")
+
+# ==============================================================================
+# DIGITAL TWIN SANDBOX SIMULATION ENDPOINT
+# ==============================================================================
+@app.post("/api/sandbox/simulate")
 async def simulate_sandbox(request: Request):
     user = request.session.get("user")
     if not user:
