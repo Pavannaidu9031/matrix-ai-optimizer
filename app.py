@@ -8,7 +8,6 @@ from email.mime.text import MIMEText
 from typing import Optional
 
 from authlib.integrations.starlette_client import OAuth
-from fastapi import Depends, FastAPI, Form, HTTPException, Request
 from fastapi.responses import (
     HTMLResponse,
     JSONResponse,
@@ -21,6 +20,9 @@ import psycopg2
 from psycopg2 import pool
 from pydantic import BaseModel
 from starlette.middleware.sessions import SessionMiddleware
+
+from google import genai
+from groq import AsyncGroq
 
 import optimizer
 
@@ -136,6 +138,10 @@ class ExperimentModel(BaseModel):
     h2_response_time: float
     wavelength_shift: Optional[float] = None
     batch_notes: Optional[str] = None
+
+class ChatRequest(BaseModel):
+    message: str
+    provider: str  # 'gemini' or 'groq'
 
 # ==============================================================================
 # DASHBOARD ROUTE (With Pending Approval Check)
@@ -669,7 +675,6 @@ def send_approval_email(recipient_email: str):
         """
         msg.attach(MIMEText(body, 'html'))
 
-        # Switched to SMTP_SSL on Port 465 to bypass free-tier port blocking
         server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
         server.login(sender_email, sender_password)
         server.sendmail(sender_email, recipient_email, msg.as_string())
@@ -743,9 +748,101 @@ def approve_user(request: Request, email: str, background_tasks: BackgroundTasks
         conn.commit()
         cur.close()
         
-        # Fire off the automated email in the background so the UI doesn't hang!
         background_tasks.add_task(send_approval_email, email)
         
     finally:
         release_db_connection(conn)
     return RedirectResponse("/admin/users", status_code=303)
+
+@app.post("/admin/users/{email}/revoke")
+def revoke_user(request: Request, email: str):
+    user = request.session.get("user")
+    if not user or user.get("email", "").lower() != FOUNDER_EMAIL.lower():
+        return RedirectResponse("/")
+        
+    # Prevent founder from accidentally revoking themselves
+    if email.lower() == FOUNDER_EMAIL.lower():
+        return RedirectResponse("/admin/users", status_code=303) 
+        
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute("UPDATE users SET is_approved = FALSE WHERE email = %s", (email,))
+        conn.commit()
+        cur.close()
+    finally:
+        release_db_connection(conn)
+    return RedirectResponse("/admin/users", status_code=303)
+
+# ==============================================================================
+# AI SCIENTIFIC CO-PILOT ENDPOINT
+# ==============================================================================
+@app.post("/api/chat")
+async def chat_with_agent(request: Request, data: ChatRequest):
+    user = request.session.get("user")
+    if not user:
+        return JSONResponse({"error": "not_authenticated"}, status_code=401)
+        
+    user_email = user.get("email")
+    
+    # Fetch the user's recent experiments to give the AI context
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT rf_power, working_pressure, target_distance, sputter_time, 
+                   film_thickness, rotation_speed, ar_flow, xrd_phase, quality_score 
+            FROM experiments WHERE user_email = %s ORDER BY created_at DESC LIMIT 5
+        """, (user_email,))
+        rows = cur.fetchall()
+        cols = [desc[0] for desc in cur.description]
+        recent_exps = [dict(zip(cols, row)) for row in rows]
+        cur.close()
+    except Exception as e:
+        recent_exps = []
+        print(f"Error fetching context for AI: {e}")
+    finally:
+        release_db_connection(conn)
+        
+    # Construct the System Prompt
+    system_context = (
+        "You are an expert Materials Science AI Assistant built into the MatrixAI platform. "
+        "The user is optimizing thin-film deposition parameters using a PVD/CVD process. "
+        "Provide concise, highly scientific, and actionable answers."
+    )
+    
+    if recent_exps:
+        system_context += f"\nHere is the data from their most recent experiments: {recent_exps}\n"
+    
+    full_prompt = f"{system_context}\n\nUser Question: {data.message}"
+    
+    try:
+        if data.provider == "gemini":
+            api_key = os.getenv("GEMINI_API_KEY")
+            if not api_key:
+                 return JSONResponse({"error": "GEMINI_API_KEY not found in environment."}, status_code=500)
+            
+            client = genai.Client(api_key=api_key)
+            response = client.models.generate_content(
+                model='gemini-2.5-flash',
+                contents=full_prompt,
+            )
+            return {"reply": response.text}
+            
+        elif data.provider == "groq":
+            api_key = os.getenv("GROQ_API_KEY")
+            if not api_key:
+                 return JSONResponse({"error": "GROQ_API_KEY not found in environment."}, status_code=500)
+            
+            client = AsyncGroq(api_key=api_key)
+            chat_completion = await client.chat.completions.create(
+                messages=[{"role": "user", "content": full_prompt}],
+                model="llama-3.3-70b-versatile",
+            )
+            return {"reply": chat_completion.choices[0].message.content}
+            
+        else:
+            return JSONResponse({"error": "Invalid AI provider selected."}, status_code=400)
+            
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
