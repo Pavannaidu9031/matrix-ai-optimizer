@@ -321,6 +321,35 @@ async def auth_callback(request: Request):
 def logout(request: Request):
     request.session.clear()
     return RedirectResponse("/")
+    @app.post("/api/sandbox/simulate")
+async def simulate_sandbox(request: Request):
+    user = request.session.get("user")
+    if not user:
+        return JSONResponse({"error": "not_authenticated"}, status_code=401)
+        
+    try:
+        body = await request.json()
+        target_material = body.get("target_material", "Generic")
+        params = body.get("params", []) # [rf, press, dist, thick, rot, ar]
+        
+        if len(params) != 6:
+            return JSONResponse({"error": "Invalid parameter array length."}, status_code=400)
+            
+        conn = get_db_connection()
+        try:
+            cur = conn.cursor()
+            cur.execute("SELECT * FROM experiments WHERE user_email = %s", (user.get("email"),))
+            rows = cur.fetchall()
+            cols = [desc[0] for desc in cur.description] if cur.description else []
+            experiments = [dict(zip(cols, r)) for r in rows]
+            cur.close()
+        finally:
+            release_db_connection(conn)
+            
+        sim_result = optimizer.simulate_sandbox_point(experiments, target_material, [float(p) for p in params])
+        return JSONResponse({"success": True, "simulation": sim_result})
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
 
 # ==============================================================================
 # FORM SUBMISSION ROUTE (/add)
