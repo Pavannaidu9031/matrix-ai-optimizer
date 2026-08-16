@@ -167,27 +167,20 @@
                 <!-- SUGGESTION OUTPUT PANEL -->
                 <div id="resultCard" class="hidden mt-8 pt-6 border-t border-slate-800 space-y-6">
                     <div class="flex items-center justify-between">
-                        <h3 class="text-lg font-bold text-white">🎯 Recommended Next Run #<span id="runNum">X</span></h3>
+                        <h3 class="text-lg font-bold text-white">🎯 Recommended Next Batch #<span id="runNum">X</span></h3>
                         <span id="confBadge" class="px-3 py-1 rounded-full text-xs font-bold"></span>
                     </div>
 
-                    <!-- Parameter Pills Grid -->
-                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                        <div class="bg-blue-950/40 border border-blue-800/40 p-3 rounded-xl"><div class="text-[11px] text-slate-400">RF Power</div><div class="text-sm font-bold text-white" id="p_rf">-</div></div>
-                        <div class="bg-blue-950/40 border border-blue-800/40 p-3 rounded-xl"><div class="text-[11px] text-slate-400">Pressure</div><div class="text-sm font-bold text-white" id="p_press">-</div></div>
-                        <div class="bg-blue-950/40 border border-blue-800/40 p-3 rounded-xl"><div class="text-[11px] text-slate-400">Target Distance</div><div class="text-sm font-bold text-white" id="p_dist">-</div></div>
-                        <div class="bg-blue-950/40 border border-blue-800/40 p-3 rounded-xl"><div class="text-[11px] text-slate-400">Film Thickness</div><div class="text-sm font-bold text-white" id="p_thick">-</div></div>
-                        <div class="bg-blue-950/40 border border-blue-800/40 p-3 rounded-xl"><div class="text-[11px] text-slate-400">Rotation Speed</div><div class="text-sm font-bold text-white" id="p_rot">-</div></div>
-                        <div class="bg-blue-950/40 border border-blue-800/40 p-3 rounded-xl"><div class="text-[11px] text-slate-400">Ar Flow</div><div class="text-sm font-bold text-white" id="p_ar">-</div></div>
-                        <div class="bg-emerald-950/40 border border-emerald-800/40 p-3 rounded-xl"><div class="text-[11px] text-emerald-400">Expected XRD</div><div class="text-sm font-bold text-emerald-300" id="p_xrd">-</div></div>
-                        <div class="bg-emerald-950/40 border border-emerald-800/40 p-3 rounded-xl"><div class="text-[11px] text-emerald-400">Expected Shift</div><div class="text-sm font-bold text-emerald-300" id="p_shift">-</div></div>
+                    <!-- REPLACED: BATCH OPTIONS GRID -->
+                    <div id="batchOptionsGrid" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <!-- Will be injected by Javascript -->
                     </div>
                     
                     <!-- DIGITAL TWIN SANDBOX -->
                     <div id="digitalTwinSection" class="bg-slate-950/50 rounded-xl p-4 border border-slate-800 space-y-4">
                         <div class="text-xs font-bold text-purple-400 uppercase tracking-wider flex items-center space-x-2">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
-                            <span>Digital Twin Simulation</span>
+                            <span>Digital Twin Simulation (Max Quality Candidate)</span>
                         </div>
                         <p class="text-xs text-slate-400">Simulated wavelength shift response ±1σ uncertainty for the most sensitive parameters.</p>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -222,11 +215,8 @@
 
                     <!-- ACTION BUTTONS -->
                     <div class="flex space-x-3">
-                        <button id="btnApply" type="button" class="border border-blue-400 text-blue-400 hover:bg-blue-400/10 font-bold text-sm px-6 py-2.5 rounded-xl transition">
-                            ⬇ Apply to Form
-                        </button>
                         <button id="btnPdf" type="button" class="border border-purple-400 text-purple-400 hover:bg-purple-400/10 font-bold text-sm px-6 py-2.5 rounded-xl transition flex items-center">
-                            📄 Download PDF Report
+                            📄 Download PDF Report (Max Quality)
                         </button>
                     </div>
                 </div>
@@ -557,7 +547,7 @@
             });
         }
 
-        // 2. BAYESIAN SUGGEST BUTTON TRIGGER (Now with Domain Adaptation)
+        // 2. BAYESIAN SUGGEST BUTTON TRIGGER (Now with Domain Adaptation & Batching)
         document.getElementById('btnSuggest')?.addEventListener('click', async () => {
             const btn = document.getElementById('btnSuggest');
             const btnText = document.getElementById('btnText');
@@ -580,14 +570,40 @@
                     latestSuggestion = data;
                     
                     document.getElementById('runNum').innerText = data.run_number;
-                    document.getElementById('p_rf').innerText = data.suggested.rf_power + " W";
-                    document.getElementById('p_press').innerText = data.suggested.working_pressure + " mTorr";
-                    document.getElementById('p_dist').innerText = data.suggested.target_distance + " cm";
-                    document.getElementById('p_thick').innerText = data.suggested.film_thickness + " nm";
-                    document.getElementById('p_rot').innerText = data.suggested.rotation_speed + " rpm";
-                    document.getElementById('p_ar').innerText = data.suggested.ar_flow + " sccm";
-                    document.getElementById('p_xrd').innerText = data.expected.xrd_phase;
-                    document.getElementById('p_shift').innerText = data.expected.wavelength_shift_estimate + " pm";
+                    
+                    // INJECT BATCH OPTIONS GRID
+                    if (data.batch_options) {
+                        const grid = document.getElementById('batchOptionsGrid');
+                        grid.innerHTML = '';
+                        data.batch_options.forEach((opt, idx) => {
+                            let colorClass = idx === 0 ? 'border-blue-500/50 bg-blue-900/20' : (idx === 1 ? 'border-emerald-500/50 bg-emerald-900/20' : 'border-purple-500/50 bg-purple-900/20');
+                            let titleColor = idx === 0 ? 'text-blue-400' : (idx === 1 ? 'text-emerald-400' : 'text-purple-400');
+                            let badgeText = idx === 0 ? '🏆 Max Quality' : (idx === 1 ? '⚡ High Efficiency' : '🗺️ Pure Exploration');
+                            
+                            grid.innerHTML += `
+                                <div class="border ${colorClass} rounded-xl p-4 flex flex-col justify-between relative overflow-hidden">
+                                    <div class="absolute top-0 left-0 w-full h-1 ${idx === 0 ? 'bg-blue-500' : (idx === 1 ? 'bg-emerald-500' : 'bg-purple-500')}"></div>
+                                    <div>
+                                        <h4 class="font-bold ${titleColor} text-sm mb-3">${badgeText}</h4>
+                                        <div class="space-y-1.5 text-xs text-slate-300">
+                                            <div class="flex justify-between"><span>RF Power:</span> <span class="font-bold text-white">${opt.data.rf_power} W</span></div>
+                                            <div class="flex justify-between"><span>Pressure:</span> <span class="font-bold text-white">${opt.data.working_pressure} mT</span></div>
+                                            <div class="flex justify-between"><span>Distance:</span> <span class="font-bold text-white">${opt.data.target_distance} cm</span></div>
+                                            <div class="flex justify-between"><span>Ar Flow:</span> <span class="font-bold text-white">${opt.data.ar_flow} sccm</span></div>
+                                            <div class="flex justify-between"><span>Thickness:</span> <span class="font-bold text-white">${opt.data.film_thickness} nm</span></div>
+                                            <hr class="border-slate-700/50 my-2">
+                                            <div class="flex justify-between ${titleColor} font-bold"><span>Expected Shift:</span> <span>${opt.data.expected_shift} pm</span></div>
+                                        </div>
+                                    </div>
+                                    <button type="button" onclick="applyBatch(${idx})" class="mt-4 w-full bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white font-semibold text-xs py-2 rounded-lg transition shadow-sm">
+                                        Use These Parameters
+                                    </button>
+                                </div>
+                            `;
+                        });
+                        window.latestBatch = data.batch_options;
+                    }
+                    
                     document.getElementById('expText').innerText = data.explanation;
 
                     const badge = document.getElementById('confBadge');
@@ -662,10 +678,10 @@
             }
         });
 
-        // 3. APPLY PARAMETERS TO FORM
-        document.getElementById('btnApply')?.addEventListener('click', () => {
-            if (!latestSuggestion) return;
-            const s = latestSuggestion.suggested;
+        // 3. APPLY PARAMETERS TO FORM FROM BATCH
+        function applyBatch(index) {
+            if(!window.latestBatch) return;
+            const s = window.latestBatch[index].data;
             const fields = [
                 { id: 'rf_power_w', val: s.rf_power },
                 { id: 'working_pressure_mtorr', val: s.working_pressure },
@@ -683,7 +699,7 @@
                 }
             });
             document.getElementById('formSection')?.scrollIntoView({ behavior: 'smooth' });
-        });
+        }
 
         // 4. GENERATE PDF LAB REPORT
         document.getElementById('btnPdf')?.addEventListener('click', () => {
@@ -706,7 +722,7 @@
             doc.text(`Date: ${new Date().toLocaleDateString()}`, 20, 52);
             
             doc.setFont("helvetica", "bold");
-            doc.text("Suggested Processing Parameters:", 20, 70);
+            doc.text("Suggested Processing Parameters (Max Quality):", 20, 70);
             doc.setFont("helvetica", "normal");
             const p = s.suggested;
             let y = 80;
