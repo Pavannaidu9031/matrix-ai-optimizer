@@ -288,3 +288,63 @@ def generate_bayesian_suggestion(user_experiments: list, recent_suggestions: lis
         "explanation": " ".join(sentences),
         "digital_twin": sandbox_data
     }
+    def simulate_sandbox_point(user_experiments: list, target_material: str, slider_params: list) -> dict:
+    """Simulates model output for arbitrary manual slider adjustments."""
+    X_list, y_xrd_list, y_wave_list = [], [], []
+
+    priors = MATERIAL_PRIORS.get(target_material, MATERIAL_PRIORS["Generic"])
+    for p in priors:
+        X_list.append(p[:6])
+        y_xrd_list.append(p[6])
+        y_wave_list.append(p[7])
+
+    for exp in user_experiments:
+        if exp.get("target_material", target_material) != target_material and target_material != "Generic":
+            continue
+        rf = float(exp.get("rf_power") or exp.get("rf_power_w") or 120.0)
+        press = float(exp.get("working_pressure") or exp.get("working_pressure_mtorr") or 5.0)
+        dist = float(exp.get("target_distance") or exp.get("target_substrate_distance_cm") or 7.0)
+        thick = float(exp.get("film_thickness") or exp.get("film_thickness_nm") or 200.0)
+        rot = float(exp.get("rotation_speed") or exp.get("rotation_speed_rpm") or 5.0)
+        ar = float(exp.get("ar_flow") or exp.get("ar_flow_sccm") or 30.0)
+
+        phase = str(exp.get("xrd_phase") or "Amorphous").strip()
+        y_xrd_list.append(XRD_MAP.get(phase, 0.0))
+        
+        wave_key = "wavelength_shift" if "wavelength_shift" in exp else "wavelength_shift_pm"
+        y_wave_list.append(float(exp[wave_key]) if exp.get(wave_key) is not None else None)
+        X_list.append([rf, press, dist, thick, rot, ar])
+
+    X = np.array(X_list)
+    y_xrd = np.array(y_xrd_list)
+
+    valid_waves = [v for v in y_wave_list if v is not None]
+    min_w, max_w = (min(valid_waves), max(valid_waves)) if valid_waves else (0.0, 200.0)
+    denom = (max_w - min_w) if max_w > min_w else 1.0
+    y_wave_norm = np.array([(v - min_w) / denom if v is not None else 0.5 for v in y_wave_list])
+
+    physical_length_scales = [10.0, 1.0, 1.0, 50.0, 2.0, 5.0]
+    kernel_xrd = ConstantKernel(1.0) * RBF(length_scale=physical_length_scales) + WhiteKernel(noise_level=0.1)
+    kernel_wave = ConstantKernel(1.0) * RBF(length_scale=physical_length_scales) + WhiteKernel(noise_level=0.1)
+
+    gp_xrd = GaussianProcessRegressor(kernel=kernel_xrd, normalize_y=True, random_state=42).fit(X, y_xrd)
+    gp_wave = GaussianProcessRegressor(kernel=kernel_wave, normalize_y=True, random_state=42).fit(X, y_wave_norm)
+
+    point = np.array([slider_params])
+    pred_xrd, std_xrd = gp_xrd.predict(point, return_std=True)
+    pred_wave_norm, std_wave = gp_wave.predict(point, return_std=True)
+
+    predicted_shift = round(float(min_w + float(pred_wave_norm[0]) * denom), 1)
+    uncertainty_pm = round(float(std_wave[0] * denom), 1)
+    xrd_score = float(pred_xrd[0])
+
+    if xrd_score >= 0.7: phase = "Monoclinic"
+    elif xrd_score >= 0.3: phase = "Partial"
+    else: phase = "Amorphous"
+
+    return {
+        "predicted_wavelength_shift": predicted_shift,
+        "uncertainty": uncertainty_pm,
+        "expected_phase": phase,
+        "xrd_score": round(xrd_score, 2)
+    }
