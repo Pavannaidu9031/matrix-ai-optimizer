@@ -356,6 +356,37 @@ async def simulate_sandbox(request: Request):
         return JSONResponse({"error": str(e)}, status_code=500)
 
 # ==============================================================================
+# ACTIVE PHASE MAP ENDPOINT
+# ==============================================================================
+@app.post("/api/optimizer/phase-map")
+async def get_phase_map(request: Request):
+    user = request.session.get("user")
+    if not user:
+        return JSONResponse({"error": "not_authenticated"}, status_code=401)
+        
+    try:
+        body = await request.json()
+        target_material = body.get("target_material", "Generic")
+        param_x = body.get("param_x", "rf_power")
+        param_y = body.get("param_y", "working_pressure")
+        
+        conn = get_db_connection()
+        try:
+            cur = conn.cursor()
+            cur.execute("SELECT * FROM experiments WHERE user_email = %s", (user.get("email"),))
+            rows = cur.fetchall()
+            cols = [desc[0] for desc in cur.description] if cur.description else []
+            experiments = [dict(zip(cols, r)) for r in rows]
+            cur.close()
+        finally:
+            release_db_connection(conn)
+            
+        map_data = optimizer.generate_phase_map(experiments, target_material, param_x, param_y)
+        return JSONResponse({"success": True, "phase_map": map_data})
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+# ==============================================================================
 # FORM SUBMISSION ROUTE (/add)
 # ==============================================================================
 @app.post("/add")
