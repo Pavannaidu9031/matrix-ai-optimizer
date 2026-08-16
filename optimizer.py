@@ -145,7 +145,7 @@ def generate_bayesian_suggestion(user_experiments: list, recent_suggestions: lis
 
     b_mult = 0.7 if real_count <= 15 else 0.85
     bounds = [
-        (max(80.0, b_rf * b_mult), min(150.0, b_rf * (2.0 - b_mult))),
+        (max(15.0, b_rf * b_mult), min(200.0, b_rf * (2.0 - b_mult))),
         (max(3.0, b_press * b_mult), min(10.0, b_press * (2.0 - b_mult))),
         (max(3.0, b_dist * b_mult), min(7.0, b_dist * (2.0 - b_mult))),
         (max(100.0, b_thick * b_mult), min(500.0, b_thick * (2.0 - b_mult))),
@@ -153,7 +153,7 @@ def generate_bayesian_suggestion(user_experiments: list, recent_suggestions: lis
         (max(20.0, b_ar * b_mult), min(40.0, b_ar * (2.0 - b_mult)))
     ]
     if real_count <= 8:
-        bounds = [(80.0, 150.0), (3.0, 10.0), (3.0, 7.0), (100.0, 500.0), [1.0, 5.0, 10.0], (20.0, 40.0)]
+        bounds = [(15.0, 200.0), (3.0, 10.0), (3.0, 7.0), (100.0, 500.0), [1.0, 5.0, 10.0], (20.0, 40.0)]
 
     np.random.seed(42)
     num_candidates = 2000
@@ -344,4 +344,78 @@ def simulate_sandbox_point(user_experiments: list, target_material: str, slider_
         "uncertainty": uncertainty_pm,
         "expected_phase": phase,
         "xrd_score": round(xrd_score, 2)
+    }
+
+# ------------------------------------------------------------------------------
+# ACTIVE PHASE MAP GENERATOR
+# ------------------------------------------------------------------------------
+def generate_phase_map(user_experiments: list, target_material: str, param_x: str = "rf_power", param_y: str = "working_pressure", resolution: int = 15) -> dict:
+    """Generates a 2D grid prediction for Active Phase Maps across two chosen parameters."""
+    X_list, y_xrd_list, y_wave_list = [], [], []
+
+    priors = MATERIAL_PRIORS.get(target_material, MATERIAL_PRIORS["Generic"])
+    for p in priors:
+        X_list.append(p[:6])
+        y_xrd_list.append(p[6])
+        y_wave_list.append(p[7])
+
+    for exp in user_experiments:
+        if exp.get("target_material", target_material) != target_material and target_material != "Generic":
+            continue
+        rf = float(exp.get("rf_power") or exp.get("rf_power_w") or 120.0)
+        press = float(exp.get("working_pressure") or exp.get("working_pressure_mtorr") or 5.0)
+        dist = float(exp.get("target_distance") or exp.get("target_substrate_distance_cm") or 7.0)
+        thick = float(exp.get("film_thickness") or exp.get("film_thickness_nm") or 200.0)
+        rot = float(exp.get("rotation_speed") or exp.get("rotation_speed_rpm") or 5.0)
+        ar = float(exp.get("ar_flow") or exp.get("ar_flow_sccm") or 30.0)
+
+        phase = str(exp.get("xrd_phase") or "Amorphous").strip()
+        y_xrd_list.append(XRD_MAP.get(phase, 0.0))
+        wave_key = "wavelength_shift" if "wavelength_shift" in exp else "wavelength_shift_pm"
+        y_wave_list.append(float(exp[wave_key]) if exp.get(wave_key) is not None else None)
+        X_list.append([rf, press, dist, thick, rot, ar])
+
+    X = np.array(X_list)
+    y_xrd = np.array(y_xrd_list)
+
+    physical_length_scales = [10.0, 1.0, 1.0, 50.0, 2.0, 5.0]
+    kernel_xrd = ConstantKernel(1.0) * RBF(length_scale=physical_length_scales) + WhiteKernel(noise_level=0.1)
+    gp_xrd = GaussianProcessRegressor(kernel=kernel_xrd, normalize_y=True, random_state=42).fit(X, y_xrd)
+
+    param_indices = {"rf_power": 0, "working_pressure": 1, "target_distance": 2, "film_thickness": 3, "rotation_speed": 4, "ar_flow": 5}
+    idx_x = param_indices.get(param_x, 0)
+    idx_y = param_indices.get(param_y, 1)
+
+    defaults = [120.0, 5.0, 5.0, 200.0, 5.0, 30.0]
+    if user_experiments:
+        best_run = max(user_experiments, key=lambda e: float(e.get("quality_score") or 0.0))
+        defaults[0] = float(best_run.get("rf_power") or best_run.get("rf_power_w") or 120.0)
+        defaults[1] = float(best_run.get("working_pressure") or best_run.get("working_pressure_mtorr") or 5.0)
+        defaults[2] = float(best_run.get("target_distance") or best_run.get("target_substrate_distance_cm") or 5.0)
+        defaults[3] = float(best_run.get("film_thickness") or best_run.get("film_thickness_nm") or 200.0)
+        defaults[5] = float(best_run.get("ar_flow") or best_run.get("ar_flow_sccm") or 30.0)
+
+    x_min, x_max = (15.0, 200.0) if idx_x == 0 else (3.0, 10.0)
+    y_min, y_max = (15.0, 200.0) if idx_y == 0 else (3.0, 10.0)
+
+    x_vals = np.linspace(x_min, x_max, resolution)
+    y_vals = np.linspace(y_min, y_max, resolution)
+
+    grid_z = []
+    for y_v in y_vals:
+        row = []
+        for x_v in x_vals:
+            pt = list(defaults)
+            pt[idx_x] = x_v
+            pt[idx_y] = y_v
+            pred = gp_xrd.predict([pt])[0]
+            row.append(round(float(pred), 2))
+        grid_z.append(row)
+
+    return {
+        "x": x_vals.tolist(),
+        "y": y_vals.tolist(),
+        "z": grid_z,
+        "param_x": param_x,
+        "param_y": param_y
     }
