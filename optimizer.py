@@ -434,3 +434,44 @@ def calibrate_noise_variance(user_experiments: list) -> dict:
         "sample_variance": round(variance, 2),
         "message": f"Successfully calibrated WhiteKernel noise level to {calibrated_noise} based on experimental variance."
     }
+
+# ------------------------------------------------------------------------------
+# AUTOMATED SYNTHESIS RECIPE GENERATOR
+# ------------------------------------------------------------------------------
+def generate_synthesis_recipe(params: dict, target_material: str) -> str:
+    """Compiles parameters into a structured, step-by-step PVD deposition script."""
+    rf = params.get("rf_power", 120.0)
+    press = params.get("working_pressure", 5.0)
+    ar = params.get("ar_flow", 30.0)
+    o2 = params.get("o2_flow", 5.0)
+    dist = params.get("target_distance", 7.0)
+    thick = params.get("film_thickness", 100.0)
+    rot = params.get("rotation_speed", 5.0)
+
+    recipe = f"""# MatrixAI PVD Deposition Recipe ({target_material})
+## Target Thickness: {thick} nm | Substrate Rotation: {rot} RPM
+
+### Step 1: Chamber Evacuation & Base Pressure
+* **Target Base Pressure:** < $5.0 \\times 10^{-6}$ Torr
+* **Substrate Pre-heating:** 300 °C for 15 minutes.
+
+### Step 2: Gas Stabilization
+* **Argon (Ar) Flow:** {ar} SCCM
+* **Oxygen ($O_2$) Flow:** {o2} SCCM
+* **Working Pressure Setpoint:** {press} mTorr (Throttle valve automated stabilization: 120s delay).
+
+### Step 3: Target Pre-Sputtering
+* **Shutter Status:** CLOSED
+* **RF Power Ramp:** Ramp to {rf} W at 20 W/min to prevent thermal shock.
+* **Duration:** 5 minutes (Target cleaning phase).
+
+### Step 4: Thin-Film Deposition
+* **Shutter Status:** OPEN
+* **Target-Substrate Distance:** {dist} cm
+* **Estimated Deposition Time:** {int(thick * 0.3)} minutes (Assuming standard rate ~0.3 nm/s at {rf}W).
+
+### Step 5: Post-Deposition Cool Down
+* **RF Power:** Ramp down to 0 W.
+* **Gas Flow:** Maintain Ar flow for 10 minutes during cool down below 100 °C.
+"""
+    return recipe
