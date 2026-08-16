@@ -413,6 +413,25 @@ async def calibrate_noise(request: Request):
         return JSONResponse({"error": str(e)}, status_code=500)
 
 # ==============================================================================
+# AUTOMATED SYNTHESIS RECIPE ENDPOINT
+# ==============================================================================
+@app.post("/api/optimizer/recipe")
+async def get_synthesis_recipe(request: Request):
+    user = request.session.get("user")
+    if not user:
+        return JSONResponse({"error": "not_authenticated"}, status_code=401)
+        
+    try:
+        body = await request.json()
+        target_material = body.get("target_material", "Generic")
+        params = body.get("params", {})
+        
+        recipe_md = optimizer.generate_synthesis_recipe(params, target_material)
+        return JSONResponse({"success": True, "recipe": recipe_md})
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+# ==============================================================================
 # FORM SUBMISSION ROUTE (/add)
 # ==============================================================================
 @app.post("/add")
