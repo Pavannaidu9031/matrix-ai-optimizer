@@ -1,6 +1,8 @@
-from fastapi import Depends, FastAPI, Form, HTTPException, Request, BackgroundTasks
+from fastapi import Depends, FastAPI, Form, HTTPException, Request, BackgroundTasks, UploadFile, File
 import io
 import os
+import json
+import re
 import smtplib
 import datetime
 from email.mime.multipart import MIMEMultipart
@@ -106,6 +108,13 @@ def safe_calculate_quality_score(xrd_phase, wavelength_shift, h2_response_time, 
         print(f"Quality score fallback: {err}")
         return 50.0
 
+def ensure_material_column(cur):
+    """Silently ensures the target_material column exists for domain adaptation upgrades."""
+    try:
+        cur.execute("ALTER TABLE experiments ADD COLUMN IF NOT EXISTS target_material VARCHAR DEFAULT 'Generic'")
+    except Exception:
+        pass
+
 # ==============================================================================
 # OAUTH CONFIGURATION
 # ==============================================================================
@@ -123,6 +132,7 @@ oauth.register(
 )
 
 class ExperimentModel(BaseModel):
+    target_material: str = "Generic"
     rf_power: float
     working_pressure: float
     ar_flow: float
@@ -141,10 +151,10 @@ class ExperimentModel(BaseModel):
 
 class ChatRequest(BaseModel):
     message: str
-    provider: str  # 'gemini' or 'groq'
+    provider: str  
 
 # ==============================================================================
-# DASHBOARD ROUTE (With Pending Approval Check)
+# DASHBOARD ROUTE
 # ==============================================================================
 @app.get("/", response_class=HTMLResponse)
 def index(request: Request):
@@ -153,11 +163,9 @@ def index(request: Request):
         return templates.TemplateResponse(request, "index.html", {"user": None, "experiments": [], "stats": {}})
 
     user_email = user_session.get("email", "")
-    
-    # Check if user is approved (Founders bypass this)
     is_approved = user_session.get("is_approved", False)
+    
     if not is_approved and user_email.lower() != FOUNDER_EMAIL.lower():
-        # Double check DB in case Admin just approved them while they were on the pending page
         conn = get_db_connection()
         try:
             cur = conn.cursor()
@@ -176,14 +184,14 @@ def index(request: Request):
         if not is_approved:
             return templates.TemplateResponse(request, "pending.html", {"user": user_session})
 
-    # Load Dashboard Data
     experiments = []
     try:
         conn = get_db_connection()
         try:
             cur = conn.cursor()
+            ensure_material_column(cur)
             cur.execute("""
-                SELECT id, user_email, rf_power, working_pressure, ar_flow, o2_flow,
+                SELECT id, user_email, target_material, rf_power, working_pressure, ar_flow, o2_flow,
                        substrate_temp, target_distance, sputter_time, film_thickness,
                        rotation_speed, substrate_type, xrd_phase, grain_size,
                        h2_response_time, wavelength_shift, batch_notes, quality_score, created_at
@@ -237,7 +245,7 @@ def index(request: Request):
     })
 
 # ==============================================================================
-# AUTH ROUTING (Creates Users Table Automatically)
+# AUTH ROUTING
 # ==============================================================================
 @app.get("/login/google")
 async def login_google(request: Request):
@@ -263,11 +271,9 @@ async def auth_callback(request: Request):
 
         is_approved = (email.lower() == FOUNDER_EMAIL.lower())
 
-        # Sync user with database and manage approvals
         conn = get_db_connection()
         try:
             cur = conn.cursor()
-            # Ensure users table exists
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS users (
                     email VARCHAR PRIMARY KEY,
@@ -290,11 +296,9 @@ async def auth_callback(request: Request):
                 conn.commit()
             else:
                 is_approved = user_row[0]
-
             cur.close()
         except Exception as db_err:
             print(f"Auth DB Sync Error: {db_err}")
-            # Fallback allow founder if DB is temporarily down
             if email.lower() == FOUNDER_EMAIL.lower():
                 is_approved = True
         finally:
@@ -349,6 +353,7 @@ async def add_experiment_form(request: Request):
                     return str(val).strip()
             return default
 
+        target_material = get_str(["target_material"], "Generic")
         rf_power = get_float(["rf_power_w", "rf_power"], 120.0)
         working_pressure = get_float(["working_pressure_mtorr", "working_pressure", "pressure"], 5.0)
         ar_flow = get_float(["ar_flow_sccm", "ar_flow"], 30.0)
@@ -373,6 +378,9 @@ async def add_experiment_form(request: Request):
         conn = get_db_connection()
         cur = conn.cursor()
         
+        ensure_material_column(cur)
+        conn.commit()
+
         existing_rows = []
         try:
             cur.execute("SELECT * FROM experiments WHERE user_email = %s", (user_email,))
@@ -389,16 +397,16 @@ async def add_experiment_form(request: Request):
 
         cur.execute("""
             INSERT INTO experiments (
-                user_email, rf_power, working_pressure, ar_flow,
+                user_email, target_material, rf_power, working_pressure, ar_flow,
                 o2_flow, substrate_temp, target_distance, sputter_time,
                 film_thickness, rotation_speed, substrate_type, xrd_phase,
                 grain_size, h2_response_time, wavelength_shift, batch_notes,
                 quality_score, created_at
             ) VALUES (
-                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW()
+                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW()
             )
         """, (
-            user_email, rf_power, working_pressure, ar_flow,
+            user_email, target_material, rf_power, working_pressure, ar_flow,
             o2_flow, substrate_temp, target_distance, sputter_time,
             film_thickness, rotation_speed, substrate_type, xrd_phase,
             grain_size, h2_response_time, wavelength_shift, batch_notes,
@@ -413,122 +421,10 @@ async def add_experiment_form(request: Request):
                 conn.rollback()
             except Exception:
                 pass
-        error_html = f"""
-        <div style="font-family: sans-serif; padding: 2rem; background: #0f172a; color: white; height: 100vh;">
-            <h1 style="color: #ef4444;">Database Insert Failed</h1>
-            <p>Supabase rejected the experiment data. Exact PostgreSQL Error:</p>
-            <div style="background: #1e293b; padding: 1rem; border-radius: 8px; font-family: monospace; color: #f87171; margin-bottom: 2rem;">
-                {str(db_err)}
-            </div>
-            <a href="/" style="color: #3b82f6; text-decoration: none; border: 1px solid #3b82f6; padding: 10px 15px; border-radius: 5px;">&larr; Go Back</a>
-        </div>
-        """
-        return HTMLResponse(content=error_html, status_code=500)
+        return HTMLResponse(f"<h1>Database Insert Failed</h1><p>{str(db_err)}</p>", status_code=500)
     finally:
         if conn:
             release_db_connection(conn)
-
-# ==============================================================================
-# PERMANENT EXPERIMENT SAVE (JSON API /experiments)
-# ==============================================================================
-@app.post("/experiments")
-async def save_experiment_json(request: Request, data: ExperimentModel):
-    user = request.session.get("user")
-    if not user:
-        return JSONResponse({"error": "not_authenticated"}, status_code=401)
-    
-    user_email = user.get("email")
-    conn = get_db_connection()
-    try:
-        cur = conn.cursor()
-        
-        cur.execute("SELECT * FROM experiments WHERE user_email = %s", (user_email,))
-        existing_rows = cur.fetchall()
-        cols = [desc[0] for desc in cur.description] if cur.description else []
-        all_exps = [dict(zip(cols, r)) for r in existing_rows]
-        
-        quality_score = safe_calculate_quality_score(
-            data.xrd_phase, data.wavelength_shift, data.h2_response_time, data.grain_size, all_exps
-        )
-
-        cur.execute("""
-            INSERT INTO experiments (
-                user_email, rf_power, working_pressure, ar_flow,
-                o2_flow, substrate_temp, target_distance, sputter_time,
-                film_thickness, rotation_speed, substrate_type, xrd_phase,
-                grain_size, h2_response_time, wavelength_shift, batch_notes,
-                quality_score, created_at
-            ) VALUES (
-                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW()
-            ) RETURNING id
-        """, (
-            user_email, data.rf_power, data.working_pressure, data.ar_flow,
-            data.o2_flow, data.substrate_temp, data.target_distance, data.sputter_time,
-            data.film_thickness, data.rotation_speed, data.substrate_type, data.xrd_phase,
-            data.grain_size, data.h2_response_time, data.wavelength_shift, data.batch_notes,
-            quality_score
-        ))
-        
-        new_id = cur.fetchone()[0]
-        conn.commit()
-        cur.close()
-
-        return JSONResponse({
-            "success": True,
-            "id": new_id,
-            "quality_score": quality_score,
-            "message": "Experiment saved permanently to Supabase"
-        })
-    except Exception as e:
-        if conn:
-            conn.rollback()
-        return JSONResponse({"error": "save_failed", "message": str(e)}, status_code=500)
-    finally:
-        release_db_connection(conn)
-
-# ==============================================================================
-# FETCH EXPERIMENTS API
-# ==============================================================================
-@app.get("/experiments")
-async def get_experiments(request: Request):
-    user = request.session.get("user")
-    if not user:
-        return JSONResponse({"error": "not_authenticated"}, status_code=401)
-    
-    user_email = user.get("email")
-    conn = get_db_connection()
-    try:
-        cur = conn.cursor()
-        cur.execute("""
-            SELECT id, user_email, rf_power, working_pressure, ar_flow, o2_flow,
-                   substrate_temp, target_distance, sputter_time, film_thickness,
-                   rotation_speed, substrate_type, xrd_phase, grain_size,
-                   h2_response_time, wavelength_shift, batch_notes, quality_score, created_at
-            FROM experiments
-            WHERE user_email = %s
-            ORDER BY created_at DESC
-        """, (user_email,))
-        
-        rows = cur.fetchall()
-        columns = [desc[0] for desc in cur.description]
-        experiments = []
-        for row in rows:
-            row_dict = dict(zip(columns, row))
-            if isinstance(row_dict.get("created_at"), datetime.datetime):
-                row_dict["created_at"] = row_dict["created_at"].isoformat()
-            experiments.append(row_dict)
-            
-        cur.close()
-
-        return JSONResponse({
-            "success": True,
-            "experiments": experiments,
-            "count": len(experiments)
-        })
-    except Exception as e:
-        return JSONResponse({"error": "fetch_failed", "message": str(e)}, status_code=500)
-    finally:
-        release_db_connection(conn)
 
 # ==============================================================================
 # BAYESIAN OPTIMIZER ENDPOINT
@@ -541,6 +437,16 @@ async def get_bayes_suggestion(request: Request):
         return JSONResponse(status_code=401, content={"message": "Unauthorized"})
 
     user_email = user_session.get("email")
+    target_material = "Generic"
+
+    # Extract dynamic material domain from the client if provided
+    if request.method == "POST":
+        try:
+            body = await request.json()
+            target_material = body.get("target_material", "Generic")
+        except Exception:
+            pass
+
     conn = None
     try:
         conn = get_db_connection()
@@ -574,7 +480,12 @@ async def get_bayes_suggestion(request: Request):
 
         cur.close()
 
-        result = optimizer.generate_bayesian_suggestion(experiments, recent_suggestions)
+        # Pass target_material to the upgraded AI engine
+        result = optimizer.generate_bayesian_suggestion(
+            experiments, 
+            recent_suggestions, 
+            target_material=target_material
+        )
         
         try:
             cur_hist = conn.cursor()
@@ -605,6 +516,56 @@ async def get_bayes_suggestion(request: Request):
     finally:
         if conn:
             release_db_connection(conn)
+
+# ==============================================================================
+# MULTIMODAL VISION AI ENDPOINT (THE VISUAL SCIENTIST)
+# ==============================================================================
+@app.post("/api/vision")
+async def analyze_image_vision(
+    request: Request, 
+    image: UploadFile = File(...), 
+    analysis_type: str = Form(...)
+):
+    user = request.session.get("user")
+    if not user:
+        return JSONResponse({"error": "not_authenticated"}, status_code=401)
+    
+    try:
+        api_key = os.getenv("GEMINI_API_KEY")
+        if not api_key:
+            return JSONResponse({"error": "GEMINI_API_KEY not configured."}, status_code=500)
+        
+        image_bytes = await image.read()
+        client = genai.Client(api_key=api_key)
+        
+        prompt = (
+            f"Analyze this {analysis_type} image for materials science. "
+            "If it is an XRD plot, identify the dominant phase (must be exactly: Monoclinic, Partial, or Amorphous). "
+            "If it is an SEM/FESEM micrograph, estimate the average grain size in nm (return just a numeric value). "
+            "Return strictly a JSON object with a single key 'extracted_value'. "
+            "For example: {\"extracted_value\": \"Monoclinic\"} or {\"extracted_value\": \"25.4\"}."
+        )
+        
+        response = client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=[
+                prompt,
+                genai.types.Part.from_bytes(data=image_bytes, mime_type=image.content_type)
+            ],
+        )
+        
+        # Safely parse the AI JSON string response
+        reply_text = response.text
+        match = re.search(r'\{.*\}', reply_text, re.DOTALL)
+        if match:
+            data = json.loads(match.group(0))
+            return {"success": True, "extracted_value": data.get("extracted_value")}
+        else:
+            return {"success": False, "message": "Failed to parse AI output. Try again."}
+            
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
 
 # ==============================================================================
 # CSV EXPORT
@@ -644,60 +605,17 @@ def export_csv(request: Request):
         release_db_connection(conn)
 
 # ==============================================================================
-# EMAIL NOTIFICATION HELPER
-# ==============================================================================
-def send_approval_email(recipient_email: str):
-    """Sends a welcome email to the newly approved user via SMTP."""
-    sender_email = os.getenv("SMTP_EMAIL")
-    sender_password = os.getenv("SMTP_PASSWORD")
-    
-    if not sender_email or not sender_password:
-        print("SMTP_EMAIL or SMTP_PASSWORD not set in environment. Email skipped.")
-        return
-
-    try:
-        msg = MIMEMultipart()
-        msg['From'] = sender_email
-        msg['To'] = recipient_email
-        msg['Subject'] = "Access Granted: Welcome to MatrixAI"
-
-        body = """
-        <div style="font-family: Arial, sans-serif; padding: 20px; color: #1e293b; line-height: 1.6;">
-            <h2 style="color: #3b82f6;">Welcome to MatrixAI</h2>
-            <p>Hello,</p>
-            <p>Your access request for the MatrixAI Research Laboratory has been <strong>approved</strong> by the founder.</p>
-            <p>You can now log in, access the dashboard, and begin optimizing your thin-film deposition experiments.</p>
-            <br>
-            <a href="https://rock-ai-optimizer.onrender.com/" style="display: inline-block; padding: 12px 24px; background-color: #3b82f6; color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: bold;">Access Dashboard</a>
-            <br><br>
-            <p>Happy experimenting!</p>
-        </div>
-        """
-        msg.attach(MIMEText(body, 'html'))
-
-        server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
-        server.login(sender_email, sender_password)
-        server.sendmail(sender_email, recipient_email, msg.as_string())
-        server.quit()
-        print(f"Approval email sent successfully to {recipient_email}")
-    except Exception as e:
-        print(f"Failed to send email to {recipient_email}: {e}")
-
-# ==============================================================================
 # ADMIN PANEL ROUTES
 # ==============================================================================
 @app.get("/admin/users", response_class=HTMLResponse)
 def admin_dashboard(request: Request):
     user = request.session.get("user")
-    # Strictly enforce that only the Founder can access this route
     if not user or user.get("email", "").lower() != FOUNDER_EMAIL.lower():
         return RedirectResponse("/")
 
     conn = get_db_connection()
     try:
         cur = conn.cursor()
-        
-        # Force create the users table if the Admin accesses the panel before anyone logs in
         cur.execute("""
             CREATE TABLE IF NOT EXISTS users (
                 email VARCHAR PRIMARY KEY,
@@ -709,7 +627,6 @@ def admin_dashboard(request: Request):
         """)
         conn.commit()
 
-        # Fetch all users and calculate how many experiments they have logged
         cur.execute("""
             SELECT u.email, u.name, u.picture, u.is_approved, u.created_at,
                    COUNT(e.id) as exp_count
@@ -747,9 +664,6 @@ def approve_user(request: Request, email: str, background_tasks: BackgroundTasks
         cur.execute("UPDATE users SET is_approved = TRUE WHERE email = %s", (email,))
         conn.commit()
         cur.close()
-        
-        background_tasks.add_task(send_approval_email, email)
-        
     finally:
         release_db_connection(conn)
     return RedirectResponse("/admin/users", status_code=303)
@@ -760,7 +674,6 @@ def revoke_user(request: Request, email: str):
     if not user or user.get("email", "").lower() != FOUNDER_EMAIL.lower():
         return RedirectResponse("/")
         
-    # Prevent founder from accidentally revoking themselves
     if email.lower() == FOUNDER_EMAIL.lower():
         return RedirectResponse("/admin/users", status_code=303) 
         
@@ -785,12 +698,12 @@ async def chat_with_agent(request: Request, data: ChatRequest):
         
     user_email = user.get("email")
     
-    # Fetch the user's recent experiments to give the AI context
     conn = get_db_connection()
     try:
         cur = conn.cursor()
+        ensure_material_column(cur)
         cur.execute("""
-            SELECT rf_power, working_pressure, target_distance, sputter_time, 
+            SELECT target_material, rf_power, working_pressure, target_distance, sputter_time, 
                    film_thickness, rotation_speed, ar_flow, xrd_phase, quality_score 
             FROM experiments WHERE user_email = %s ORDER BY created_at DESC LIMIT 5
         """, (user_email,))
@@ -804,7 +717,6 @@ async def chat_with_agent(request: Request, data: ChatRequest):
     finally:
         release_db_connection(conn)
         
-    # Construct the System Prompt
     system_context = (
         "You are an expert Materials Science AI Assistant built into the MatrixAI platform. "
         "The user is optimizing thin-film deposition parameters using a PVD/CVD process. "
