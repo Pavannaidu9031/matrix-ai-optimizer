@@ -4,7 +4,7 @@ from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import RBF, WhiteKernel, ConstantKernel
 
 # ------------------------------------------------------------------------------
-# UPGRADE 3: Literature Pre-Seeding (Now Multi-Material)
+# MULTI-MATERIAL LITERATURE PRIORS
 # ------------------------------------------------------------------------------
 MATERIAL_PRIORS = {
     "Generic": [
@@ -34,9 +34,6 @@ MATERIAL_PRIORS = {
 XRD_MAP = {"Monoclinic": 1.0, "Partial": 0.5, "Amorphous": 0.0}
 PARAM_NAMES = ["RF Power", "Pressure", "Target Distance", "Film Thickness", "Rotation Speed", "Ar Flow"]
 
-# ------------------------------------------------------------------------------
-# UPGRADE 7: Experiment Quality Score Calculation
-# ------------------------------------------------------------------------------
 def calculate_quality_score(xrd_phase, wavelength_shift_pm, h2_response_s, grain_size_nm, all_experiments):
     xrd_score = XRD_MAP.get(str(xrd_phase).strip(), 0.0)
 
@@ -56,26 +53,36 @@ def calculate_quality_score(xrd_phase, wavelength_shift_pm, h2_response_s, grain
     quality = (xrd_score * 40.0) + (wave_norm * 30.0) + (h2_norm * 20.0) + (grain_norm * 10.0)
     return round(float(np.clip(quality, 0.0, 100.0)), 1)
 
+def format_candidate(candidate_array, mean_xrd, mean_wave, min_w, denom):
+    s_rf, s_press, s_dist, s_thick, s_rot, s_ar = candidate_array
+    pred_xrd = float(mean_xrd)
+    pred_wave_pm = round(float(min_w + float(mean_wave) * denom), 1)
+
+    if pred_xrd >= 0.7: phase = "Monoclinic"
+    elif pred_xrd >= 0.3: phase = "Partial"
+    else: phase = "Amorphous"
+    
+    return {
+        "rf_power": round(float(s_rf), 1),
+        "working_pressure": round(float(s_press), 1),
+        "target_distance": round(float(s_dist), 1),
+        "film_thickness": round(float(s_thick), 1),
+        "rotation_speed": float(s_rot),
+        "ar_flow": round(float(s_ar), 1),
+        "expected_phase": phase,
+        "expected_shift": pred_wave_pm
+    }
+
 # ------------------------------------------------------------------------------
-# MAIN OPTIMIZATION LOGIC
+# MAIN OPTIMIZATION LOGIC (Batch & Pareto Enabled)
 # ------------------------------------------------------------------------------
 def generate_bayesian_suggestion(user_experiments: list, recent_suggestions: list = None, target_material: str = "Generic") -> dict:
     real_count = len(user_experiments)
 
-    # --------------------------------------------------------------------------
-    # UPGRADE 1: Dynamic Kappa UCB Schedule
-    # --------------------------------------------------------------------------
-    if real_count <= 7:
-        kappa = 1.5  
-    elif real_count <= 15:
-        kappa = 1.5  
-    else:
-        kappa = 0.5  
+    kappa = 1.5 if real_count <= 15 else 0.5  
 
-    # Prepare datasets
     X_list, y_xrd_list, y_wave_list = [], [], []
 
-    # Domain adaptation: Load specific material priors
     priors = MATERIAL_PRIORS.get(target_material, MATERIAL_PRIORS["Generic"])
     for p in priors:
         X_list.append(p[:6])
@@ -83,7 +90,6 @@ def generate_bayesian_suggestion(user_experiments: list, recent_suggestions: lis
         y_wave_list.append(p[7])
 
     for exp in user_experiments:
-        # Domain adaptation: filter by material if available in data
         if exp.get("target_material", target_material) != target_material and target_material != "Generic":
             continue
             
@@ -95,73 +101,120 @@ def generate_bayesian_suggestion(user_experiments: list, recent_suggestions: lis
         ar = float(exp.get("ar_flow") or exp.get("ar_flow_sccm") or 30.0)
 
         phase = str(exp.get("xrd_phase") or "Amorphous").strip()
-        xrd_val = XRD_MAP.get(phase, 0.0)
+        y_xrd_list.append(XRD_MAP.get(phase, 0.0))
         
         wave_key = "wavelength_shift" if "wavelength_shift" in exp else "wavelength_shift_pm"
-        wave_val = float(exp[wave_key]) if exp.get(wave_key) is not None else None
-
+        y_wave_list.append(float(exp[wave_key]) if exp.get(wave_key) is not None else None)
         X_list.append([rf, press, dist, thick, rot, ar])
-        y_xrd_list.append(xrd_val)
-        y_wave_list.append(wave_val)
 
     X = np.array(X_list)
     y_xrd = np.array(y_xrd_list)
 
     valid_waves = [v for v in y_wave_list if v is not None]
-    min_w = min(valid_waves) if valid_waves else 0.0
-    max_w = max(valid_waves) if valid_waves else 200.0
+    min_w, max_w = (min(valid_waves), max(valid_waves)) if valid_waves else (0.0, 200.0)
     denom = (max_w - min_w) if max_w > min_w else 1.0
 
-    y_wave_norm = np.array([
-        (v - min_w) / denom if v is not None else 0.5 for v in y_wave_list
-    ])
+    y_wave_norm = np.array([(v - min_w) / denom if v is not None else 0.5 for v in y_wave_list])
 
-    # --------------------------------------------------------------------------
-    # UPGRADE 2: Anisotropic Gaussian Processes with Physical Intuition
-    # --------------------------------------------------------------------------
     physical_length_scales = [10.0, 1.0, 1.0, 50.0, 2.0, 5.0]
 
-    kernel_xrd = ConstantKernel(1.0) * RBF(
-        length_scale=physical_length_scales,
-        length_scale_bounds=(0.1, 1000)
-    ) + WhiteKernel(noise_level=0.1)
-
-    gp_xrd = GaussianProcessRegressor(
-        kernel=kernel_xrd, 
-        n_restarts_optimizer=10, 
-        normalize_y=True,
-        random_state=42
-    )
+    kernel_xrd = ConstantKernel(1.0) * RBF(length_scale=physical_length_scales, length_scale_bounds=(0.1, 1000)) + WhiteKernel(noise_level=0.1)
+    gp_xrd = GaussianProcessRegressor(kernel=kernel_xrd, n_restarts_optimizer=10, normalize_y=True, random_state=42)
     gp_xrd.fit(X, y_xrd)
 
-    kernel_wave = ConstantKernel(1.0) * RBF(
-        length_scale=physical_length_scales,
-        length_scale_bounds=(0.1, 1000)
-    ) + WhiteKernel(noise_level=0.1)
-    
-    gp_wave = GaussianProcessRegressor(
-        kernel=kernel_wave, 
-        n_restarts_optimizer=10, 
-        normalize_y=True,
-        random_state=42
-    )
+    kernel_wave = ConstantKernel(1.0) * RBF(length_scale=physical_length_scales, length_scale_bounds=(0.1, 1000)) + WhiteKernel(noise_level=0.1)
+    gp_wave = GaussianProcessRegressor(kernel=kernel_wave, n_restarts_optimizer=10, normalize_y=True, random_state=42)
     gp_wave.fit(X, y_wave_norm)
     
-    # --------------------------------------------------------------------------
-    # HARDWARE ANOMALY DETECTION
-    # --------------------------------------------------------------------------
     anomaly_detected = False
     if real_count > 0:
-        last_exp = X_list[-1]
-        pred_last, _ = gp_wave.predict([last_exp], return_std=True)
-        actual_last = y_wave_norm[-1]
-        # If actual value deviates massively from GP mathematical prediction, flag hardware
-        if abs(pred_last[0] - actual_last) > 0.4:  
+        pred_last, _ = gp_wave.predict([X_list[-1]], return_std=True)
+        if abs(pred_last[0] - y_wave_norm[-1]) > 0.4:  
             anomaly_detected = True
 
+    # Adaptive Bounds
+    if user_experiments:
+        best_run = max(user_experiments, key=lambda e: float(e.get("quality_score") or 0.0))
+        b_rf = float(best_run.get("rf_power") or best_run.get("rf_power_w") or 120.0)
+        b_press = float(best_run.get("working_pressure") or best_run.get("working_pressure_mtorr") or 5.0)
+        b_dist = float(best_run.get("target_distance") or best_run.get("target_substrate_distance_cm") or 5.0)
+        b_thick = float(best_run.get("film_thickness") or best_run.get("film_thickness_nm") or 200.0)
+        b_ar = float(best_run.get("ar_flow") or best_run.get("ar_flow_sccm") or 30.0)
+    else:
+        b_rf, b_press, b_dist, b_thick, b_ar = 120.0, 5.0, 5.0, 200.0, 30.0
+
+    b_mult = 0.7 if real_count <= 15 else 0.85
+    bounds = [
+        (max(80.0, b_rf * b_mult), min(150.0, b_rf * (2.0 - b_mult))),
+        (max(3.0, b_press * b_mult), min(10.0, b_press * (2.0 - b_mult))),
+        (max(3.0, b_dist * b_mult), min(7.0, b_dist * (2.0 - b_mult))),
+        (max(100.0, b_thick * b_mult), min(500.0, b_thick * (2.0 - b_mult))),
+        [1.0, 5.0, 10.0],
+        (max(20.0, b_ar * b_mult), min(40.0, b_ar * (2.0 - b_mult)))
+    ]
+    if real_count <= 8:
+        bounds = [(80.0, 150.0), (3.0, 10.0), (3.0, 7.0), (100.0, 500.0), [1.0, 5.0, 10.0], (20.0, 40.0)]
+
+    np.random.seed(42)
+    num_candidates = 2000
+    candidates = np.column_stack([
+        np.random.uniform(bounds[0][0], bounds[0][1], num_candidates),
+        np.random.uniform(bounds[1][0], bounds[1][1], num_candidates),
+        np.random.uniform(bounds[2][0], bounds[2][1], num_candidates),
+        np.random.uniform(bounds[3][0], bounds[3][1], num_candidates),
+        np.random.choice(bounds[4], num_candidates),
+        np.random.uniform(bounds[5][0], bounds[5][1], num_candidates)
+    ])
+
+    mean_xrd, std_xrd = gp_xrd.predict(candidates, return_std=True)
+    mean_wave, std_wave = gp_wave.predict(candidates, return_std=True)
+    
+    mean_combined = 0.7 * mean_xrd + 0.3 * mean_wave
+    std_combined = 0.7 * std_xrd + 0.3 * std_wave
+    acquisition = mean_combined + (kappa * std_combined)
+
     # --------------------------------------------------------------------------
-    # DIGITAL TWIN SANDBOX GENERATOR
+    # FEATURE 1 & 2: PARETO BATCH GENERATION (3 Distinct Options)
     # --------------------------------------------------------------------------
+    
+    # Option 1: Max Quality (Standard UCB)
+    idx_1 = int(np.argmax(acquisition))
+    opt1 = candidates[idx_1]
+    
+    # Option 2: High Efficiency / Low Cost (Pareto Optimized)
+    # Cost function C(x) penalizes high thickness (time) and high Ar flow
+    cost_penalty = 0.5 * (candidates[:, 3] / bounds[3][1]) + 0.5 * (candidates[:, 5] / bounds[5][1])
+    acq_eff = acquisition - (1.2 * cost_penalty) 
+    
+    # Force physical diversity constraint (Delta > 10.0)
+    dist_to_opt1 = np.linalg.norm(candidates - opt1, axis=1)
+    acq_eff[dist_to_opt1 < 10.0] = -9999.0 
+    idx_2 = int(np.argmax(acq_eff))
+    opt2 = candidates[idx_2]
+    
+    # Option 3: Pure Exploration (Max Uncertainty)
+    acq_exp = np.copy(std_combined)
+    dist_to_opt2 = np.linalg.norm(candidates - opt2, axis=1)
+    acq_exp[(dist_to_opt1 < 10.0) | (dist_to_opt2 < 10.0)] = -9999.0
+    idx_3 = int(np.argmax(acq_exp))
+    opt3 = candidates[idx_3]
+
+    batch_options = [
+        {"type": "Max Quality", "data": format_candidate(opt1, mean_xrd[idx_1], mean_wave[idx_1], min_w, denom)},
+        {"type": "High Efficiency", "data": format_candidate(opt2, mean_xrd[idx_2], mean_wave[idx_2], min_w, denom)},
+        {"type": "Pure Exploration", "data": format_candidate(opt3, mean_xrd[idx_3], mean_wave[idx_3], min_w, denom)}
+    ]
+
+    # Map Option 1 as primary for legacy UI compatibility
+    best_candidate = opt1
+    s_rf, s_press, s_dist, s_thick, s_rot, s_ar = best_candidate
+    pred_xrd = float(mean_xrd[idx_1])
+    pred_wave_pm = round(float(min_w + float(mean_wave[idx_1]) * denom), 1)
+
+    if pred_xrd >= 0.7: expected_phase = "Monoclinic"
+    elif pred_xrd >= 0.3: expected_phase = "Partial"
+    else: expected_phase = "Amorphous"
+
     def generate_sandbox_curve(param_index, base_params, bounds_tuple):
         sandbox_X = []
         test_vals = np.linspace(bounds_tuple[0], bounds_tuple[1], 20)
@@ -176,170 +229,32 @@ def generate_bayesian_suggestion(user_experiments: list, recent_suggestions: lis
             "std": (std_w * denom).tolist()
         }
 
-    # --------------------------------------------------------------------------
-    # SANITY CHECK
-    # --------------------------------------------------------------------------
-    test_point = np.array([[150.0, 3.0, 3.0, 200.0, 10.0, 30.0]])
-    sanity_pred, _ = gp_xrd.predict(test_point, return_std=True)
-    model_sanity_check = round(float(sanity_pred[0]), 3)
-
-    # --------------------------------------------------------------------------
-    # UPGRADE 6: Adaptive Parameter Bounds
-    # --------------------------------------------------------------------------
-    if user_experiments:
-        best_run = max(user_experiments, key=lambda e: float(e.get("quality_score") or 0.0))
-        b_rf = float(best_run.get("rf_power") or best_run.get("rf_power_w") or 120.0)
-        b_press = float(best_run.get("working_pressure") or best_run.get("working_pressure_mtorr") or 5.0)
-        b_dist = float(best_run.get("target_distance") or best_run.get("target_substrate_distance_cm") or 5.0)
-        b_thick = float(best_run.get("film_thickness") or best_run.get("film_thickness_nm") or 200.0)
-        b_ar = float(best_run.get("ar_flow") or best_run.get("ar_flow_sccm") or 30.0)
-    else:
-        b_rf, b_press, b_dist, b_thick, b_ar = 120.0, 5.0, 5.0, 200.0, 30.0
-
-    if real_count <= 8:
-        bounds = [(80.0, 150.0), (3.0, 10.0), (3.0, 7.0), (100.0, 500.0), [1.0, 5.0, 10.0], (20.0, 40.0)]
-    elif real_count <= 15:
-        bounds = [
-            (max(80.0, b_rf * 0.7), min(150.0, b_rf * 1.3)),
-            (max(3.0, b_press * 0.7), min(10.0, b_press * 1.3)),
-            (max(3.0, b_dist * 0.7), min(7.0, b_dist * 1.3)),
-            (max(100.0, b_thick * 0.7), min(500.0, b_thick * 1.3)),
-            [1.0, 5.0, 10.0],
-            (max(20.0, b_ar * 0.7), min(40.0, b_ar * 1.3))
-        ]
-    else:
-        bounds = [
-            (max(80.0, b_rf * 0.85), min(150.0, b_rf * 1.15)),
-            (max(3.0, b_press * 0.85), min(10.0, b_press * 1.15)),
-            (max(3.0, b_dist * 0.85), min(7.0, b_dist * 1.15)),
-            (max(100.0, b_thick * 0.85), min(500.0, b_thick * 1.15)),
-            [1.0, 5.0, 10.0],
-            (max(20.0, b_ar * 0.85), min(40.0, b_ar * 1.15))
-        ]
-
-    # Sample Candidates
-    np.random.seed(42)
-    num_candidates = 1000
-    c_rf = np.random.uniform(bounds[0][0], bounds[0][1], num_candidates)
-    c_press = np.random.uniform(bounds[1][0], bounds[1][1], num_candidates)
-    c_dist = np.random.uniform(bounds[2][0], bounds[2][1], num_candidates)
-    c_thick = np.random.uniform(bounds[3][0], bounds[3][1], num_candidates)
-    c_rot = np.random.choice(bounds[4], num_candidates)
-    c_ar = np.random.uniform(bounds[5][0], bounds[5][1], num_candidates)
-
-    candidates = np.column_stack([c_rf, c_press, c_dist, c_thick, c_rot, c_ar])
-
-    mean_xrd, std_xrd = gp_xrd.predict(candidates, return_std=True)
-    mean_wave, std_wave = gp_wave.predict(candidates, return_std=True)
-
-    mean_combined = 0.7 * mean_xrd + 0.3 * mean_wave
-    std_combined = 0.7 * std_xrd + 0.3 * std_wave
-    acquisition = mean_combined + (kappa * std_combined)
-
-    best_idx = int(np.argmax(acquisition))
-    best_candidate = candidates[best_idx]
-
-    pred_xrd = float(mean_xrd[best_idx])
-    pred_wave_norm = float(mean_wave[best_idx])
-    pred_wave_pm = round(float(min_w + pred_wave_norm * denom), 1)
-    combined_score = round(float(mean_combined[best_idx]), 2)
-
-    if pred_xrd >= 0.7:
-        expected_phase = "Monoclinic"
-    elif pred_xrd >= 0.3:
-        expected_phase = "Partial"
-    else:
-        expected_phase = "Amorphous"
-
-    # --------------------------------------------------------------------------
-    # UPGRADE 4: Per-Parameter Length Scale Uncertainty Display
-    # --------------------------------------------------------------------------
-    try:
-        rbf_k = gp_xrd.kernel_.k1.k2
-        l_scales = rbf_k.length_scale
-        scaled_ls = (l_scales - np.min(l_scales)) / (np.max(l_scales) - np.min(l_scales) + 1e-6)
-    except Exception:
-        try:
-            l_scales = gp_xrd.kernel_.k1.length_scale
-            scaled_ls = (l_scales - np.min(l_scales)) / (np.max(l_scales) - np.min(l_scales) + 1e-6)
-        except Exception:
-            scaled_ls = np.ones(6) * 0.5
-
-    uncertainties = {}
-    for idx, name in enumerate(PARAM_NAMES):
-        uncertainties[name] = round(float(np.clip(scaled_ls[idx], 0.1, 1.0)), 2)
-
-    most_unc = PARAM_NAMES[int(np.argmax(scaled_ls))]
-    most_cert = PARAM_NAMES[int(np.argmin(scaled_ls))]
-
-    # --------------------------------------------------------------------------
-    # UPGRADE 5: Multi-Run Convergence Detection
-    # --------------------------------------------------------------------------
-    converged = False
-    convergence_score = min(100, int((real_count / 20.0) * 100))
-    runs_to_conv = max(1, 15 - real_count)
-
-    if recent_suggestions and len(recent_suggestions) >= 2:
-        last3 = [
-            [
-                float(r["suggested_rf_power"]),
-                float(r["suggested_pressure"]),
-                float(r["suggested_distance"]),
-                float(r["suggested_thickness"]),
-                float(r["suggested_rotation"]),
-                float(r["suggested_ar_flow"]),
-            ]
-            for r in recent_suggestions
-        ]
-        last3.append(best_candidate.tolist())
-
-        variances = np.var(last3, axis=0)
-
-        if (
-            variances[0] < 25.0
-            and variances[1] < 0.25
-            and variances[2] < 0.09
-            and variances[3] < 225.0
-            and variances[4] < 1.0
-        ):
-            converged = True
-            convergence_score = 100
-            runs_to_conv = 0
-
-    # Generate Digital Twin plot curves for the two most sensitive parameters
-    s_rf, s_press, s_dist, s_thick, s_rot, s_ar = best_candidate
     sandbox_data = {
         "rf_curve": generate_sandbox_curve(0, best_candidate, bounds[0]),
         "pressure_curve": generate_sandbox_curve(1, best_candidate, bounds[1])
     }
 
-    # --------------------------------------------------------------------------
-    # UPGRADE 8: Smart Scientific Explanation Generator
-    # --------------------------------------------------------------------------
+    try:
+        rbf_k = gp_xrd.kernel_.k1.k2
+        l_scales = rbf_k.length_scale
+        scaled_ls = (l_scales - np.min(l_scales)) / (np.max(l_scales) - np.min(l_scales) + 1e-6)
+    except Exception:
+        scaled_ls = np.ones(6) * 0.5
+    uncertainties = {PARAM_NAMES[i]: round(float(np.clip(scaled_ls[i], 0.1, 1.0)), 2) for i in range(6)}
+
+    converged = False
+    if recent_suggestions and len(recent_suggestions) >= 2:
+        last3 = [[float(r["suggested_rf_power"]), float(r["suggested_pressure"]), float(r["suggested_distance"]), float(r["suggested_thickness"]), float(r["suggested_rotation"]), float(r["suggested_ar_flow"])] for r in recent_suggestions]
+        last3.append(best_candidate.tolist())
+        variances = np.var(last3, axis=0)
+        if variances[0] < 25.0 and variances[1] < 0.25 and variances[2] < 0.09 and variances[3] < 225.0 and variances[4] < 1.0:
+            converged = True
+
     sentences = []
-
-    if s_rf > b_rf + 5.0:
-        sentences.append(f"Increasing RF power to {round(s_rf, 1)}W to provide higher adatom energy for {target_material} phase nucleation.")
-    elif s_rf < b_rf - 5.0:
-        sentences.append(f"Lowering RF power to {round(s_rf, 1)}W to reduce plasma damage during film growth.")
-
-    if s_dist < b_dist - 0.5:
-        sentences.append(f"Reducing target distance to {round(s_dist, 1)}cm enhances kinetic energy transfer to the growing film.")
-
-    if s_rot >= 5.0:
-        sentences.append(f"Substrate rotation at {int(s_rot)} rpm ensures circumferential coating uniformity across non-planar surfaces.")
-        
-    if anomaly_detected:
-        sentences.append("WARNING: High residual variance detected in recent runs. Check target wear or vacuum seal integrity.")
-
-    if not sentences:
-        sentences.append(f"Balancing working pressure at {round(s_press, 1)} mTorr and Ar flow at {round(s_ar, 1)} sccm to maintain optimal stoichiometry.")
-
-    explanation = " ".join(sentences)
-
-    base_conf = 33 if real_count < 6 else (66 if real_count <= 10 else 90)
-    conf_score = int(np.clip(base_conf + (7 if not converged else 10), 10, 99))
-    conf_label = "HIGH" if conf_score >= 75 else ("MEDIUM" if conf_score >= 45 else "LOW")
+    if s_rf > b_rf + 5.0: sentences.append(f"Increasing RF power to {round(s_rf, 1)}W to provide higher adatom energy.")
+    elif s_rf < b_rf - 5.0: sentences.append(f"Lowering RF power to {round(s_rf, 1)}W to reduce plasma damage.")
+    if anomaly_detected: sentences.append("WARNING: High residual variance detected in recent runs. Check target wear.")
+    if not sentences: sentences.append(f"Balancing working pressure at {round(s_press, 1)} mTorr and Ar flow at {round(s_ar, 1)} sccm.")
 
     return {
         "app_name": "MatrixAI",
@@ -347,7 +262,7 @@ def generate_bayesian_suggestion(user_experiments: list, recent_suggestions: lis
         "kappa_used": round(float(kappa), 2),
         "target_material": target_material,
         "hardware_anomaly": anomaly_detected,
-        "model_sanity_check": model_sanity_check,
+        "batch_options": batch_options,
         "suggested": {
             "rf_power": round(float(s_rf), 1),
             "working_pressure": round(float(s_press), 1),
@@ -358,25 +273,18 @@ def generate_bayesian_suggestion(user_experiments: list, recent_suggestions: lis
         },
         "expected": {
             "xrd_phase": expected_phase,
-            "xrd_score": round(pred_xrd, 2),
             "wavelength_shift_estimate": pred_wave_pm,
-            "combined_score": combined_score,
         },
         "confidence": {
-            "score": conf_score,
-            "label": conf_label,
-            "data_points_used": real_count + len(priors),
-            "literature_points": len(priors),
-            "real_points": real_count,
+            "score": int(np.clip((33 if real_count < 6 else 90) + (10 if converged else 0), 10, 99)),
+            "label": "HIGH" if real_count >= 6 else "MEDIUM",
         },
         "convergence": {
             "converged": converged,
-            "convergence_score": convergence_score,
-            "runs_to_convergence_estimate": runs_to_conv,
+            "convergence_score": min(100, int((real_count / 20.0) * 100)),
+            "runs_to_convergence_estimate": 0 if converged else max(1, 15 - real_count),
         },
         "parameter_uncertainties": uncertainties,
-        "most_uncertain_parameter": most_unc,
-        "most_certain_parameter": most_cert,
-        "explanation": explanation,
+        "explanation": " ".join(sentences),
         "digital_twin": sandbox_data
     }
