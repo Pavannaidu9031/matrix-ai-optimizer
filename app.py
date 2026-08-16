@@ -427,6 +427,108 @@ async def add_experiment_form(request: Request):
             release_db_connection(conn)
 
 # ==============================================================================
+# PERMANENT EXPERIMENT SAVE (JSON API /experiments)
+# ==============================================================================
+@app.post("/experiments")
+async def save_experiment_json(request: Request, data: ExperimentModel):
+    user = request.session.get("user")
+    if not user:
+        return JSONResponse({"error": "not_authenticated"}, status_code=401)
+    
+    user_email = user.get("email")
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+        
+        cur.execute("SELECT * FROM experiments WHERE user_email = %s", (user_email,))
+        existing_rows = cur.fetchall()
+        cols = [desc[0] for desc in cur.description] if cur.description else []
+        all_exps = [dict(zip(cols, r)) for r in existing_rows]
+        
+        quality_score = safe_calculate_quality_score(
+            data.xrd_phase, data.wavelength_shift, data.h2_response_time, data.grain_size, all_exps
+        )
+
+        cur.execute("""
+            INSERT INTO experiments (
+                user_email, rf_power, working_pressure, ar_flow,
+                o2_flow, substrate_temp, target_distance, sputter_time,
+                film_thickness, rotation_speed, substrate_type, xrd_phase,
+                grain_size, h2_response_time, wavelength_shift, batch_notes,
+                quality_score, created_at
+            ) VALUES (
+                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW()
+            ) RETURNING id
+        """, (
+            user_email, data.rf_power, data.working_pressure, data.ar_flow,
+            data.o2_flow, data.substrate_temp, data.target_distance, data.sputter_time,
+            data.film_thickness, data.rotation_speed, data.substrate_type, data.xrd_phase,
+            data.grain_size, data.h2_response_time, data.wavelength_shift, data.batch_notes,
+            quality_score
+        ))
+        
+        new_id = cur.fetchone()[0]
+        conn.commit()
+        cur.close()
+
+        return JSONResponse({
+            "success": True,
+            "id": new_id,
+            "quality_score": quality_score,
+            "message": "Experiment saved permanently to Supabase"
+        })
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        return JSONResponse({"error": "save_failed", "message": str(e)}, status_code=500)
+    finally:
+        release_db_connection(conn)
+
+# ==============================================================================
+# FETCH EXPERIMENTS API
+# ==============================================================================
+@app.get("/experiments")
+async def get_experiments(request: Request):
+    user = request.session.get("user")
+    if not user:
+        return JSONResponse({"error": "not_authenticated"}, status_code=401)
+    
+    user_email = user.get("email")
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT id, user_email, rf_power, working_pressure, ar_flow, o2_flow,
+                   substrate_temp, target_distance, sputter_time, film_thickness,
+                   rotation_speed, substrate_type, xrd_phase, grain_size,
+                   h2_response_time, wavelength_shift, batch_notes, quality_score, created_at
+            FROM experiments
+            WHERE user_email = %s
+            ORDER BY created_at DESC
+        """, (user_email,))
+        
+        rows = cur.fetchall()
+        columns = [desc[0] for desc in cur.description]
+        experiments = []
+        for row in rows:
+            row_dict = dict(zip(columns, row))
+            if isinstance(row_dict.get("created_at"), datetime.datetime):
+                row_dict["created_at"] = row_dict["created_at"].isoformat()
+            experiments.append(row_dict)
+            
+        cur.close()
+
+        return JSONResponse({
+            "success": True,
+            "experiments": experiments,
+            "count": len(experiments)
+        })
+    except Exception as e:
+        return JSONResponse({"error": "fetch_failed", "message": str(e)}, status_code=500)
+    finally:
+        release_db_connection(conn)
+
+# ==============================================================================
 # BAYESIAN OPTIMIZER ENDPOINT
 # ==============================================================================
 @app.get("/suggest")
@@ -439,7 +541,6 @@ async def get_bayes_suggestion(request: Request):
     user_email = user_session.get("email")
     target_material = "Generic"
 
-    # Extract dynamic material domain from the client if provided
     if request.method == "POST":
         try:
             body = await request.json()
@@ -480,7 +581,6 @@ async def get_bayes_suggestion(request: Request):
 
         cur.close()
 
-        # Pass target_material to the upgraded AI engine
         result = optimizer.generate_bayesian_suggestion(
             experiments, 
             recent_suggestions, 
@@ -543,7 +643,7 @@ async def analyze_image_vision(
             "If it is an XRD plot, identify the dominant phase (must be exactly: Monoclinic, Partial, or Amorphous). "
             "If it is an SEM/FESEM micrograph, estimate the average grain size in nm (return just a numeric value). "
             "Return strictly a JSON object with a single key 'extracted_value'. "
-            "For example: {\"extracted_value\": \"Monoclinic\"} or {\"extracted_value\": \"25.4\"}."
+            "For example: {{\"extracted_value\": \"Monoclinic\"}} or {{\"extracted_value\": \"25.4\"}}."
         )
         
         response = client.models.generate_content(
@@ -554,7 +654,6 @@ async def analyze_image_vision(
             ],
         )
         
-        # Safely parse the AI JSON string response
         reply_text = response.text
         match = re.search(r'\{.*\}', reply_text, re.DOTALL)
         if match:
@@ -566,6 +665,97 @@ async def analyze_image_vision(
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
 
+
+# ==============================================================================
+# LITERATURE INGESTION ENDPOINT (PDF to Database)
+# ==============================================================================
+@app.post("/api/literature/upload")
+async def upload_literature_pdf(request: Request, file: UploadFile = File(...)):
+    user = request.session.get("user")
+    
+    # Restrict to Admin/Founder only
+    if not user or user.get("email", "").lower() != FOUNDER_EMAIL.lower():
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+        
+    try:
+        api_key = os.getenv("GEMINI_API_KEY")
+        if not api_key:
+            return JSONResponse({"error": "GEMINI_API_KEY not configured."}, status_code=500)
+            
+        pdf_bytes = await file.read()
+        client = genai.Client(api_key=api_key)
+        
+        prompt = (
+            "You are an expert Materials Scientist. Read this research paper and extract the optimal or primary "
+            "experimental parameters for thin-film deposition. "
+            "Return strictly a JSON object with the following keys and numerical values (no units): "
+            "'target_material' (string), 'rf_power' (float), 'working_pressure' (float), 'ar_flow' (float), "
+            "'o2_flow' (float), 'substrate_temp' (float), 'target_distance' (float), 'sputter_time' (float), "
+            "'film_thickness' (float), 'rotation_speed' (float), 'xrd_phase' (string: Monoclinic, Partial, or Amorphous), "
+            "'grain_size' (float), 'h2_response_time' (float), 'wavelength_shift' (float)."
+        )
+        
+        response = client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=[
+                prompt,
+                genai.types.Part.from_bytes(data=pdf_bytes, mime_type="application/pdf")
+            ],
+        )
+        
+        reply_text = response.text
+        match = re.search(r'\{.*\}', reply_text, re.DOTALL)
+        if not match:
+            return JSONResponse({"error": "Failed to parse AI output."}, status_code=500)
+            
+        data = json.loads(match.group(0))
+        
+        conn = get_db_connection()
+        try:
+            cur = conn.cursor()
+            ensure_material_column(cur)
+            
+            quality_score = 75.0 
+            
+            cur.execute("""
+                INSERT INTO experiments (
+                    user_email, target_material, rf_power, working_pressure, ar_flow,
+                    o2_flow, substrate_temp, target_distance, sputter_time,
+                    film_thickness, rotation_speed, substrate_type, xrd_phase,
+                    grain_size, h2_response_time, wavelength_shift, batch_notes,
+                    quality_score, created_at
+                ) VALUES (
+                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW()
+                )
+            """, (
+                user.get("email"), 
+                data.get("target_material", "Generic"),
+                float(data.get("rf_power", 120.0)),
+                float(data.get("working_pressure", 5.0)),
+                float(data.get("ar_flow", 30.0)),
+                float(data.get("o2_flow", 5.0)),
+                float(data.get("substrate_temp", 300.0)),
+                float(data.get("target_distance", 7.0)),
+                float(data.get("sputter_time", 30.0)),
+                float(data.get("film_thickness", 100.0)),
+                float(data.get("rotation_speed", 5.0)),
+                "Si Wafer",
+                data.get("xrd_phase", "Monoclinic"),
+                float(data.get("grain_size", 15.0)),
+                float(data.get("h2_response_time", 10.0)),
+                float(data.get("wavelength_shift", 100.0)),
+                "Literature Prior (AI Extracted)",
+                quality_score
+            ))
+            conn.commit()
+            cur.close()
+        finally:
+            release_db_connection(conn)
+            
+        return JSONResponse({"success": True, "extracted_data": data})
+        
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
 
 # ==============================================================================
 # CSV EXPORT
