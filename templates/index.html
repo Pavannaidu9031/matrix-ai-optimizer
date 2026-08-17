@@ -80,6 +80,10 @@
                     <a href="/scheduler" class="text-xs font-semibold text-slate-300 hover:text-blue-400 transition">Scheduler</a>
                     <a href="/thesis" class="text-xs font-semibold text-slate-300 hover:text-blue-400 transition">Thesis</a>
                     <a href="/publication" class="text-xs font-semibold text-slate-300 hover:text-blue-400 transition">Publication</a>
+                    
+                    <!-- NEW AGENT AND API LINKS -->
+                    <a href="/agent" class="text-xs font-semibold text-slate-300 hover:text-blue-400 transition">Agent</a>
+                    <a href="/api/docs" class="text-xs font-semibold text-slate-300 hover:text-blue-400 transition">API</a>
                     <!-- NEW NAVIGATION LINKS END HERE -->
 
                     <div class="flex items-center space-x-3 bg-slate-850 px-3 py-1.5 rounded-xl border border-slate-800 ml-2">
@@ -220,6 +224,22 @@
                                 <option value="ZnO">ZnO (Zinc Oxide)</option>
                             </select>
                         </div>
+                        
+                        <!-- NEW MODEL SETTINGS TOGGLE (DKL AND ACQUISITION STRATEGY) -->
+                        <div class="flex items-center justify-end space-x-3 mb-4 w-full">
+                            <label class="text-xs text-slate-400 font-semibold">Model Architecture:</label>
+                            <select id="modelType" class="bg-slate-850 border border-slate-700 text-xs text-white rounded-lg px-3 py-1.5 focus:border-blue-500">
+                                <option value="standard">Standard GP (sklearn)</option>
+                                <option value="dkl">Deep Kernel Learning (PyTorch)</option>
+                            </select>
+                            <label class="text-xs text-slate-400 font-semibold ml-2">Acquisition:</label>
+                            <select id="acqStrategy" class="bg-slate-850 border border-slate-700 text-xs text-white rounded-lg px-3 py-1.5 focus:border-blue-500">
+                                <option value="ucb">UCB</option>
+                                <option value="ts">Thompson Sampling</option>
+                                <option value="hybrid">Hybrid</option>
+                            </select>
+                        </div>
+
                         <button id="btnSuggest" class="btn-glow text-white font-bold text-base px-8 py-4 rounded-xl transition flex items-center space-x-3 w-full sm:w-auto justify-center">
                             <span id="btnText">✦ Suggest Next Parameters</span>
                             <div id="btnSpinner" class="hidden w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
@@ -792,23 +812,33 @@
             });
         }
 
-        // 2. BAYESIAN SUGGEST BUTTON TRIGGER (Now with Domain Adaptation, Batching, & Branching)
+        // 2. BAYESIAN SUGGEST BUTTON TRIGGER (Now with Domain Adaptation, Batching, Branching, Model Arch, and Acquisition Strategy)
         document.getElementById('btnSuggest')?.addEventListener('click', async () => {
             const btn = document.getElementById('btnSuggest');
             const btnText = document.getElementById('btnText');
             const btnSpinner = document.getElementById('btnSpinner');
+            
             const targetMaterial = document.getElementById('targetMaterialSuggest')?.value || 'Generic';
-            const branchName = document.getElementById('branch_name')?.value || 'main'; // ADDED BRANCH
+            const branchName = document.getElementById('branch_name')?.value || 'main';
+            // GRAB NEW SETTINGS FROM THE DROPDOWNS
+            const modelType = document.getElementById('modelType')?.value || 'standard';
+            const acqStrategy = document.getElementById('acqStrategy')?.value || 'ucb';
 
             btn.disabled = true;
             btnText.innerText = "Analyzing experiments...";
             btnSpinner.classList.remove('hidden');
 
             try {
+                // PASS NEW SETTINGS TO THE BACKEND
                 const response = await fetch('/suggest', { 
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ target_material: targetMaterial, branch: branchName }) // ADDED BRANCH
+                    body: JSON.stringify({ 
+                        target_material: targetMaterial, 
+                        branch: branchName,
+                        model_type: modelType,
+                        acquisition: acqStrategy
+                    }) 
                 });
                 const data = await response.json();
 
