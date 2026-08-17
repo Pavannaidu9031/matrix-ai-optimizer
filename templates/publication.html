@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <title>Publication Readiness - MatrixAI</title>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen p-8">
+    <div class="max-w-5xl mx-auto space-y-6">
+        <h1 class="text-3xl font-bold">Publication Readiness Checker</h1>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="bg-slate-900 border border-slate-800 p-6 rounded-2xl">
+                <h3 class="text-lg font-bold text-slate-300">Overall Novelty Score</h3>
+                <div class="text-5xl font-extrabold {% if readiness.status == 'GREEN' %}text-emerald-500{% elif readiness.status == 'AMBER' %}text-amber-500{% else %}text-red-500{% endif %} mt-2">
+                    {{ readiness.score }} / 100
+                </div>
+            </div>
+
+            <div class="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-4">
+                <h3 class="text-lg font-bold text-slate-300">Suggested Journals</h3>
+                <ul class="list-disc pl-5 space-y-2 text-slate-400">
+                    {% for j in readiness.journals %}
+                    <li><strong class="text-blue-400">{{ j.name }}</strong> (IF: {{ j.if }})</li>
+                    {% endfor %}
+                </ul>
+            </div>
+            
+            <div class="md:col-span-2 bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-4">
+                <h3 class="text-lg font-bold text-slate-300">Novelty Claims</h3>
+                <ul class="list-disc pl-5 space-y-2 text-emerald-400">
+                    {% for c in readiness.claims %}
+                    <li>{{ c }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
