@@ -74,7 +74,7 @@ def format_candidate(candidate_array, mean_xrd, mean_wave, min_w, denom):
     }
 
 # ------------------------------------------------------------------------------
-# MAIN OPTIMIZATION LOGIC (Batch & Pareto Enabled)
+# MAIN OPTIMIZATION LOGIC (Feature 9: Smart Parameter Bounds Included)
 # ------------------------------------------------------------------------------
 def generate_bayesian_suggestion(user_experiments: list, recent_suggestions: list = None, target_material: str = "Generic") -> dict:
     real_count = len(user_experiments)
@@ -132,7 +132,10 @@ def generate_bayesian_suggestion(user_experiments: list, recent_suggestions: lis
         if abs(pred_last[0] - y_wave_norm[-1]) > 0.4:  
             anomaly_detected = True
 
-    # Adaptive Bounds
+    # --------------------------------------------------------------------------
+    # FEATURE 9: SMART PARAMETER BOUNDS LEARNING & DEAD ZONE DETECTION
+    # --------------------------------------------------------------------------
+    sentences = []
     if user_experiments:
         best_run = max(user_experiments, key=lambda e: float(e.get("quality_score") or 0.0))
         b_rf = float(best_run.get("rf_power") or best_run.get("rf_power_w") or 120.0)
@@ -143,17 +146,42 @@ def generate_bayesian_suggestion(user_experiments: list, recent_suggestions: lis
     else:
         b_rf, b_press, b_dist, b_thick, b_ar = 120.0, 5.0, 5.0, 200.0, 30.0
 
-    b_mult = 0.7 if real_count <= 15 else 0.85
-    bounds = [
-        (max(15.0, b_rf * b_mult), min(200.0, b_rf * (2.0 - b_mult))),
-        (max(3.0, b_press * b_mult), min(10.0, b_press * (2.0 - b_mult))),
-        (max(3.0, b_dist * b_mult), min(7.0, b_dist * (2.0 - b_mult))),
-        (max(100.0, b_thick * b_mult), min(500.0, b_thick * (2.0 - b_mult))),
-        [1.0, 5.0, 10.0],
-        (max(20.0, b_ar * b_mult), min(40.0, b_ar * (2.0 - b_mult)))
-    ]
-    if real_count <= 8:
+    # Phased bounds tightening based on accumulated data
+    if real_count <= 5:
+        # Phase 1: Full Exploration
         bounds = [(15.0, 200.0), (3.0, 10.0), (3.0, 7.0), (100.0, 500.0), [1.0, 5.0, 10.0], (20.0, 40.0)]
+    elif real_count <= 12:
+        # Phase 2: ±30% around current best (Targeted Exploration)
+        bounds = [
+            (max(15.0, b_rf * 0.7), min(200.0, b_rf * 1.3)),
+            (max(3.0, b_press * 0.7), min(10.0, b_press * 1.3)),
+            (max(3.0, b_dist * 0.7), min(7.0, b_dist * 1.3)),
+            (max(100.0, b_thick * 0.7), min(500.0, b_thick * 1.3)),
+            [1.0, 5.0, 10.0],
+            (max(20.0, b_ar * 0.7), min(40.0, b_ar * 1.3))
+        ]
+        sentences.append("Phase 2: Tightening optimization bounds to ±30% around the optimal parameter region.")
+    else:
+        # Phase 3: ±15% around current best (Fine-Tuning)
+        bounds = [
+            (max(15.0, b_rf * 0.85), min(200.0, b_rf * 1.15)),
+            (max(3.0, b_press * 0.85), min(10.0, b_press * 1.15)),
+            (max(3.0, b_dist * 0.85), min(7.0, b_dist * 1.15)),
+            (max(100.0, b_thick * 0.85), min(500.0, b_thick * 1.15)),
+            [1.0, 5.0, 10.0],
+            (max(20.0, b_ar * 0.85), min(40.0, b_ar * 1.15))
+        ]
+        sentences.append("Phase 3: Deep convergence mode. Bounding search to ±15% for fine-tuning.")
+
+    # Dead Zone Detection (Filter out consistent failure regions)
+    if real_count >= 3:
+        amorphous_runs = [e for e in user_experiments if str(e.get("xrd_phase", "")).strip() == "Amorphous"]
+        if len(amorphous_runs) >= 3:
+            max_amorphous_rf = max([float(e.get("rf_power", 120.0)) for e in amorphous_runs])
+            # If all amorphous results happened below a certain RF, exclude that region completely
+            if max_amorphous_rf < 90.0:
+                bounds[0] = (max(bounds[0][0], 90.0), bounds[0][1])
+                sentences.append("Dead Zone Excluded: RF Power < 90W consistently yielded Amorphous films.")
 
     np.random.seed(42)
     num_candidates = 2000
@@ -240,9 +268,8 @@ def generate_bayesian_suggestion(user_experiments: list, recent_suggestions: lis
         if variances[0] < 25.0 and variances[1] < 0.25 and variances[2] < 0.09 and variances[3] < 225.0 and variances[4] < 1.0:
             converged = True
 
-    sentences = []
-    if s_rf > b_rf + 5.0: sentences.append(f"Increasing RF power to {round(s_rf, 1)}W to provide higher adatom energy.")
-    elif s_rf < b_rf - 5.0: sentences.append(f"Lowering RF power to {round(s_rf, 1)}W to reduce plasma damage.")
+    if s_rf > b_rf + 5.0 and real_count <= 12: sentences.append(f"Increasing RF power to {round(s_rf, 1)}W to provide higher adatom energy.")
+    elif s_rf < b_rf - 5.0 and real_count <= 12: sentences.append(f"Lowering RF power to {round(s_rf, 1)}W to reduce plasma damage.")
     if anomaly_detected: sentences.append("WARNING: High residual variance detected in recent runs. Check target wear.")
     if not sentences: sentences.append(f"Balancing working pressure at {round(s_press, 1)} mTorr and Ar flow at {round(s_ar, 1)} sccm.")
 
@@ -283,7 +310,6 @@ def generate_bayesian_suggestion(user_experiments: list, recent_suggestions: lis
 # DIGITAL TWIN SANDBOX SIMULATOR
 # ------------------------------------------------------------------------------
 def simulate_sandbox_point(user_experiments: list, target_material: str, slider_params: list) -> dict:
-    """Simulates model output for arbitrary manual slider adjustments."""
     X_list, y_xrd_list, y_wave_list = [], [], []
 
     priors = MATERIAL_PRIORS.get(target_material, MATERIAL_PRIORS["Generic"])
@@ -347,7 +373,6 @@ def simulate_sandbox_point(user_experiments: list, target_material: str, slider_
 # ACTIVE PHASE MAP GENERATOR
 # ------------------------------------------------------------------------------
 def generate_phase_map(user_experiments: list, target_material: str, param_x: str = "rf_power", param_y: str = "working_pressure", resolution: int = 15) -> dict:
-    """Generates a 2D grid prediction for Active Phase Maps across two chosen parameters."""
     X_list, y_xrd_list, y_wave_list = [], [], []
 
     priors = MATERIAL_PRIORS.get(target_material, MATERIAL_PRIORS["Generic"])
@@ -421,7 +446,6 @@ def generate_phase_map(user_experiments: list, target_material: str, param_x: st
 # AUTOMATED NOISE CALIBRATION (REPETITIVE RUN VARIANCE TESTING)
 # ------------------------------------------------------------------------------
 def calibrate_noise_variance(user_experiments: list) -> dict:
-    """Calculates instrument noise variance from user's logged experiments."""
     if not user_experiments or len(user_experiments) < 3:
         return {"calibrated_noise": 0.1, "message": "Insufficient experiments for robust calibration (need at least 3). Defaulting to 0.1."}
     
@@ -439,7 +463,6 @@ def calibrate_noise_variance(user_experiments: list) -> dict:
 # AUTOMATED SYNTHESIS RECIPE GENERATOR
 # ------------------------------------------------------------------------------
 def generate_synthesis_recipe(params: dict, target_material: str) -> str:
-    """Compiles parameters into a structured, step-by-step PVD deposition script."""
     rf = params.get("rf_power", 120.0)
     press = params.get("working_pressure", 5.0)
     ar = params.get("ar_flow", 30.0)
