@@ -115,6 +115,13 @@ def ensure_material_column(cur):
     except Exception:
         pass
 
+def ensure_branch_column(cur):
+    """Silently ensures the branch_name column exists for optimization branching."""
+    try:
+        cur.execute("ALTER TABLE experiments ADD COLUMN IF NOT EXISTS branch_name VARCHAR DEFAULT 'main'")
+    except Exception:
+        pass
+
 # ==============================================================================
 # OAUTH CONFIGURATION
 # ==============================================================================
@@ -148,19 +155,20 @@ class ExperimentModel(BaseModel):
     h2_response_time: float
     wavelength_shift: Optional[float] = None
     batch_notes: Optional[str] = None
+    branch_name: str = "main"
 
 class ChatRequest(BaseModel):
     message: str
     provider: str  
 
 # ==============================================================================
-# DASHBOARD ROUTE
+# DASHBOARD ROUTE (UPDATED FOR BRANCHING)
 # ==============================================================================
 @app.get("/", response_class=HTMLResponse)
-def index(request: Request):
+def index(request: Request, branch: str = 'main'):
     user_session = request.session.get("user")
     if not user_session:
-        return templates.TemplateResponse(request, "index.html", {"user": None, "experiments": [], "stats": {}})
+        return templates.TemplateResponse(request, "index.html", {"user": None, "experiments": [], "stats": {}, "branches": [], "current_branch": "main"})
 
     user_email = user_session.get("email", "")
     is_approved = user_session.get("is_approved", False)
@@ -185,20 +193,35 @@ def index(request: Request):
             return templates.TemplateResponse(request, "pending.html", {"user": user_session})
 
     experiments = []
+    branches = ['main']
     try:
         conn = get_db_connection()
         try:
             cur = conn.cursor()
             ensure_material_column(cur)
+            ensure_branch_column(cur)
+            conn.commit()
+
+            # 1. Fetch available branches for this user
+            try:
+                cur.execute("SELECT DISTINCT branch_name FROM experiments WHERE user_email = %s", (user_email,))
+                fetched_branches = [r[0] for r in cur.fetchall() if r[0]]
+                if 'main' not in fetched_branches:
+                    fetched_branches.insert(0, 'main')
+                branches = fetched_branches
+            except Exception as e:
+                print(f"Error fetching branches: {e}")
+
+            # 2. Fetch experiments only for the selected branch
             cur.execute("""
                 SELECT id, user_email, target_material, rf_power, working_pressure, ar_flow, o2_flow,
                        substrate_temp, target_distance, sputter_time, film_thickness,
                        rotation_speed, substrate_type, xrd_phase, grain_size,
-                       h2_response_time, wavelength_shift, batch_notes, quality_score, created_at
+                       h2_response_time, wavelength_shift, batch_notes, quality_score, created_at, branch_name
                 FROM experiments
-                WHERE user_email = %s
+                WHERE user_email = %s AND branch_name = %s
                 ORDER BY created_at DESC
-            """, (user_email,))
+            """, (user_email, branch))
             
             rows = cur.fetchall()
             columns = [desc[0] for desc in cur.description]
@@ -241,7 +264,9 @@ def index(request: Request):
     return templates.TemplateResponse(request, "index.html", {
         "user": user_session,
         "experiments": experiments,
-        "stats": stats
+        "stats": stats,
+        "branches": branches,
+        "current_branch": branch
     })
 
 # ==============================================================================
@@ -335,6 +360,7 @@ async def simulate_sandbox(request: Request):
         body = await request.json()
         target_material = body.get("target_material", "Generic")
         params = body.get("params", []) # [rf, press, dist, thick, rot, ar]
+        branch = body.get("branch", "main")
         
         if len(params) != 6:
             return JSONResponse({"error": "Invalid parameter array length."}, status_code=400)
@@ -342,7 +368,8 @@ async def simulate_sandbox(request: Request):
         conn = get_db_connection()
         try:
             cur = conn.cursor()
-            cur.execute("SELECT * FROM experiments WHERE user_email = %s", (user.get("email"),))
+            ensure_branch_column(cur)
+            cur.execute("SELECT * FROM experiments WHERE user_email = %s AND branch_name = %s", (user.get("email"), branch))
             rows = cur.fetchall()
             cols = [desc[0] for desc in cur.description] if cur.description else []
             experiments = [dict(zip(cols, r)) for r in rows]
@@ -356,83 +383,7 @@ async def simulate_sandbox(request: Request):
         return JSONResponse({"error": str(e)}, status_code=500)
 
 # ==============================================================================
-# ACTIVE PHASE MAP ENDPOINT
-# ==============================================================================
-@app.post("/api/optimizer/phase-map")
-async def get_phase_map(request: Request):
-    user = request.session.get("user")
-    if not user:
-        return JSONResponse({"error": "not_authenticated"}, status_code=401)
-        
-    try:
-        body = await request.json()
-        target_material = body.get("target_material", "Generic")
-        param_x = body.get("param_x", "rf_power")
-        param_y = body.get("param_y", "working_pressure")
-        
-        conn = get_db_connection()
-        try:
-            cur = conn.cursor()
-            cur.execute("SELECT * FROM experiments WHERE user_email = %s", (user.get("email"),))
-            rows = cur.fetchall()
-            cols = [desc[0] for desc in cur.description] if cur.description else []
-            experiments = [dict(zip(cols, r)) for r in rows]
-            cur.close()
-        finally:
-            release_db_connection(conn)
-            
-        map_data = optimizer.generate_phase_map(experiments, target_material, param_x, param_y)
-        return JSONResponse({"success": True, "phase_map": map_data})
-    except Exception as e:
-        return JSONResponse({"error": str(e)}, status_code=500)
-
-# ==============================================================================
-# AUTOMATED NOISE CALIBRATION ENDPOINT
-# ==============================================================================
-@app.post("/api/optimizer/calibrate-noise")
-async def calibrate_noise(request: Request):
-    user = request.session.get("user")
-    if not user:
-        return JSONResponse({"error": "not_authenticated"}, status_code=401)
-        
-    try:
-        conn = get_db_connection()
-        try:
-            cur = conn.cursor()
-            cur.execute("SELECT * FROM experiments WHERE user_email = %s", (user.get("email"),))
-            rows = cur.fetchall()
-            cols = [desc[0] for desc in cur.description] if cur.description else []
-            experiments = [dict(zip(cols, r)) for r in rows]
-            cur.close()
-        finally:
-            release_db_connection(conn)
-            
-        calibration = optimizer.calibrate_noise_variance(experiments)
-        return JSONResponse({"success": True, "calibration": calibration})
-    except Exception as e:
-        return JSONResponse({"error": str(e)}, status_code=500)
-
-# ==============================================================================
-# AUTOMATED SYNTHESIS RECIPE ENDPOINT
-# ==============================================================================
-@app.post("/api/optimizer/recipe")
-async def get_synthesis_recipe(request: Request):
-    user = request.session.get("user")
-    if not user:
-        return JSONResponse({"error": "not_authenticated"}, status_code=401)
-        
-    try:
-        body = await request.json()
-        target_material = body.get("target_material", "Generic")
-        params = body.get("params", {})
-        
-        recipe_md = optimizer.generate_synthesis_recipe(params, target_material)
-        return JSONResponse({"success": True, "recipe": recipe_md})
-    except Exception as e:
-        return JSONResponse({"error": str(e)}, status_code=500)
-
-# ==============================================================================
-# FORM SUBMISSION ROUTE (/add)
+# FORM SUBMISSION ROUTE (/add) (UPDATED FOR BRANCHING)
 # ==============================================================================
 @app.post("/add")
 async def add_experiment_form(request: Request):
@@ -478,6 +429,7 @@ async def add_experiment_form(request: Request):
         h2_response_time = get_float(["h2_response_time_s", "h2_response_time", "h2_response"], 10.0)
         wavelength_shift = get_float(["wavelength_shift_pm", "wavelength_shift"], 0.0)
         batch_notes = get_str(["notes", "batch_notes"], "Manual Entry")
+        branch_name = get_str(["branch_name", "branch"], "main")
 
     except Exception as parse_err:
         return HTMLResponse(f"<h1>Form Parsing Error</h1><p>{str(parse_err)}</p>", status_code=400)
@@ -488,11 +440,12 @@ async def add_experiment_form(request: Request):
         cur = conn.cursor()
         
         ensure_material_column(cur)
+        ensure_branch_column(cur)
         conn.commit()
 
         existing_rows = []
         try:
-            cur.execute("SELECT * FROM experiments WHERE user_email = %s", (user_email,))
+            cur.execute("SELECT * FROM experiments WHERE user_email = %s AND branch_name = %s", (user_email, branch_name))
             existing_rows = cur.fetchall()
         except Exception:
             pass 
@@ -510,20 +463,20 @@ async def add_experiment_form(request: Request):
                 o2_flow, substrate_temp, target_distance, sputter_time,
                 film_thickness, rotation_speed, substrate_type, xrd_phase,
                 grain_size, h2_response_time, wavelength_shift, batch_notes,
-                quality_score, created_at
+                quality_score, branch_name, created_at
             ) VALUES (
-                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW()
+                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW()
             )
         """, (
             user_email, target_material, rf_power, working_pressure, ar_flow,
             o2_flow, substrate_temp, target_distance, sputter_time,
             film_thickness, rotation_speed, substrate_type, xrd_phase,
             grain_size, h2_response_time, wavelength_shift, batch_notes,
-            quality_score
+            quality_score, branch_name
         ))
         conn.commit()
         cur.close()
-        return RedirectResponse("/", status_code=303)
+        return RedirectResponse(f"/?branch={branch_name}", status_code=303)
     except Exception as db_err:
         if conn:
             try:
@@ -536,7 +489,7 @@ async def add_experiment_form(request: Request):
             release_db_connection(conn)
 
 # ==============================================================================
-# PERMANENT EXPERIMENT SAVE (JSON API /experiments)
+# PERMANENT EXPERIMENT SAVE (JSON API /experiments) (UPDATED FOR BRANCHING)
 # ==============================================================================
 @app.post("/experiments")
 async def save_experiment_json(request: Request, data: ExperimentModel):
@@ -548,8 +501,9 @@ async def save_experiment_json(request: Request, data: ExperimentModel):
     conn = get_db_connection()
     try:
         cur = conn.cursor()
+        ensure_branch_column(cur)
         
-        cur.execute("SELECT * FROM experiments WHERE user_email = %s", (user_email,))
+        cur.execute("SELECT * FROM experiments WHERE user_email = %s AND branch_name = %s", (user_email, data.branch_name))
         existing_rows = cur.fetchall()
         cols = [desc[0] for desc in cur.description] if cur.description else []
         all_exps = [dict(zip(cols, r)) for r in existing_rows]
@@ -564,16 +518,16 @@ async def save_experiment_json(request: Request, data: ExperimentModel):
                 o2_flow, substrate_temp, target_distance, sputter_time,
                 film_thickness, rotation_speed, substrate_type, xrd_phase,
                 grain_size, h2_response_time, wavelength_shift, batch_notes,
-                quality_score, created_at
+                quality_score, branch_name, created_at
             ) VALUES (
-                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW()
+                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW()
             ) RETURNING id
         """, (
             user_email, data.rf_power, data.working_pressure, data.ar_flow,
             data.o2_flow, data.substrate_temp, data.target_distance, data.sputter_time,
             data.film_thickness, data.rotation_speed, data.substrate_type, data.xrd_phase,
             data.grain_size, data.h2_response_time, data.wavelength_shift, data.batch_notes,
-            quality_score
+            quality_score, data.branch_name
         ))
         
         new_id = cur.fetchone()[0]
@@ -584,7 +538,7 @@ async def save_experiment_json(request: Request, data: ExperimentModel):
             "success": True,
             "id": new_id,
             "quality_score": quality_score,
-            "message": "Experiment saved permanently to Supabase"
+            "message": f"Experiment saved permanently to Supabase (Branch: {data.branch_name})"
         })
     except Exception as e:
         if conn:
@@ -597,7 +551,7 @@ async def save_experiment_json(request: Request, data: ExperimentModel):
 # FETCH EXPERIMENTS API
 # ==============================================================================
 @app.get("/experiments")
-async def get_experiments(request: Request):
+async def get_experiments(request: Request, branch: str = "main"):
     user = request.session.get("user")
     if not user:
         return JSONResponse({"error": "not_authenticated"}, status_code=401)
@@ -606,15 +560,16 @@ async def get_experiments(request: Request):
     conn = get_db_connection()
     try:
         cur = conn.cursor()
+        ensure_branch_column(cur)
         cur.execute("""
             SELECT id, user_email, rf_power, working_pressure, ar_flow, o2_flow,
                    substrate_temp, target_distance, sputter_time, film_thickness,
                    rotation_speed, substrate_type, xrd_phase, grain_size,
-                   h2_response_time, wavelength_shift, batch_notes, quality_score, created_at
+                   h2_response_time, wavelength_shift, batch_notes, quality_score, created_at, branch_name
             FROM experiments
-            WHERE user_email = %s
+            WHERE user_email = %s AND branch_name = %s
             ORDER BY created_at DESC
-        """, (user_email,))
+        """, (user_email, branch))
         
         rows = cur.fetchall()
         columns = [desc[0] for desc in cur.description]
@@ -638,7 +593,7 @@ async def get_experiments(request: Request):
         release_db_connection(conn)
 
 # ==============================================================================
-# BAYESIAN OPTIMIZER ENDPOINT
+# BAYESIAN OPTIMIZER ENDPOINT (UPDATED FOR BRANCHING)
 # ==============================================================================
 @app.get("/suggest")
 @app.post("/suggest")
@@ -649,11 +604,13 @@ async def get_bayes_suggestion(request: Request):
 
     user_email = user_session.get("email")
     target_material = "Generic"
+    branch = "main"
 
     if request.method == "POST":
         try:
             body = await request.json()
             target_material = body.get("target_material", "Generic")
+            branch = body.get("branch", "main")
         except Exception:
             pass
 
@@ -661,10 +618,12 @@ async def get_bayes_suggestion(request: Request):
     try:
         conn = get_db_connection()
         cur = conn.cursor()
+        ensure_branch_column(cur)
         
         experiments = []
         try:
-            cur.execute("SELECT * FROM experiments WHERE user_email = %s ORDER BY created_at DESC", (user_email,))
+            # ONLY grab experiments from the selected branch!
+            cur.execute("SELECT * FROM experiments WHERE user_email = %s AND branch_name = %s ORDER BY created_at DESC", (user_email, branch))
             rows = cur.fetchall()
             cols = [desc[0] for desc in cur.description] if cur.description else []
             for row in rows:
