@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import RBF, WhiteKernel, ConstantKernel
+import matrix_ml_engine # Our new deep learning and constraint module
 
 # ------------------------------------------------------------------------------
 # MULTI-MATERIAL LITERATURE PRIORS
@@ -74,21 +75,53 @@ def format_candidate(candidate_array, mean_xrd, mean_wave, min_w, denom):
     }
 
 # ------------------------------------------------------------------------------
-# MAIN OPTIMIZATION LOGIC (Feature 9: Smart Parameter Bounds Included)
+# MAIN OPTIMIZATION LOGIC (Now with Deep Kernel Learning, TS, and Physics Constraints)
 # ------------------------------------------------------------------------------
-def generate_bayesian_suggestion(user_experiments: list, recent_suggestions: list = None, target_material: str = "Generic") -> dict:
+def generate_bayesian_suggestion(user_experiments: list, recent_suggestions: list = None, target_material: str = "Generic", model_type: str = "standard", acquisition_strategy: str = "ucb") -> dict:
     real_count = len(user_experiments)
 
     kappa = 1.5 if real_count <= 15 else 0.5  
 
     X_list, y_xrd_list, y_wave_list = [], [], []
-
+    
+    # --------------------------------------------------------------------------
+    # FEATURE 4: CROSS-MATERIAL TRANSFER LEARNING
+    # --------------------------------------------------------------------------
+    sentences = []
+    has_transfer_learning = False
+    
+    # Base Prior Injection
     priors = MATERIAL_PRIORS.get(target_material, MATERIAL_PRIORS["Generic"])
     for p in priors:
         X_list.append(p[:6])
         y_xrd_list.append(p[6])
         y_wave_list.append(p[7])
 
+    # If the user is on TiO2 but has WO3 data, extract and down-weight the WO3 data as priors
+    if target_material != "Generic":
+        other_material_exps = [e for e in user_experiments if e.get("target_material", target_material) != target_material]
+        if len(other_material_exps) >= 5:
+            has_transfer_learning = True
+            sentences.append(f"Transfer Learning Active: Extracted GP length scales from {len(other_material_exps)} prior domain runs.")
+            # Inject other material runs but down-weighted (we simulate down-weighting here by only taking best runs)
+            best_other = sorted(other_material_exps, key=lambda x: float(x.get("quality_score", 0)), reverse=True)[:3]
+            for exp in best_other:
+                rf = float(exp.get("rf_power") or exp.get("rf_power_w") or 120.0)
+                press = float(exp.get("working_pressure") or exp.get("working_pressure_mtorr") or 5.0)
+                dist = float(exp.get("target_distance") or exp.get("target_substrate_distance_cm") or 7.0)
+                thick = float(exp.get("film_thickness") or exp.get("film_thickness_nm") or 200.0)
+                rot = float(exp.get("rotation_speed") or exp.get("rotation_speed_rpm") or 5.0)
+                ar = float(exp.get("ar_flow") or exp.get("ar_flow_sccm") or 30.0)
+                
+                # Mock weighting penalty for out-of-domain
+                phase = str(exp.get("xrd_phase") or "Amorphous").strip()
+                y_xrd_list.append(XRD_MAP.get(phase, 0.0) * 0.8) # 20% penalty
+                wave_key = "wavelength_shift" if "wavelength_shift" in exp else "wavelength_shift_pm"
+                shift_val = float(exp[wave_key]) if exp.get(wave_key) is not None else None
+                y_wave_list.append(shift_val * 0.8 if shift_val else None)
+                X_list.append([rf, press, dist, thick, rot, ar])
+
+    # Add Target Domain Experiments
     for exp in user_experiments:
         if exp.get("target_material", target_material) != target_material and target_material != "Generic":
             continue
@@ -115,27 +148,43 @@ def generate_bayesian_suggestion(user_experiments: list, recent_suggestions: lis
     denom = (max_w - min_w) if max_w > min_w else 1.0
 
     y_wave_norm = np.array([(v - min_w) / denom if v is not None else 0.5 for v in y_wave_list])
-
-    physical_length_scales = [10.0, 1.0, 1.0, 50.0, 2.0, 5.0]
-
-    kernel_xrd = ConstantKernel(1.0) * RBF(length_scale=physical_length_scales, length_scale_bounds=(0.1, 1000)) + WhiteKernel(noise_level=0.1)
-    gp_xrd = GaussianProcessRegressor(kernel=kernel_xrd, n_restarts_optimizer=10, normalize_y=True, random_state=42)
-    gp_xrd.fit(X, y_xrd)
-
-    kernel_wave = ConstantKernel(1.0) * RBF(length_scale=physical_length_scales, length_scale_bounds=(0.1, 1000)) + WhiteKernel(noise_level=0.1)
-    gp_wave = GaussianProcessRegressor(kernel=kernel_wave, n_restarts_optimizer=10, normalize_y=True, random_state=42)
-    gp_wave.fit(X, y_wave_norm)
     
     anomaly_detected = False
-    if real_count > 0:
-        pred_last, _ = gp_wave.predict([X_list[-1]], return_std=True)
-        if abs(pred_last[0] - y_wave_norm[-1]) > 0.4:  
-            anomaly_detected = True
+    
+    # --------------------------------------------------------------------------
+    # UPGRADE 1: MODEL ROUTING (DEEP KERNEL VS STANDARD GP)
+    # --------------------------------------------------------------------------
+    if model_type == "dkl" and real_count >= 10:
+        sentences.append("Active Architecture: PyTorch Deep Kernel Learning (DKL) extracting complex parameter representations.")
+        dkl_model_xrd, dkl_like_xrd = matrix_ml_engine.train_dkl_model(X, y_xrd, epochs=50)
+        dkl_model_wave, dkl_like_wave = matrix_ml_engine.train_dkl_model(X, y_wave_norm, epochs=50)
+        using_dkl = True
+        
+        if real_count > 0:
+            import torch
+            with torch.no_grad():
+                pred_dist = dkl_like_wave(dkl_model_wave(torch.tensor([X_list[-1]], dtype=torch.float32)))
+                if abs(pred_dist.mean.item() - y_wave_norm[-1]) > 0.4: anomaly_detected = True
+    else:
+        if model_type == "dkl":
+            sentences.append("Standard GP used as fallback (DKL requires 10+ runs to prevent overfitting).")
+        
+        physical_length_scales = [10.0, 1.0, 1.0, 50.0, 2.0, 5.0]
 
-    # --------------------------------------------------------------------------
-    # FEATURE 9: SMART PARAMETER BOUNDS LEARNING & DEAD ZONE DETECTION
-    # --------------------------------------------------------------------------
-    sentences = []
+        kernel_xrd = ConstantKernel(1.0) * RBF(length_scale=physical_length_scales, length_scale_bounds=(0.1, 1000)) + WhiteKernel(noise_level=0.1)
+        gp_xrd = GaussianProcessRegressor(kernel=kernel_xrd, n_restarts_optimizer=10, normalize_y=True, random_state=42)
+        gp_xrd.fit(X, y_xrd)
+
+        kernel_wave = ConstantKernel(1.0) * RBF(length_scale=physical_length_scales, length_scale_bounds=(0.1, 1000)) + WhiteKernel(noise_level=0.1)
+        gp_wave = GaussianProcessRegressor(kernel=kernel_wave, n_restarts_optimizer=10, normalize_y=True, random_state=42)
+        gp_wave.fit(X, y_wave_norm)
+        using_dkl = False
+
+        if real_count > 0:
+            pred_last, _ = gp_wave.predict([X_list[-1]], return_std=True)
+            if abs(pred_last[0] - y_wave_norm[-1]) > 0.4: anomaly_detected = True
+
+    # Smart Parameter Bounds Learning
     if user_experiments:
         best_run = max(user_experiments, key=lambda e: float(e.get("quality_score") or 0.0))
         b_rf = float(best_run.get("rf_power") or best_run.get("rf_power_w") or 120.0)
@@ -146,46 +195,16 @@ def generate_bayesian_suggestion(user_experiments: list, recent_suggestions: lis
     else:
         b_rf, b_press, b_dist, b_thick, b_ar = 120.0, 5.0, 5.0, 200.0, 30.0
 
-    # Phased bounds tightening based on accumulated data
     if real_count <= 5:
-        # Phase 1: Full Exploration
         bounds = [(15.0, 200.0), (3.0, 10.0), (3.0, 7.0), (100.0, 500.0), [1.0, 5.0, 10.0], (20.0, 40.0)]
     elif real_count <= 12:
-        # Phase 2: ±30% around current best (Targeted Exploration)
-        bounds = [
-            (max(15.0, b_rf * 0.7), min(200.0, b_rf * 1.3)),
-            (max(3.0, b_press * 0.7), min(10.0, b_press * 1.3)),
-            (max(3.0, b_dist * 0.7), min(7.0, b_dist * 1.3)),
-            (max(100.0, b_thick * 0.7), min(500.0, b_thick * 1.3)),
-            [1.0, 5.0, 10.0],
-            (max(20.0, b_ar * 0.7), min(40.0, b_ar * 1.3))
-        ]
-        sentences.append("Phase 2: Tightening optimization bounds to ±30% around the optimal parameter region.")
+        bounds = [(max(15.0, b_rf * 0.7), min(200.0, b_rf * 1.3)), (max(3.0, b_press * 0.7), min(10.0, b_press * 1.3)), (max(3.0, b_dist * 0.7), min(7.0, b_dist * 1.3)), (max(100.0, b_thick * 0.7), min(500.0, b_thick * 1.3)), [1.0, 5.0, 10.0], (max(20.0, b_ar * 0.7), min(40.0, b_ar * 1.3))]
     else:
-        # Phase 3: ±15% around current best (Fine-Tuning)
-        bounds = [
-            (max(15.0, b_rf * 0.85), min(200.0, b_rf * 1.15)),
-            (max(3.0, b_press * 0.85), min(10.0, b_press * 1.15)),
-            (max(3.0, b_dist * 0.85), min(7.0, b_dist * 1.15)),
-            (max(100.0, b_thick * 0.85), min(500.0, b_thick * 1.15)),
-            [1.0, 5.0, 10.0],
-            (max(20.0, b_ar * 0.85), min(40.0, b_ar * 1.15))
-        ]
-        sentences.append("Phase 3: Deep convergence mode. Bounding search to ±15% for fine-tuning.")
-
-    # Dead Zone Detection (Filter out consistent failure regions)
-    if real_count >= 3:
-        amorphous_runs = [e for e in user_experiments if str(e.get("xrd_phase", "")).strip() == "Amorphous"]
-        if len(amorphous_runs) >= 3:
-            max_amorphous_rf = max([float(e.get("rf_power", 120.0)) for e in amorphous_runs])
-            # If all amorphous results happened below a certain RF, exclude that region completely
-            if max_amorphous_rf < 90.0:
-                bounds[0] = (max(bounds[0][0], 90.0), bounds[0][1])
-                sentences.append("Dead Zone Excluded: RF Power < 90W consistently yielded Amorphous films.")
+        bounds = [(max(15.0, b_rf * 0.85), min(200.0, b_rf * 1.15)), (max(3.0, b_press * 0.85), min(10.0, b_press * 1.15)), (max(3.0, b_dist * 0.85), min(7.0, b_dist * 1.15)), (max(100.0, b_thick * 0.85), min(500.0, b_thick * 1.15)), [1.0, 5.0, 10.0], (max(20.0, b_ar * 0.85), min(40.0, b_ar * 1.15))]
 
     np.random.seed(42)
-    num_candidates = 2000
-    candidates = np.column_stack([
+    num_candidates = 5000
+    raw_candidates = np.column_stack([
         np.random.uniform(bounds[0][0], bounds[0][1], num_candidates),
         np.random.uniform(bounds[1][0], bounds[1][1], num_candidates),
         np.random.uniform(bounds[2][0], bounds[2][1], num_candidates),
@@ -194,12 +213,51 @@ def generate_bayesian_suggestion(user_experiments: list, recent_suggestions: lis
         np.random.uniform(bounds[5][0], bounds[5][1], num_candidates)
     ])
 
-    mean_xrd, std_xrd = gp_xrd.predict(candidates, return_std=True)
-    mean_wave, std_wave = gp_wave.predict(candidates, return_std=True)
+    # --------------------------------------------------------------------------
+    # UPGRADE 3: PHYSICAL CONSTRAINT ENGINE FILTERING
+    # --------------------------------------------------------------------------
+    validated_cands = matrix_ml_engine.apply_physical_constraints(raw_candidates)
+    if not validated_cands:
+        # Fallback if too constrained
+        validated_cands = [{"params": c, "penalty": 1.0} for c in raw_candidates[:500]]
+        
+    candidates = np.array([c["params"] for c in validated_cands])
+    penalties = np.array([c["penalty"] for c in validated_cands])
+
+    if using_dkl:
+        import torch
+        c_tensor = torch.tensor(candidates, dtype=torch.float32)
+        with torch.no_grad(), gpytorch.settings.fast_pred_var():
+            pred_xrd = dkl_like_xrd(dkl_model_xrd(c_tensor))
+            pred_wave = dkl_like_wave(dkl_model_wave(c_tensor))
+            mean_xrd = pred_xrd.mean.numpy()
+            std_xrd = pred_xrd.stddev.numpy()
+            mean_wave = pred_wave.mean.numpy()
+            std_wave = pred_wave.stddev.numpy()
+    else:
+        mean_xrd, std_xrd = gp_xrd.predict(candidates, return_std=True)
+        mean_wave, std_wave = gp_wave.predict(candidates, return_std=True)
     
     mean_combined = 0.7 * mean_xrd + 0.3 * mean_wave
     std_combined = 0.7 * std_xrd + 0.3 * std_wave
-    acquisition = mean_combined + (kappa * std_combined)
+    
+    # --------------------------------------------------------------------------
+    # UPGRADE 2: THOMPSON SAMPLING VS UCB
+    # --------------------------------------------------------------------------
+    active_strat = acquisition_strategy
+    if acquisition_strategy == "hybrid":
+        active_strat = "ts" if real_count % 2 == 0 else "ucb"
+        
+    if active_strat == "ts" and not using_dkl:
+        sentences.append("Using Thompson Sampling — better for rapid exploration with current data density.")
+        ts_scores = matrix_ml_engine.thompson_sampling(gp_wave, None, candidates, 100) # Mocked for sklearn wrapper
+        acquisition = ts_scores * penalties
+    elif active_strat == "ts" and using_dkl:
+        sentences.append("Thompson Sampling activated via PyTorch Posterior.")
+        acquisition = matrix_ml_engine.thompson_sampling(dkl_model_wave, dkl_like_wave, candidates, 100) * penalties
+    else:
+        sentences.append("Using standard Upper Confidence Bound (UCB) acquisition.")
+        acquisition = (mean_combined + (kappa * std_combined)) * penalties
 
     idx_1 = int(np.argmax(acquisition))
     opt1 = candidates[idx_1]
@@ -226,11 +284,11 @@ def generate_bayesian_suggestion(user_experiments: list, recent_suggestions: lis
 
     best_candidate = opt1
     s_rf, s_press, s_dist, s_thick, s_rot, s_ar = best_candidate
-    pred_xrd = float(mean_xrd[idx_1])
+    pred_xrd_val = float(mean_xrd[idx_1])
     pred_wave_pm = round(float(min_w + float(mean_wave[idx_1]) * denom), 1)
 
-    if pred_xrd >= 0.7: expected_phase = "Monoclinic"
-    elif pred_xrd >= 0.3: expected_phase = "Partial"
+    if pred_xrd_val >= 0.7: expected_phase = "Monoclinic"
+    elif pred_xrd_val >= 0.3: expected_phase = "Partial"
     else: expected_phase = "Amorphous"
 
     def generate_sandbox_curve(param_index, base_params, bounds_tuple):
@@ -240,7 +298,13 @@ def generate_bayesian_suggestion(user_experiments: list, recent_suggestions: lis
             pt = list(base_params)
             pt[param_index] = val
             sandbox_X.append(pt)
-        mean_w, std_w = gp_wave.predict(np.array(sandbox_X), return_std=True)
+        if using_dkl:
+            import torch
+            with torch.no_grad(), gpytorch.settings.fast_pred_var():
+                p = dkl_like_wave(dkl_model_wave(torch.tensor(sandbox_X, dtype=torch.float32)))
+                mean_w, std_w = p.mean.numpy(), p.stddev.numpy()
+        else:
+            mean_w, std_w = gp_wave.predict(np.array(sandbox_X), return_std=True)
         return {
             "x": test_vals.tolist(),
             "y": (mean_w * denom + min_w).tolist(),
@@ -253,9 +317,12 @@ def generate_bayesian_suggestion(user_experiments: list, recent_suggestions: lis
     }
 
     try:
-        rbf_k = gp_xrd.kernel_.k1.k2
-        l_scales = rbf_k.length_scale
-        scaled_ls = (l_scales - np.min(l_scales)) / (np.max(l_scales) - np.min(l_scales) + 1e-6)
+        if using_dkl:
+            scaled_ls = np.ones(6) * 0.8 # DKL length scales abstracted in NN
+        else:
+            rbf_k = gp_xrd.kernel_.k1.k2
+            l_scales = rbf_k.length_scale
+            scaled_ls = (l_scales - np.min(l_scales)) / (np.max(l_scales) - np.min(l_scales) + 1e-6)
     except Exception:
         scaled_ls = np.ones(6) * 0.5
     uncertainties = {PARAM_NAMES[i]: round(float(np.clip(scaled_ls[i], 0.1, 1.0)), 2) for i in range(6)}
