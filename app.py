@@ -17,6 +17,7 @@ from fastapi.responses import (
     StreamingResponse,
 )
 from fastapi.templating import Jinja2Templates
+from fastapi.staticfiles import StaticFiles
 import pandas as pd
 import psycopg2
 from psycopg2 import pool
@@ -27,6 +28,7 @@ from google import genai
 from groq import AsyncGroq
 
 import optimizer
+import advanced_features # Unified module for new advanced features
 
 # ==============================================================================
 # FASTAPI & PERMANENT SESSION INITIALIZATION
@@ -42,6 +44,10 @@ app.add_middleware(
     same_site="lax",
     https_only=True
 )
+
+# Optional: Mount static files for PWA. If the directory doesn't exist, don't crash.
+if os.path.exists("static"):
+    app.mount("/static", StaticFiles(directory="static"), name="static")
 
 templates = Jinja2Templates(directory="templates")
 
@@ -162,7 +168,7 @@ class ChatRequest(BaseModel):
     provider: str  
 
 # ==============================================================================
-# DASHBOARD ROUTE (UPDATED FOR BRANCHING)
+# DASHBOARD ROUTE (UPDATED FOR BRANCHING & FAILURE ANALYSIS)
 # ==============================================================================
 @app.get("/", response_class=HTMLResponse)
 def index(request: Request, branch: str = 'main'):
@@ -261,12 +267,18 @@ def index(request: Request, branch: str = 'main'):
         "runs_remaining": runs_remaining
     }
 
+    # Smart Failure Analysis Trigger
+    latest_failure = None
+    if experiments:
+        latest_failure = advanced_features.analyze_failure(experiments, experiments[0])
+
     return templates.TemplateResponse(request, "index.html", {
         "user": user_session,
         "experiments": experiments,
         "stats": stats,
         "branches": branches,
-        "current_branch": branch
+        "current_branch": branch,
+        "failure_analysis": latest_failure
     })
 
 # ==============================================================================
@@ -1016,3 +1028,119 @@ async def chat_with_agent(request: Request, data: ChatRequest):
             
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
+
+# ==============================================================================
+# NEW ADVANCED MODULE ROUTES
+# ==============================================================================
+
+@app.get("/thesis", response_class=HTMLResponse)
+def thesis_dashboard(request: Request):
+    user = request.session.get("user")
+    if not user: return RedirectResponse("/")
+    return templates.TemplateResponse(request, "thesis.html", {"user": user})
+
+@app.post("/api/thesis/generate")
+async def api_generate_thesis(request: Request):
+    user = request.session.get("user")
+    body = await request.json()
+    
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT * FROM experiments WHERE user_email = %s", (user.get("email"),))
+        cols = [desc[0] for desc in cur.description]
+        experiments = [dict(zip(cols, row)) for row in cur.fetchall()]
+    finally:
+        release_db_connection(conn)
+        
+    content = advanced_features.generate_thesis_content(experiments, body.get("section"))
+    return JSONResponse({"success": True, "content": content})
+
+@app.get("/scheduler", response_class=HTMLResponse)
+def scheduler_dashboard(request: Request):
+    return templates.TemplateResponse(request, "scheduler.html", {"user": request.session.get("user")})
+
+@app.post("/api/scheduler/plan")
+async def api_schedule_plan(request: Request):
+    body = await request.json()
+    schedule = advanced_features.schedule_experiments([], float(body.get("hours", 0)), int(body.get("days", 1)))
+    return JSONResponse({"success": True, "schedule": schedule})
+
+@app.get("/supervisor", response_class=HTMLResponse)
+def supervisor_dashboard(request: Request):
+    """Real-Time Collaboration: Read-only view for supervisors."""
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT * FROM experiments ORDER BY created_at DESC LIMIT 50")
+        cols = [desc[0] for desc in cur.description]
+        experiments = [dict(zip(cols, row)) for row in cur.fetchall()]
+    finally:
+        release_db_connection(conn)
+    return templates.TemplateResponse(request, "supervisor.html", {"user": request.session.get("user"), "experiments": experiments})
+
+@app.get("/api/equipment/health")
+async def get_equipment_health(request: Request):
+    user = request.session.get("user")
+    if not user: return JSONResponse({"error": "not_authenticated"}, status_code=401)
+    
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT film_thickness, sputter_time, working_pressure FROM experiments WHERE user_email = %s ORDER BY created_at DESC LIMIT 20", (user.get("email"),))
+        cols = [desc[0] for desc in cur.description]
+        experiments = [dict(zip(cols, row)) for row in cur.fetchall()]
+        cur.close()
+    finally:
+        release_db_connection(conn)
+        
+    health = advanced_features.check_equipment_health(experiments)
+    return JSONResponse({"success": True, "health": health})
+
+@app.post("/api/sensor/predict")
+async def predict_sensor(request: Request):
+    user = request.session.get("user")
+    if not user: return JSONResponse({"error": "not_authenticated"}, status_code=401)
+    body = await request.json()
+    predictions = advanced_features.predict_sensor_performance(body.get("params", {}))
+    return JSONResponse({"success": True, "predictions": predictions})
+
+@app.get("/publication", response_class=HTMLResponse)
+def publication_dashboard(request: Request):
+    user = request.session.get("user")
+    if not user: return RedirectResponse("/")
+    
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT * FROM experiments WHERE user_email = %s", (user.get("email"),))
+        cols = [desc[0] for desc in cur.description]
+        experiments = [dict(zip(cols, row)) for row in cur.fetchall()]
+        cur.close()
+    finally:
+        release_db_connection(conn)
+        
+    readiness = advanced_features.check_publication_readiness(experiments)
+    return templates.TemplateResponse(request, "publication.html", {"user": user, "readiness": readiness})
+
+class CommentModel(BaseModel):
+    experiment_id: int
+    comment_text: str
+
+@app.post("/api/comments/add")
+async def add_comment(request: Request, data: CommentModel):
+    user = request.session.get("user")
+    if not user: return JSONResponse({"error": "not_authenticated"}, status_code=401)
+    
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            INSERT INTO experiment_comments (experiment_id, user_email, comment_text, created_at)
+            VALUES (%s, %s, %s, NOW()) RETURNING id
+        """, (data.experiment_id, user.get("email"), data.comment_text))
+        conn.commit()
+        cur.close()
+        return JSONResponse({"success": True, "message": "Comment added."})
+    finally:
+        release_db_connection(conn)
