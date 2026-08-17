@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <title>Thesis Assistant - MatrixAI</title>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen p-8">
+    <div class="max-w-5xl mx-auto space-y-6">
+        <h1 class="text-3xl font-bold">Academic Thesis Generator</h1>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <button onclick="generate('results')" class="bg-blue-600 p-4 rounded-xl font-bold">Generate Results Chapter</button>
+            <button onclick="generate('discussion')" class="bg-purple-600 p-4 rounded-xl font-bold">Generate Discussion Points</button>
+            <button onclick="generate('abstract')" class="bg-emerald-600 p-4 rounded-xl font-bold">Generate Abstract</button>
+            <button onclick="generate('novelty')" class="bg-amber-600 p-4 rounded-xl font-bold">Publication Novelty Score</button>
+        </div>
+        <pre id="output" class="bg-slate-900 p-6 rounded-xl border border-slate-800 h-96 overflow-y-auto whitespace-pre-wrap"></pre>
+    </div>
+    <script>
+        async function generate(section) {
+            document.getElementById('output').innerText = "Analyzing data and generating academic prose...";
+            const res = await fetch('/api/thesis/generate', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({section: section})
+            });
+            const data = await res.json();
+            document.getElementById('output').innerText = data.content;
+        }
+    </script>
+</body>
+</html>
