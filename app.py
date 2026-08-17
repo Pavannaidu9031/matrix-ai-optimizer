@@ -1,10 +1,12 @@
-from fastapi import Depends, FastAPI, Form, HTTPException, Request, BackgroundTasks, UploadFile, File
+from fastapi import Depends, FastAPI, Form, HTTPException, Request, BackgroundTasks, UploadFile, File, Header
 import io
 import os
 import json
 import re
 import smtplib
 import datetime
+import hashlib
+import secrets
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from typing import Optional
@@ -29,6 +31,7 @@ from groq import AsyncGroq
 
 import optimizer
 import advanced_features # Unified module for new advanced features
+import matrix_ml_engine # Unified module for Deep Learning and Agent features
 
 # ==============================================================================
 # FASTAPI & PERMANENT SESSION INITIALIZATION
@@ -1144,3 +1147,96 @@ async def add_comment(request: Request, data: CommentModel):
         return JSONResponse({"success": True, "message": "Comment added."})
     finally:
         release_db_connection(conn)
+
+# ==============================================================================
+# FEATURE 6: PUBLIC REST API WITH API KEY AUTH
+# ==============================================================================
+def verify_api_key(x_api_key: str = Header(...)):
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+        key_hash = hashlib.sha256(x_api_key.encode()).hexdigest()
+        cur.execute("SELECT user_email FROM api_keys WHERE api_key_hash = %s", (key_hash,))
+        user = cur.fetchone()
+        if not user:
+            raise HTTPException(status_code=401, detail="Invalid or unauthorized API Key")
+        
+        cur.execute("UPDATE api_keys SET usage_count = usage_count + 1 WHERE api_key_hash = %s", (key_hash,))
+        conn.commit()
+        return user[0]
+    finally:
+        release_db_connection(conn)
+
+@app.post("/api/v1/suggest")
+async def api_v1_suggest(request: Request, body: dict, api_user: str = Depends(verify_api_key)):
+    target_material = body.get("material", "Generic")
+    experiments = body.get("experiments", [])
+    # Utilize existing optimizer logic formatting for API
+    result = optimizer.generate_bayesian_suggestion(experiments, [], target_material=target_material)
+    return JSONResponse(result)
+
+@app.post("/api/v1/predict")
+async def api_v1_predict(body: dict, api_user: str = Depends(verify_api_key)):
+    params = body.get("parameters", {})
+    # Using the sensor predictor as a mock for the API prediction
+    predictions = advanced_features.predict_sensor_performance(params)
+    return JSONResponse({"predicted": predictions})
+
+# ==============================================================================
+# FEATURE 1: DNA FINGERPRINTING & WHAT-IF ANALYZER
+# ==============================================================================
+@app.post("/api/experiments/fingerprint")
+async def get_fingerprint(request: Request):
+    user = request.session.get("user")
+    if not user: return JSONResponse({"error": "unauthorized"}, status_code=401)
+    
+    body = await request.json()
+    target_exp = body.get("experiment")
+    
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT * FROM experiments WHERE user_email = %s", (user['email'],))
+        cols = [desc[0] for desc in cur.description]
+        all_exps = [dict(zip(cols, row)) for row in cur.fetchall()]
+    finally:
+        release_db_connection(conn)
+        
+    similar = matrix_ml_engine.get_dna_fingerprint(target_exp, all_exps)
+    return JSONResponse({"success": True, "similar": similar})
+
+@app.post("/api/experiments/whatif")
+async def calculate_whatif(request: Request):
+    body = await request.json()
+    params = body.get("params", [])
+    target_material = body.get("material", "Generic")
+    
+    # Use existing sandbox simulator for counterfactuals
+    sim = optimizer.simulate_sandbox_point([], target_material, params)
+    return JSONResponse({"success": True, "simulation": sim})
+
+# ==============================================================================
+# FEATURE 3: AGENT MODE
+# ==============================================================================
+@app.get("/agent", response_class=HTMLResponse)
+def agent_dashboard(request: Request):
+    user = request.session.get("user")
+    if not user: return RedirectResponse("/")
+    return templates.TemplateResponse(request, "agent.html", {"user": user})
+
+@app.post("/api/agent/campaign")
+async def generate_campaign(request: Request):
+    body = await request.json()
+    budget = int(body.get("budget", 25))
+    deadline = body.get("deadline", "2026-12-31")
+    
+    campaign = matrix_ml_engine.generate_agent_campaign(budget, deadline, [])
+    return JSONResponse({"success": True, "campaign": campaign})
+
+# ==============================================================================
+# API DOCS PAGE
+# ==============================================================================
+@app.get("/api/docs", response_class=HTMLResponse)
+def apidocs_page(request: Request):
+    user = request.session.get("user")
+    return templates.TemplateResponse(request, "apidocs.html", {"user": user})
