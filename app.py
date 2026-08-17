@@ -1198,7 +1198,15 @@ async def get_fingerprint(request: Request):
         cur = conn.cursor()
         cur.execute("SELECT * FROM experiments WHERE user_email = %s", (user['email'],))
         cols = [desc[0] for desc in cur.description]
-        all_exps = [dict(zip(cols, row)) for row in cur.fetchall()]
+        
+        all_exps = []
+        for row in cur.fetchall():
+            row_dict = dict(zip(cols, row))
+            # Convert the datetime object to a JSON-safe string
+            if isinstance(row_dict.get("created_at"), datetime.datetime):
+                row_dict["created_at"] = row_dict["created_at"].isoformat()
+            all_exps.append(row_dict)
+            
     finally:
         release_db_connection(conn)
         
