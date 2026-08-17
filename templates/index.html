@@ -148,6 +148,17 @@
                 </div>
             </div>
 
+            <!-- FEATURE 4: EQUIPMENT HEALTH DASHBOARD -->
+            <section class="bg-slate-900/80 p-6 rounded-2xl border border-slate-800 shadow-xl" id="healthWidget">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-bold text-white tracking-tight">Equipment Health & Drift Monitor</h2>
+                    <span id="healthBadge" class="px-3 py-1 rounded-full text-xs font-bold bg-slate-800 text-slate-400">Loading...</span>
+                </div>
+                <div id="healthAlerts" class="space-y-3">
+                    <p class="text-xs text-slate-400">Checking CST8 status based on variance logs...</p>
+                </div>
+            </section>
+
             <!-- FEATURE 1: SMART FAILURE ANALYSIS ALERT -->
             {% if failure_analysis and failure_analysis.is_failure %}
             <div class="bg-red-950/40 border border-red-900 rounded-2xl p-6 shadow-xl space-y-4">
@@ -679,6 +690,31 @@
         {% else %}
         const expData = [];
         {% endif %}
+
+        // Fetch Equipment Health Status automatically
+        async function loadHealth() {
+            const res = await fetch('/api/equipment/health');
+            const data = await res.json();
+            if(data.success && data.health) {
+                const badge = document.getElementById('healthBadge');
+                const alerts = document.getElementById('healthAlerts');
+                
+                if(data.health.status === 'GREEN') {
+                    badge.className = 'px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-400';
+                    badge.innerText = 'OPTIMAL';
+                } else if(data.health.status === 'AMBER') {
+                    badge.className = 'px-3 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-400';
+                    badge.innerText = 'WARNING';
+                } else {
+                    badge.className = 'px-3 py-1 rounded-full text-xs font-bold bg-red-500/20 text-red-400';
+                    badge.innerText = 'CRITICAL DRIFT';
+                }
+                
+                alerts.innerHTML = data.health.alerts.map(a => `<p class="text-sm font-medium ${a.severity === 'HIGH' ? 'text-amber-300' : 'text-slate-400'}">${a.message}</p>`).join('');
+            }
+        }
+        // Wait briefly so backend doesn't crash on load
+        setTimeout(loadHealth, 1500);
 
         // BRANCHING SCRIPT
         function createNewBranch() {
