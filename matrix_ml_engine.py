@@ -94,14 +94,31 @@ def thompson_sampling(model, likelihood, candidates, n_samples=100):
 # ==============================================================================
 def get_dna_fingerprint(target_run, all_runs):
     weights = np.array([0.25, 0.10, 0.25, 0.20, 0.15, 0.05])
-    t_vec = np.array([target_run['rf_power'], target_run['working_pressure'], target_run['target_distance'], 
-                      target_run.get('film_thickness', 200), target_run['rotation_speed'], target_run['ar_flow']])
+    
+    # Safely convert to float, falling back to defaults if the database value is None/NULL
+    t_rf = float(target_run.get('rf_power') or 120.0)
+    t_press = float(target_run.get('working_pressure') or 5.0)
+    t_dist = float(target_run.get('target_distance') or 7.0)
+    t_thick = float(target_run.get('film_thickness') or 200.0)
+    t_rot = float(target_run.get('rotation_speed') or 5.0)
+    t_ar = float(target_run.get('ar_flow') or 30.0)
+    
+    t_vec = np.array([t_rf, t_press, t_dist, t_thick, t_rot, t_ar])
     
     similarities = []
     for r in all_runs:
         if r.get('id') == target_run.get('id'): continue
-        r_vec = np.array([r['rf_power'], r['working_pressure'], r['target_distance'], 
-                          r.get('film_thickness', 200), r['rotation_speed'], r['ar_flow']])
+        
+        # Safely convert comparison runs
+        r_rf = float(r.get('rf_power') or 120.0)
+        r_press = float(r.get('working_pressure') or 5.0)
+        r_dist = float(r.get('target_distance') or 7.0)
+        r_thick = float(r.get('film_thickness') or 200.0)
+        r_rot = float(r.get('rotation_speed') or 5.0)
+        r_ar = float(r.get('ar_flow') or 30.0)
+        
+        r_vec = np.array([r_rf, r_press, r_dist, r_thick, r_rot, r_ar])
+        
         dist = euclidean(t_vec * weights, r_vec * weights)
         match_pct = max(0, 100 - (dist * 2))
         similarities.append({"id": r.get('id'), "match": round(match_pct, 1), "run": r})
