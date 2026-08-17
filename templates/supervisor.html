@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Supervisor Dashboard - MatrixAI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen p-8">
+    <div class="max-w-6xl mx-auto space-y-6">
+        <h1 class="text-3xl font-bold text-white">Supervisor Dashboard</h1>
+        <p class="text-slate-400">Read-only overview of recent lab experiments and equipment health.</p>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div class="bg-slate-900 border border-slate-800 p-6 rounded-2xl">
+                <h3 class="text-lg font-bold text-slate-300">Total Runs Logged</h3>
+                <div class="text-4xl font-extrabold text-blue-500 mt-2">{{ experiments|length }}</div>
+            </div>
+            <div class="bg-slate-900 border border-slate-800 p-6 rounded-2xl">
+                <h3 class="text-lg font-bold text-slate-300">Equipment Health</h3>
+                <div id="healthBadge" class="text-2xl font-bold text-slate-500 mt-2">Loading...</div>
+            </div>
+            <div class="bg-slate-900 border border-slate-800 p-6 rounded-2xl">
+                <h3 class="text-lg font-bold text-slate-300">Best Shift Found</h3>
+                <div class="text-4xl font-extrabold text-purple-500 mt-2">
+                    {% if experiments %}
+                        {{ experiments | map(attribute='wavelength_shift') | reject('none') | max | default('0') }} pm
+                    {% else %}
+                        0 pm
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <h2 class="text-2xl font-bold mt-8">Recent Experiments</h2>
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+            <table class="w-full text-left">
+                <thead class="bg-slate-850 text-slate-400 text-xs uppercase">
+                    <tr>
+                        <th class="p-4">Researcher</th>
+                        <th class="p-4">Material</th>
+                        <th class="p-4">Quality Score</th>
+                        <th class="p-4">RF Power</th>
+                        <th class="p-4">Phase</th>
+                        <th class="p-4">Wave Shift</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-800 text-sm">
+                    {% for exp in experiments %}
+                    <tr class="hover:bg-slate-800/50">
+                        <td class="p-4 text-blue-400">{{ exp.user_email }}</td>
+                        <td class="p-4 font-bold">{{ exp.target_material }}</td>
+                        <td class="p-4">{{ exp.quality_score }}</td>
+                        <td class="p-4">{{ exp.rf_power }} W</td>
+                        <td class="p-4">{{ exp.xrd_phase }}</td>
+                        <td class="p-4 font-bold text-purple-400">{{ exp.wavelength_shift }} pm</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <script>
+        // Fetch Equipment Health Status for Supervisor
+        fetch('/api/equipment/health').then(res => res.json()).then(data => {
+            if(data.success && data.health) {
+                const badge = document.getElementById('healthBadge');
+                if(data.health.status === 'GREEN') { badge.className = 'text-2xl font-extrabold text-emerald-500 mt-2'; badge.innerText = 'OPTIMAL'; }
+                else if(data.health.status === 'AMBER') { badge.className = 'text-2xl font-extrabold text-amber-500 mt-2'; badge.innerText = 'WARNING'; }
+                else { badge.className = 'text-2xl font-extrabold text-red-500 mt-2'; badge.innerText = 'CRITICAL DRIFT'; }
+            }
+        });
+    </script>
+</body>
+</html>
