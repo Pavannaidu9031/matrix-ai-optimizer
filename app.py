@@ -30,8 +30,8 @@ from google import genai
 from groq import AsyncGroq
 
 import optimizer
-import advanced_features # Unified module for new advanced features
-import matrix_ml_engine # Unified module for Deep Learning and Agent features
+import advanced_features 
+import matrix_ml_engine 
 
 # ==============================================================================
 # FASTAPI & PERMANENT SESSION INITIALIZATION
@@ -48,14 +48,13 @@ app.add_middleware(
     https_only=True
 )
 
-# Optional: Mount static files for PWA. If the directory doesn't exist, don't crash.
 if os.path.exists("static"):
     app.mount("/static", StaticFiles(directory="static"), name="static")
 
 templates = Jinja2Templates(directory="templates")
 
 # ==============================================================================
-# DYNAMIC SUPABASE POSTGRESQL CONNECTION (PORT 6543 POOLER READY)
+# DYNAMIC SUPABASE POSTGRESQL CONNECTION 
 # ==============================================================================
 connection_pool = None
 
@@ -118,14 +117,12 @@ def safe_calculate_quality_score(xrd_phase, wavelength_shift, h2_response_time, 
         return 50.0
 
 def ensure_material_column(cur):
-    """Silently ensures the target_material column exists for domain adaptation upgrades."""
     try:
         cur.execute("ALTER TABLE experiments ADD COLUMN IF NOT EXISTS target_material VARCHAR DEFAULT 'Generic'")
     except Exception:
         pass
 
 def ensure_branch_column(cur):
-    """Silently ensures the branch_name column exists for optimization branching."""
     try:
         cur.execute("ALTER TABLE experiments ADD COLUMN IF NOT EXISTS branch_name VARCHAR DEFAULT 'main'")
     except Exception:
@@ -155,7 +152,7 @@ class ExperimentModel(BaseModel):
     o2_flow: float
     substrate_temp: float
     target_distance: float
-    sputter_time: float
+    sputter_time_s: float
     film_thickness: Optional[float] = None
     rotation_speed: float = 5.0
     substrate_type: str = "Si Wafer"
@@ -171,7 +168,7 @@ class ChatRequest(BaseModel):
     provider: str  
 
 # ==============================================================================
-# DASHBOARD ROUTE (UPDATED FOR BRANCHING & FAILURE ANALYSIS)
+# DASHBOARD ROUTE
 # ==============================================================================
 @app.get("/", response_class=HTMLResponse)
 def index(request: Request, branch: str = 'main'):
@@ -211,7 +208,6 @@ def index(request: Request, branch: str = 'main'):
             ensure_branch_column(cur)
             conn.commit()
 
-            # 1. Fetch available branches for this user
             try:
                 cur.execute("SELECT DISTINCT branch_name FROM experiments WHERE user_email = %s", (user_email,))
                 fetched_branches = [r[0] for r in cur.fetchall() if r[0]]
@@ -221,10 +217,9 @@ def index(request: Request, branch: str = 'main'):
             except Exception as e:
                 print(f"Error fetching branches: {e}")
 
-            # 2. Fetch experiments only for the selected branch
             cur.execute("""
                 SELECT id, user_email, target_material, rf_power, working_pressure, ar_flow, o2_flow,
-                       substrate_temp, target_distance, sputter_time, film_thickness,
+                       substrate_temp, target_distance, sputter_time_s, film_thickness,
                        rotation_speed, substrate_type, xrd_phase, grain_size,
                        h2_response_time, wavelength_shift, batch_notes, quality_score, created_at, branch_name
                 FROM experiments
@@ -270,7 +265,6 @@ def index(request: Request, branch: str = 'main'):
         "runs_remaining": runs_remaining
     }
 
-    # Smart Failure Analysis Trigger
     latest_failure = None
     if experiments:
         latest_failure = advanced_features.analyze_failure(experiments, experiments[0])
@@ -297,12 +291,8 @@ async def auth_callback(request: Request):
     try:
         token = await oauth.google.authorize_access_token(request)
         user_info = token.get("userinfo")
-        
-        if not user_info:
-            user_info = await oauth.google.userinfo(token=token)
-
-        if not user_info:
-            return RedirectResponse("/login/google")
+        if not user_info: user_info = await oauth.google.userinfo(token=token)
+        if not user_info: return RedirectResponse("/login/google")
 
         email = user_info.get("email")
         name = user_info.get("name", "Researcher")
@@ -329,32 +319,20 @@ async def auth_callback(request: Request):
             user_row = cur.fetchone()
 
             if not user_row:
-                cur.execute(
-                    "INSERT INTO users (email, name, picture, is_approved) VALUES (%s, %s, %s, %s)",
-                    (email, name, picture, is_approved)
-                )
+                cur.execute("INSERT INTO users (email, name, picture, is_approved) VALUES (%s, %s, %s, %s)",
+                            (email, name, picture, is_approved))
                 conn.commit()
             else:
                 is_approved = user_row[0]
             cur.close()
         except Exception as db_err:
-            print(f"Auth DB Sync Error: {db_err}")
-            if email.lower() == FOUNDER_EMAIL.lower():
-                is_approved = True
+            if email.lower() == FOUNDER_EMAIL.lower(): is_approved = True
         finally:
             release_db_connection(conn)
 
-        request.session["user"] = {
-            "id": sub_id,
-            "email": email,
-            "name": name,
-            "picture": picture,
-            "is_approved": is_approved
-        }
+        request.session["user"] = {"id": sub_id, "email": email, "name": name, "picture": picture, "is_approved": is_approved}
         return RedirectResponse("/", status_code=303)
-        
     except Exception as auth_err:
-        print(f"OAuth Callback Error: {auth_err}")
         return RedirectResponse("/login/google")
 
 @app.get("/logout")
@@ -368,17 +346,15 @@ def logout(request: Request):
 @app.post("/api/sandbox/simulate")
 async def simulate_sandbox(request: Request):
     user = request.session.get("user")
-    if not user:
-        return JSONResponse({"error": "not_authenticated"}, status_code=401)
+    if not user: return JSONResponse({"error": "not_authenticated"}, status_code=401)
         
     try:
         body = await request.json()
         target_material = body.get("target_material", "Generic")
-        params = body.get("params", []) # [rf, press, dist, thick, rot, ar]
+        params = body.get("params", []) 
         branch = body.get("branch", "main")
         
-        if len(params) != 6:
-            return JSONResponse({"error": "Invalid parameter array length."}, status_code=400)
+        if len(params) != 6: return JSONResponse({"error": "Invalid parameter array length."}, status_code=400)
             
         conn = get_db_connection()
         try:
@@ -398,7 +374,69 @@ async def simulate_sandbox(request: Request):
         return JSONResponse({"error": str(e)}, status_code=500)
 
 # ==============================================================================
-# FORM SUBMISSION ROUTE (/add) (UPDATED FOR BRANCHING)
+# SECURE EXPERIMENT DELETION ENDPOINT
+# ==============================================================================
+@app.delete("/experiments/{experiment_id}")
+async def delete_experiment(experiment_id: int, request: Request):
+    user = request.session.get("user")
+    if not user:
+        return JSONResponse({"error": "not_authenticated"}, status_code=401)
+    
+    user_email = user.get("email")
+    
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+        
+        # Verify ownership
+        cur.execute("SELECT user_email FROM experiments WHERE id = %s", (experiment_id,))
+        row = cur.fetchone()
+        
+        if not row:
+            return JSONResponse({"error": "not_found"}, status_code=404)
+        if row[0] != user_email:
+            return JSONResponse({"error": "unauthorized"}, status_code=403)
+            
+        # Log to Audit Table
+        cur.execute("INSERT INTO audit_log (action, experiment_id, user_email) VALUES (%s, %s, %s)", 
+                    ("DELETE", experiment_id, user_email))
+        
+        # Execute Delete
+        cur.execute("DELETE FROM experiments WHERE id = %s AND user_email = %s", (experiment_id, user_email))
+        conn.commit()
+        cur.close()
+        
+        return JSONResponse({"success": True, "message": "Experiment deleted"})
+    except Exception as e:
+        if conn: conn.rollback()
+        return JSONResponse({"error": "delete_failed", "message": str(e)}, status_code=500)
+    finally:
+        release_db_connection(conn)
+
+@app.post("/admin/experiments/bulk-delete")
+async def bulk_delete_experiments(request: Request):
+    user = request.session.get("user")
+    if not user or user.get("email", "").lower() != FOUNDER_EMAIL.lower():
+        return JSONResponse({"error": "unauthorized"}, status_code=403)
+        
+    body = await request.json()
+    ids = body.get("experiment_ids", [])
+    
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+        for exp_id in ids:
+            cur.execute("INSERT INTO audit_log (action, experiment_id, user_email) VALUES (%s, %s, %s)", 
+                        ("ADMIN_BULK_DELETE", exp_id, user.get("email")))
+            cur.execute("DELETE FROM experiments WHERE id = %s", (exp_id,))
+        conn.commit()
+        cur.close()
+        return JSONResponse({"success": True})
+    finally:
+        release_db_connection(conn)
+
+# ==============================================================================
+# FORM SUBMISSION ROUTE (/add)
 # ==============================================================================
 @app.post("/add")
 async def add_experiment_form(request: Request):
@@ -415,17 +453,14 @@ async def add_experiment_form(request: Request):
             for k in keys:
                 val = form.get(k)
                 if val is not None and str(val).strip() != "":
-                    try:
-                        return float(val)
-                    except ValueError:
-                        pass
+                    try: return float(val)
+                    except ValueError: pass
             return default
 
         def get_str(keys, default=""):
             for k in keys:
                 val = form.get(k)
-                if val is not None:
-                    return str(val).strip()
+                if val is not None: return str(val).strip()
             return default
 
         target_material = get_str(["target_material"], "Generic")
@@ -435,7 +470,14 @@ async def add_experiment_form(request: Request):
         o2_flow = get_float(["o2_flow_sccm", "o2_flow"], 5.0)
         substrate_temp = get_float(["substrate_temp_c", "substrate_temp"], 300.0)
         target_distance = get_float(["target_substrate_distance_cm", "target_distance"], 7.0)
-        sputter_time = get_float(["sputtering_time_min", "sputter_time"], 30.0)
+        
+        # Dual time calculation
+        sputter_min = get_float(["sputtering_time_min", "sputter_time_min"], 0.0)
+        sputter_sec = get_float(["sputtering_time_sec", "sputter_time_sec"], 0.0)
+        sputter_time_s = (sputter_min * 60.0) + sputter_sec
+        if sputter_time_s <= 0:
+            sputter_time_s = 1800.0 # fallback to 30 mins
+
         film_thickness = get_float(["film_thickness_nm", "film_thickness"], 100.0)
         rotation_speed = get_float(["rotation_speed_rpm", "rotation_speed"], 5.0)
         substrate_type = get_str(["substrate_type"], "Si Wafer")
@@ -475,7 +517,7 @@ async def add_experiment_form(request: Request):
         cur.execute("""
             INSERT INTO experiments (
                 user_email, target_material, rf_power, working_pressure, ar_flow,
-                o2_flow, substrate_temp, target_distance, sputter_time,
+                o2_flow, substrate_temp, target_distance, sputter_time_s,
                 film_thickness, rotation_speed, substrate_type, xrd_phase,
                 grain_size, h2_response_time, wavelength_shift, batch_notes,
                 quality_score, branch_name, created_at
@@ -484,7 +526,7 @@ async def add_experiment_form(request: Request):
             )
         """, (
             user_email, target_material, rf_power, working_pressure, ar_flow,
-            o2_flow, substrate_temp, target_distance, sputter_time,
+            o2_flow, substrate_temp, target_distance, sputter_time_s,
             film_thickness, rotation_speed, substrate_type, xrd_phase,
             grain_size, h2_response_time, wavelength_shift, batch_notes,
             quality_score, branch_name
@@ -494,17 +536,14 @@ async def add_experiment_form(request: Request):
         return RedirectResponse(f"/?branch={branch_name}", status_code=303)
     except Exception as db_err:
         if conn:
-            try:
-                conn.rollback()
-            except Exception:
-                pass
+            try: conn.rollback()
+            except Exception: pass
         return HTMLResponse(f"<h1>Database Insert Failed</h1><p>{str(db_err)}</p>", status_code=500)
     finally:
-        if conn:
-            release_db_connection(conn)
+        if conn: release_db_connection(conn)
 
 # ==============================================================================
-# PERMANENT EXPERIMENT SAVE (JSON API /experiments) (UPDATED FOR BRANCHING)
+# PERMANENT EXPERIMENT SAVE (JSON API /experiments)
 # ==============================================================================
 @app.post("/experiments")
 async def save_experiment_json(request: Request, data: ExperimentModel):
@@ -530,7 +569,7 @@ async def save_experiment_json(request: Request, data: ExperimentModel):
         cur.execute("""
             INSERT INTO experiments (
                 user_email, rf_power, working_pressure, ar_flow,
-                o2_flow, substrate_temp, target_distance, sputter_time,
+                o2_flow, substrate_temp, target_distance, sputter_time_s,
                 film_thickness, rotation_speed, substrate_type, xrd_phase,
                 grain_size, h2_response_time, wavelength_shift, batch_notes,
                 quality_score, branch_name, created_at
@@ -539,7 +578,7 @@ async def save_experiment_json(request: Request, data: ExperimentModel):
             ) RETURNING id
         """, (
             user_email, data.rf_power, data.working_pressure, data.ar_flow,
-            data.o2_flow, data.substrate_temp, data.target_distance, data.sputter_time,
+            data.o2_flow, data.substrate_temp, data.target_distance, data.sputter_time_s,
             data.film_thickness, data.rotation_speed, data.substrate_type, data.xrd_phase,
             data.grain_size, data.h2_response_time, data.wavelength_shift, data.batch_notes,
             quality_score, data.branch_name
@@ -556,8 +595,7 @@ async def save_experiment_json(request: Request, data: ExperimentModel):
             "message": f"Experiment saved permanently to Supabase (Branch: {data.branch_name})"
         })
     except Exception as e:
-        if conn:
-            conn.rollback()
+        if conn: conn.rollback()
         return JSONResponse({"error": "save_failed", "message": str(e)}, status_code=500)
     finally:
         release_db_connection(conn)
@@ -578,7 +616,7 @@ async def get_experiments(request: Request, branch: str = "main"):
         ensure_branch_column(cur)
         cur.execute("""
             SELECT id, user_email, rf_power, working_pressure, ar_flow, o2_flow,
-                   substrate_temp, target_distance, sputter_time, film_thickness,
+                   substrate_temp, target_distance, sputter_time_s, film_thickness,
                    rotation_speed, substrate_type, xrd_phase, grain_size,
                    h2_response_time, wavelength_shift, batch_notes, quality_score, created_at, branch_name
             FROM experiments
@@ -608,7 +646,7 @@ async def get_experiments(request: Request, branch: str = "main"):
         release_db_connection(conn)
 
 # ==============================================================================
-# BAYESIAN OPTIMIZER ENDPOINT (UPDATED FOR BRANCHING)
+# BAYESIAN OPTIMIZER ENDPOINT
 # ==============================================================================
 @app.get("/suggest")
 @app.post("/suggest")
@@ -637,7 +675,6 @@ async def get_bayes_suggestion(request: Request):
         
         experiments = []
         try:
-            # ONLY grab experiments from the selected branch!
             cur.execute("SELECT * FROM experiments WHERE user_email = %s AND branch_name = %s ORDER BY created_at DESC", (user_email, branch))
             rows = cur.fetchall()
             cols = [desc[0] for desc in cur.description] if cur.description else []
@@ -701,62 +738,45 @@ async def get_bayes_suggestion(request: Request):
             release_db_connection(conn)
 
 # ==============================================================================
-# MULTIMODAL VISION AI ENDPOINT (THE VISUAL SCIENTIST)
+# MULTIMODAL VISION AI ENDPOINT
 # ==============================================================================
 @app.post("/api/vision")
-async def analyze_image_vision(
-    request: Request, 
-    image: UploadFile = File(...), 
-    analysis_type: str = Form(...)
-):
+async def analyze_image_vision(request: Request, image: UploadFile = File(...), analysis_type: str = Form(...)):
     user = request.session.get("user")
-    if not user:
-        return JSONResponse({"error": "not_authenticated"}, status_code=401)
+    if not user: return JSONResponse({"error": "not_authenticated"}, status_code=401)
     
     try:
         api_key = os.getenv("GEMINI_API_KEY")
-        if not api_key:
-            return JSONResponse({"error": "GEMINI_API_KEY not configured."}, status_code=500)
+        if not api_key: return JSONResponse({"error": "GEMINI_API_KEY not configured."}, status_code=500)
         
         image_bytes = await image.read()
         client = genai.Client(api_key=api_key)
         
-        prompt = (
-            f"Analyze this {analysis_type} image for materials science. "
+        prompt = (f"Analyze this {analysis_type} image for materials science. "
             "If it is an XRD plot, identify the dominant phase (must be exactly: Monoclinic, Partial, or Amorphous). "
             "If it is an SEM/FESEM micrograph, estimate the average grain size in nm (return just a numeric value). "
-            "Return strictly a JSON object with a single key 'extracted_value'. "
-            "For example: {{\"extracted_value\": \"Monoclinic\"}} or {{\"extracted_value\": \"25.4\"}}."
-        )
+            "Return strictly a JSON object with a single key 'extracted_value'.")
         
         response = client.models.generate_content(
             model='gemini-2.5-flash',
-            contents=[
-                prompt,
-                genai.types.Part.from_bytes(data=image_bytes, mime_type=image.content_type)
-            ],
+            contents=[prompt, genai.types.Part.from_bytes(data=image_bytes, mime_type=image.content_type)],
         )
         
-        reply_text = response.text
-        match = re.search(r'\{.*\}', reply_text, re.DOTALL)
+        match = re.search(r'\{.*\}', response.text, re.DOTALL)
         if match:
-            data = json.loads(match.group(0))
-            return {"success": True, "extracted_value": data.get("extracted_value")}
+            return {"success": True, "extracted_value": json.loads(match.group(0)).get("extracted_value")}
         else:
             return {"success": False, "message": "Failed to parse AI output. Try again."}
-            
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
 
-
 # ==============================================================================
-# LITERATURE INGESTION ENDPOINT (PDF to Database)
+# LITERATURE INGESTION ENDPOINT
 # ==============================================================================
 @app.post("/api/literature/upload")
 async def upload_literature_pdf(request: Request, file: UploadFile = File(...)):
     user = request.session.get("user")
     
-    # Restrict to Admin/Founder only
     if not user or user.get("email", "").lower() != FOUNDER_EMAIL.lower():
         return JSONResponse({"error": "unauthorized"}, status_code=401)
         
@@ -773,7 +793,7 @@ async def upload_literature_pdf(request: Request, file: UploadFile = File(...)):
             "experimental parameters for thin-film deposition. "
             "Return strictly a JSON object with the following keys and numerical values (no units): "
             "'target_material' (string), 'rf_power' (float), 'working_pressure' (float), 'ar_flow' (float), "
-            "'o2_flow' (float), 'substrate_temp' (float), 'target_distance' (float), 'sputter_time' (float), "
+            "'o2_flow' (float), 'substrate_temp' (float), 'target_distance' (float), 'sputter_time_s' (float in seconds), "
             "'film_thickness' (float), 'rotation_speed' (float), 'xrd_phase' (string: Monoclinic, Partial, or Amorphous), "
             "'grain_size' (float), 'h2_response_time' (float), 'wavelength_shift' (float)."
         )
@@ -803,7 +823,7 @@ async def upload_literature_pdf(request: Request, file: UploadFile = File(...)):
             cur.execute("""
                 INSERT INTO experiments (
                     user_email, target_material, rf_power, working_pressure, ar_flow,
-                    o2_flow, substrate_temp, target_distance, sputter_time,
+                    o2_flow, substrate_temp, target_distance, sputter_time_s,
                     film_thickness, rotation_speed, substrate_type, xrd_phase,
                     grain_size, h2_response_time, wavelength_shift, batch_notes,
                     quality_score, created_at
@@ -819,7 +839,7 @@ async def upload_literature_pdf(request: Request, file: UploadFile = File(...)):
                 float(data.get("o2_flow", 5.0)),
                 float(data.get("substrate_temp", 300.0)),
                 float(data.get("target_distance", 7.0)),
-                float(data.get("sputter_time", 30.0)),
+                float(data.get("sputter_time_s", 1800.0)),
                 float(data.get("film_thickness", 100.0)),
                 float(data.get("rotation_speed", 5.0)),
                 "Si Wafer",
@@ -846,14 +866,12 @@ async def upload_literature_pdf(request: Request, file: UploadFile = File(...)):
 @app.get("/export/csv")
 def export_csv(request: Request):
     user = request.session.get("user")
-    if not user:
-        raise HTTPException(status_code=401, detail="Unauthorized")
+    if not user: raise HTTPException(status_code=401, detail="Unauthorized")
 
-    user_email = user.get("email")
     conn = get_db_connection()
     try:
         cur = conn.cursor()
-        cur.execute("SELECT * FROM experiments WHERE user_email = %s ORDER BY created_at DESC", (user_email,))
+        cur.execute("SELECT * FROM experiments WHERE user_email = %s ORDER BY created_at DESC", (user.get("email"),))
         rows = cur.fetchall()
         cols = [desc[0] for desc in cur.description]
         experiments = []
@@ -861,11 +879,13 @@ def export_csv(request: Request):
             row_dict = dict(zip(cols, row))
             if isinstance(row_dict.get("created_at"), datetime.datetime):
                 row_dict["created_at"] = row_dict["created_at"].isoformat()
+            # Dynamic header rename fallback if needed
+            if "sputter_time" in row_dict:
+                row_dict["sputter_time_s"] = row_dict.pop("sputter_time")
             experiments.append(row_dict)
         cur.close()
 
-        if not experiments:
-            return RedirectResponse("/")
+        if not experiments: return RedirectResponse("/")
 
         df = pd.DataFrame(experiments)
         stream = io.StringIO()
@@ -976,7 +996,7 @@ async def chat_with_agent(request: Request, data: ChatRequest):
         cur = conn.cursor()
         ensure_material_column(cur)
         cur.execute("""
-            SELECT target_material, rf_power, working_pressure, target_distance, sputter_time, 
+            SELECT target_material, rf_power, working_pressure, target_distance, sputter_time_s, 
                    film_thickness, rotation_speed, ar_flow, xrd_phase, quality_score 
             FROM experiments WHERE user_email = %s ORDER BY created_at DESC LIMIT 5
         """, (user_email,))
@@ -1090,7 +1110,7 @@ async def get_equipment_health(request: Request):
     conn = get_db_connection()
     try:
         cur = conn.cursor()
-        cur.execute("SELECT film_thickness, sputter_time, working_pressure FROM experiments WHERE user_email = %s ORDER BY created_at DESC LIMIT 20", (user.get("email"),))
+        cur.execute("SELECT film_thickness, sputter_time_s, working_pressure FROM experiments WHERE user_email = %s ORDER BY created_at DESC LIMIT 20", (user.get("email"),))
         cols = [desc[0] for desc in cur.description]
         experiments = [dict(zip(cols, row)) for row in cur.fetchall()]
         cur.close()
@@ -1202,7 +1222,6 @@ async def get_fingerprint(request: Request):
         all_exps = []
         for row in cur.fetchall():
             row_dict = dict(zip(cols, row))
-            # Convert the datetime object to a JSON-safe string
             if isinstance(row_dict.get("created_at"), datetime.datetime):
                 row_dict["created_at"] = row_dict["created_at"].isoformat()
             all_exps.append(row_dict)
