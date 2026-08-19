@@ -870,14 +870,27 @@
                     method: 'POST', headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({
                         material: activeWhatIfExp.target_material || 'Generic',
-                        params: [rf, press, activeWhatIfExp.target_distance, activeWhatIfExp.film_thickness || 200, activeWhatIfExp.rotation_speed, activeWhatIfExp.ar_flow]
+                        // FIX: Force every single parameter to be a clean float number
+                        params: [
+                            parseFloat(rf), 
+                            parseFloat(press), 
+                            parseFloat(activeWhatIfExp.target_distance) || 7.0, 
+                            parseFloat(activeWhatIfExp.film_thickness) || 200.0, 
+                            parseFloat(activeWhatIfExp.rotation_speed) || 5.0, 
+                            parseFloat(activeWhatIfExp.ar_flow) || 30.0
+                        ]
                     })
                 });
                 const data = await res.json();
-                if(data.success) {
-                    const diff = (data.simulation.predicted_wavelength_shift - (activeWhatIfExp.wavelength_shift || 0)).toFixed(1);
-                    const color = diff > 0 ? 'text-emerald-400' : 'text-red-400';
+                
+                if(data.success && data.simulation) {
+                    const actualShift = parseFloat(activeWhatIfExp.wavelength_shift) || 0.0;
+                    const predictedShift = parseFloat(data.simulation.predicted_wavelength_shift) || 0.0;
+                    
+                    const diff = (predictedShift - actualShift).toFixed(1);
+                    const color = diff >= 0 ? 'text-emerald-400' : 'text-red-400';
                     const sign = diff > 0 ? '+' : '';
+                    
                     document.getElementById('wiShiftDelta').className = `font-bold text-lg ${color}`;
                     document.getElementById('wiShiftDelta').innerText = `${sign}${diff} pm`;
                     document.getElementById('wiPhase').innerText = data.simulation.expected_phase;
