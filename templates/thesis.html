@@ -1,58 +1,32 @@
-<!DOCTYPE html>
-<html lang="en" class="dark">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <script src="https://cdn.tailwindcss.com"></script>
-    <title>Thesis Assistant - MatrixAI</title>
-</head>
-<body class="bg-slate-950 text-slate-100 min-h-screen font-sans">
-    
-    <!-- UNIFIED NAVIGATION BAR -->
-    <nav class="border-b border-slate-800/80 bg-slate-900/60 backdrop-blur-md sticky top-0 z-50">
-        <div class="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-            <div class="flex items-center space-x-3">
-                <div class="w-9 h-9 rounded-lg bg-gradient-to-tr from-blue-500 to-purple-600 flex items-center justify-center font-extrabold text-white text-lg shadow-lg">M</div>
-                <span class="font-bold text-lg tracking-tight text-white">MatrixAI</span>
-            </div>
-            <div class="flex items-center space-x-4">
-                <a href="/" class="text-xs font-semibold text-slate-300 hover:text-blue-400 transition">Dashboard</a>
-                <a href="/scheduler" class="text-xs font-semibold text-slate-300 hover:text-blue-400 transition">Scheduler</a>
-                <a href="/thesis" class="text-xs font-semibold text-blue-400 transition">Thesis</a>
-                <a href="/publication" class="text-xs font-semibold text-slate-300 hover:text-blue-400 transition">Publication</a>
-                <div class="flex items-center space-x-3 bg-slate-850 px-3 py-1.5 rounded-xl border border-slate-800 ml-2">
-                    {% if user.picture %}<img src="{{ user.picture }}" alt="Profile" class="w-6 h-6 rounded-full">{% endif %}
-                    <span class="text-xs font-medium text-slate-300">{{ user.name }}</span>
-                </div>
-            </div>
-        </div>
-    </nav>
+{% extends "base.html" %}
 
-    <!-- PAGE CONTENT -->
-    <div class="max-w-5xl mx-auto space-y-6 mt-10 px-6">
-        <h1 class="text-3xl font-bold">Academic Thesis Generator</h1>
-        <p class="text-slate-400 text-sm">AI writes your thesis sections based directly on your Supabase experimental data.</p>
-        
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <button onclick="generate('results')" class="bg-blue-600 hover:bg-blue-500 p-4 rounded-xl font-bold transition shadow-lg">Generate Results Chapter</button>
-            <button onclick="generate('discussion')" class="bg-purple-600 hover:bg-purple-500 p-4 rounded-xl font-bold transition shadow-lg">Generate Discussion Points</button>
-            <button onclick="generate('abstract')" class="bg-emerald-600 hover:bg-emerald-500 p-4 rounded-xl font-bold transition shadow-lg">Generate Abstract</button>
-            <button onclick="generate('novelty')" class="bg-amber-600 hover:bg-amber-500 p-4 rounded-xl font-bold transition shadow-lg text-slate-900">Generate Novelty Claims</button>
-        </div>
-        
-        <pre id="output" class="bg-slate-900 p-6 rounded-xl border border-slate-800 h-96 overflow-y-auto whitespace-pre-wrap font-sans text-slate-300 shadow-inner">Select an option above to generate text...</pre>
+{% block title %}Thesis Writer | MatrixAI{% endblock %}
+{% block header_title %}Academic Thesis Generator{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto space-y-6">
+    <h1 class="text-3xl font-bold">Academic Thesis Generator</h1>
+    <p class="text-slate-400 text-sm">AI writes your thesis sections based directly on your Supabase experimental data.</p>
+    
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <button onclick="generate('results')" class="bg-blue-600 hover:bg-blue-500 p-4 rounded-xl font-bold transition shadow-lg">Generate Results Chapter</button>
+        <button onclick="generate('discussion')" class="bg-purple-600 hover:bg-purple-500 p-4 rounded-xl font-bold transition shadow-lg">Generate Discussion Points</button>
+        <button onclick="generate('abstract')" class="bg-emerald-600 hover:bg-emerald-500 p-4 rounded-xl font-bold transition shadow-lg">Generate Abstract</button>
+        <button onclick="generate('novelty')" class="bg-amber-600 hover:bg-amber-500 p-4 rounded-xl font-bold transition shadow-lg text-slate-900">Generate Novelty Claims</button>
     </div>
     
-    <script>
-        async function generate(section) {
-            document.getElementById('output').innerText = "Analyzing database and generating academic prose...";
-            const res = await fetch('/api/thesis/generate', {
-                method: 'POST', headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({section: section})
-            });
-            const data = await res.json();
-            document.getElementById('output').innerText = data.content;
-        }
-    </script>
-</body>
-</html>
+    <pre id="output" class="bg-slate-900 p-6 rounded-xl border border-slate-800 h-96 overflow-y-auto whitespace-pre-wrap font-sans text-slate-300 shadow-inner">Select an option above to generate text...</pre>
+</div>
+
+<script>
+    async function generate(section) {
+        document.getElementById('output').innerText = "Analyzing database and generating academic prose...";
+        const res = await fetch('/api/thesis/generate', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({section: section})
+        });
+        const data = await res.json();
+        document.getElementById('output').innerText = data.content;
+    }
+</script>
+{% endblock %}
