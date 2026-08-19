@@ -1,4 +1,3 @@
-import numpy as np
 import pandas as pd
 from google import genai
 import os
@@ -11,12 +10,17 @@ def analyze_failure(experiments, current_run):
     df['quality'] = pd.to_numeric(df['quality_score'], errors='coerce').fillna(0)
     successful_runs = df[df['quality'] > 70]
     
-    if successful_runs.empty or current_run['quality_score'] >= 50:
+    if successful_runs.empty or current_run.get('quality_score', 0) >= 50:
         return None
         
     causes = []
-    current_dep_rate = current_run['film_thickness'] / max(current_run['sputter_time'], 1)
-    avg_dep_rate = (successful_runs['film_thickness'] / successful_runs['sputter_time'].clip(lower=1)).mean()
+    
+    # Updated to use sputter_time_s and calculate rate in nm/min
+    curr_time_m = max(current_run.get('sputter_time_s', 1800) / 60.0, 1.0)
+    current_dep_rate = current_run.get('film_thickness', 100) / curr_time_m
+    
+    succ_time_m = successful_runs['sputter_time_s'].fillna(1800).clip(lower=60) / 60.0
+    avg_dep_rate = (successful_runs['film_thickness'] / succ_time_m).mean()
     
     if current_dep_rate < avg_dep_rate * 0.85:
         causes.append({
@@ -26,7 +30,7 @@ def analyze_failure(experiments, current_run):
         })
         
     avg_press = successful_runs['working_pressure'].mean()
-    if current_run['working_pressure'] > avg_press * 1.5:
+    if current_run.get('working_pressure', 5.0) > avg_press * 1.5:
         causes.append({
             "cause": "Chamber outgassing (base pressure not achieved)",
             "action": "Check base pressure log for this run. If >1e-4 Torr, bake out chamber.",
@@ -50,7 +54,7 @@ def schedule_experiments(experiments, available_hours, available_days):
     while runs_scheduled < total_capacity and current_day <= available_days:
         schedule.append({
             "day": f"Day {current_day}",
-            "task": f"Run {len(experiments) + runs_scheduled + 1}: Sputtering + XRD/FESEM Characterization",
+            "task": f"Run {len(experiments) + runs_scheduled + 1}: Sputtering (~1800s) + XRD/FESEM Characterization",
             "estimated_time": f"{cycle_time_hrs} hrs"
         })
         runs_scheduled += 1
@@ -90,7 +94,11 @@ def check_equipment_health(experiments):
         return {"status": "GREEN", "alerts": [{"message": "Collecting baseline data.", "severity": "INFO"}]}
         
     df = pd.DataFrame(experiments)
-    df['dep_rate'] = df['film_thickness'] / df['sputter_time'].clip(lower=1)
+    
+    # Updated to calculate dep rate correctly from seconds
+    df['time_min'] = df['sputter_time_s'].fillna(1800).clip(lower=60) / 60.0
+    df['dep_rate'] = df['film_thickness'] / df['time_min']
+    
     alerts = []
     status = "GREEN"
     
