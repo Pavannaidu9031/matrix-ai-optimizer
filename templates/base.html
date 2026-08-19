@@ -65,6 +65,14 @@
             <a href="/api/docs" class="flex items-center space-x-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-300 hover:bg-slate-800 hover:text-white transition">
                 <span>🔌 Public API</span>
             </a>
+
+            <!-- ADMIN PANEL (ONLY VISIBLE TO FOUNDER) -->
+            {% if user and user.email.lower() == 'pavannaidu9031@gmail.com' %}
+            <div class="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-3 mt-6 mb-2">Administration</div>
+            <a href="/admin/users" class="flex items-center space-x-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-purple-400 bg-purple-500/10 border border-purple-500/20 hover:bg-purple-500/20 transition">
+                <span>🛡️ Admin Panel</span>
+            </a>
+            {% endif %}
         </div>
 
         {% if user %}
