@@ -1,0 +1,726 @@
+{% extends "base.html" %}
+
+{% block title %}AI Process Engine | MatrixAI{% endblock %}
+{% block header_title %}AI Process Engine & Digital Twin{% endblock %}
+
+{% block content %}
+<input type="hidden" id="branch_name" value="{{ current_branch|default('main') }}">
+
+<!-- AI SUGGESTION SECTION -->
+<section class="bg-slate-900/80 p-6 rounded-2xl border border-slate-800 shadow-xl relative overflow-hidden" style="box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.25), 0 0 32px rgba(59, 130, 246, 0.08);">
+    <div class="grid grid-cols-1 lg:grid-cols-10 gap-6 items-center">
+        <div class="lg:col-span-4 space-y-2">
+            <div class="text-xs font-bold tracking-wider text-blue-400 uppercase">AI PROCESS ENGINE</div>
+            <h2 class="text-2xl font-extrabold text-white">Suggest Next Parameters</h2>
+            <p class="text-xs text-slate-400 leading-relaxed">
+                AI-powered process parameter optimization for advanced materials science research.
+            </p>
+        </div>
+
+        <div class="lg:col-span-6 flex flex-col items-start lg:items-end space-y-2">
+            <!-- DOMAIN ADAPTATION DROPDOWN -->
+            <div class="flex items-center space-x-3 mb-2">
+                <label class="text-xs text-slate-400 font-semibold">Target Material Domain:</label>
+                <select id="targetMaterialSuggest" class="bg-slate-850 border border-slate-700 text-xs text-white rounded-lg px-3 py-1.5 focus:outline-none focus:border-blue-500">
+                    <option value="Generic">Generic / Mixed</option>
+                    <option value="WO3">WO₃ (Tungsten Trioxide)</option>
+                    <option value="TiO2">TiO₂ (Titanium Dioxide)</option>
+                    <option value="ZnO">ZnO (Zinc Oxide)</option>
+                </select>
+            </div>
+            
+            <!-- MODEL SETTINGS TOGGLE -->
+            <div class="flex items-center justify-end space-x-3 mb-4 w-full">
+                <label class="text-xs text-slate-400 font-semibold">Model Architecture:</label>
+                <select id="modelType" class="bg-slate-850 border border-slate-700 text-xs text-white rounded-lg px-3 py-1.5 focus:border-blue-500">
+                    <option value="standard">Standard GP (sklearn)</option>
+                    <option value="dkl">Deep Kernel Learning (PyTorch)</option>
+                </select>
+                <label class="text-xs text-slate-400 font-semibold ml-2">Acquisition:</label>
+                <select id="acqStrategy" class="bg-slate-850 border border-slate-700 text-xs text-white rounded-lg px-3 py-1.5 focus:border-blue-500">
+                    <option value="ucb">UCB</option>
+                    <option value="ts">Thompson Sampling</option>
+                    <option value="hybrid">Hybrid</option>
+                </select>
+            </div>
+
+            <button id="btnSuggest" class="btn-glow text-white font-bold text-base px-8 py-4 rounded-xl transition flex items-center space-x-3 w-full sm:w-auto justify-center">
+                <span id="btnText">✦ Suggest Next Parameters</span>
+                <div id="btnSpinner" class="hidden w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+            </button>
+        </div>
+    </div>
+
+    <!-- SUGGESTION OUTPUT PANEL -->
+    <div id="resultCard" class="hidden mt-8 pt-6 border-t border-slate-800 space-y-6">
+        <div class="flex items-center justify-between">
+            <h3 class="text-lg font-bold text-white">🎯 Recommended Next Batch #<span id="runNum">X</span></h3>
+            <span id="confBadge" class="px-3 py-1 rounded-full text-xs font-bold"></span>
+        </div>
+
+        <!-- BATCH OPTIONS GRID -->
+        <div id="batchOptionsGrid" class="grid grid-cols-1 md:grid-cols-3 gap-4"></div>
+        
+        <!-- DIGITAL TWIN SANDBOX (STATIC PLOTLY CURVES) -->
+        <div id="digitalTwinSection" class="bg-slate-950/50 rounded-xl p-4 border border-slate-800 space-y-4">
+            <div class="text-xs font-bold text-purple-400 uppercase tracking-wider flex items-center space-x-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
+                <span>Digital Twin Simulation (Max Quality Candidate)</span>
+            </div>
+            <p class="text-xs text-slate-400">Simulated wavelength shift response ±1σ uncertainty for the most sensitive parameters.</p>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div id="plotRfCurve" class="w-full h-48 bg-slate-900 rounded-lg border border-slate-800"></div>
+                <div id="plotPressCurve" class="w-full h-48 bg-slate-900 rounded-lg border border-slate-800"></div>
+            </div>
+        </div>
+
+        <!-- CONVERGENCE PROGRESS BAR -->
+        <div class="space-y-2 bg-slate-950/50 p-4 rounded-xl border border-slate-800">
+            <div class="flex justify-between items-center text-xs">
+                <span class="font-bold text-slate-300 uppercase tracking-wider">Optimization Progress & Convergence</span>
+                <span id="convText" class="font-semibold text-blue-400">0%</span>
+            </div>
+            <div class="w-full bg-slate-800 h-2.5 rounded-full overflow-hidden">
+                <div id="convBar" class="bg-gradient-to-r from-blue-500 to-emerald-400 h-full transition-all duration-700" style="width: 0%;"></div>
+            </div>
+            <div id="convBanner" class="text-xs text-slate-400">Evaluating multi-run parameter variance...</div>
+        </div>
+
+        <!-- PARAMETER UNCERTAINTIES MINI BARS -->
+        <div class="space-y-3 bg-slate-950/50 p-4 rounded-xl border border-slate-800">
+            <div class="text-xs font-bold text-slate-300 uppercase tracking-wider">Model Uncertainty by Parameter</div>
+            <div id="uncertaintyBars" class="grid grid-cols-1 sm:grid-cols-2 gap-3"></div>
+        </div>
+
+        <!-- SCIENTIFIC EXPLANATION -->
+        <div class="bg-slate-950/50 rounded-xl p-4 border border-slate-800 space-y-1">
+            <div class="text-xs font-bold text-blue-400 uppercase tracking-wider">Scientific Rationale</div>
+            <p id="expText" class="text-xs text-slate-300 leading-relaxed"></p>
+        </div>
+
+        <!-- ACTION BUTTONS -->
+        <div class="flex flex-wrap gap-3">
+            <button id="btnPdf" type="button" class="border border-purple-400 text-purple-400 hover:bg-purple-400/10 font-bold text-sm px-6 py-2.5 rounded-xl transition flex items-center">
+                📄 Download PDF Report (Max Quality)
+            </button>
+            <button id="btnRecipe" type="button" class="bg-gradient-to-r from-emerald-600 to-teal-600 hover:opacity-90 text-white font-bold text-sm px-6 py-2.5 rounded-xl transition flex items-center">
+                🧪 Generate PVD Recipe Script
+            </button>
+        </div>
+    </div>
+</section>
+
+<!-- DIGITAL TWIN INTERACTIVE PARAMETER SANDBOX (LIVE SLIDERS) -->
+<section class="bg-slate-900/80 p-6 rounded-2xl border border-slate-800 shadow-xl space-y-6">
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center">
+        <div>
+            <div class="text-xs font-bold tracking-wider text-purple-400 uppercase">DIGITAL CHAMBER TWIN</div>
+            <h2 class="text-2xl font-extrabold text-white">Interactive Parameter Sandbox</h2>
+            <p class="text-xs text-slate-400 mt-1">Drag the sliders to virtually simulate chamber conditions and predict outcomes in real-time.</p>
+        </div>
+        <div class="mt-4 md:mt-0 bg-slate-950 px-4 py-3 rounded-xl border border-slate-800 flex items-center space-x-6">
+            <div>
+                <div class="text-[10px] text-slate-400 uppercase">Predicted Shift</div>
+                <div class="text-lg font-extrabold text-blue-400" id="simShift">-- pm</div>
+            </div>
+            <div>
+                <div class="text-[10px] text-slate-400 uppercase">Expected Phase</div>
+                <div class="text-lg font-extrabold text-emerald-400" id="simPhase">--</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 bg-slate-950/50 p-6 rounded-xl border border-slate-800">
+        <div class="space-y-2">
+            <div class="flex justify-between text-xs font-semibold">
+                <span class="text-slate-300">RF Power</span>
+                <span class="text-blue-400 font-mono" id="valRf">120 W</span>
+            </div>
+            <input type="range" id="sliderRf" min="15" max="200" step="1" value="120" class="w-full accent-blue-500 cursor-pointer">
+        </div>
+        
+        <div class="space-y-2">
+            <div class="flex justify-between text-xs font-semibold">
+                <span class="text-slate-300">Working Pressure</span>
+                <span class="text-blue-400 font-mono" id="valPress">5.0 mTorr</span>
+            </div>
+            <input type="range" id="sliderPress" min="3" max="10" step="0.1" value="5.0" class="w-full accent-blue-500 cursor-pointer">
+        </div>
+
+        <div class="space-y-2">
+            <div class="flex justify-between text-xs font-semibold">
+                <span class="text-slate-300">Target Distance</span>
+                <span class="text-blue-400 font-mono" id="valDist">7.0 cm</span>
+            </div>
+            <input type="range" id="sliderDist" min="3" max="7" step="0.1" value="7.0" class="w-full accent-blue-500 cursor-pointer">
+        </div>
+
+        <div class="space-y-2">
+            <div class="flex justify-between text-xs font-semibold">
+                <span class="text-slate-300">Film Thickness</span>
+                <span class="text-blue-400 font-mono" id="valThick">200 nm</span>
+            </div>
+            <input type="range" id="sliderThick" min="100" max="500" step="10" value="200" class="w-full accent-blue-500 cursor-pointer">
+        </div>
+
+        <div class="space-y-2">
+            <div class="flex justify-between text-xs font-semibold">
+                <span class="text-slate-300">Rotation Speed</span>
+                <span class="text-blue-400 font-mono" id="valRot">5 rpm</span>
+            </div>
+            <input type="range" id="sliderRot" min="1" max="10" step="1" value="5" class="w-full accent-blue-500 cursor-pointer">
+        </div>
+
+        <div class="space-y-2">
+            <div class="flex justify-between text-xs font-semibold">
+                <span class="text-slate-300">Ar Flow</span>
+                <span class="text-blue-400 font-mono" id="valAr">30 sccm</span>
+            </div>
+            <input type="range" id="sliderAr" min="20" max="40" step="1" value="30" class="w-full accent-blue-500 cursor-pointer">
+        </div>
+
+        <div class="space-y-2">
+            <div class="flex justify-between text-xs font-semibold">
+                <span class="text-slate-300">Sputter Time</span>
+                <span class="text-blue-400 font-mono" id="valTime">1800 s</span>
+            </div>
+            <input type="range" id="sliderTime" min="10" max="7200" step="10" value="1800" class="w-full accent-blue-500 cursor-pointer">
+        </div>
+    </div>
+    
+    <!-- SENSOR PERFORMANCE PREDICTOR -->
+    <div class="mt-6 pt-6 border-t border-slate-800">
+        <div class="text-xs font-bold tracking-wider text-amber-400 uppercase mb-4">ML Sensor Performance Predictions</div>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+            <div class="bg-slate-900 border border-slate-700 p-3 rounded-xl">
+                <div class="text-[10px] text-slate-400 uppercase">Detection Limit</div>
+                <div class="text-lg font-bold text-amber-400" id="predLimit">-- %</div>
+            </div>
+            <div class="bg-slate-900 border border-slate-700 p-3 rounded-xl">
+                <div class="text-[10px] text-slate-400 uppercase">Response Time</div>
+                <div class="text-lg font-bold text-amber-400" id="predResp">-- s</div>
+            </div>
+            <div class="bg-slate-900 border border-slate-700 p-3 rounded-xl">
+                <div class="text-[10px] text-slate-400 uppercase">Recovery Time</div>
+                <div class="text-lg font-bold text-amber-400" id="predRecov">-- s</div>
+            </div>
+            <div class="bg-slate-900 border border-slate-700 p-3 rounded-xl">
+                <div class="text-[10px] text-slate-400 uppercase">Stability Score</div>
+                <div class="text-lg font-bold text-amber-400" id="predStab">-- / 1.0</div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ACTIVE PHASE MAP SECTION -->
+<section class="bg-slate-900/80 p-6 rounded-2xl border border-slate-800 shadow-xl space-y-4">
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center">
+        <div>
+            <div class="text-xs font-bold tracking-wider text-emerald-400 uppercase">SPATIAL CHAMBER INTELLIGENCE</div>
+            <h2 class="text-2xl font-extrabold text-white">Active Phase Map Contour</h2>
+            <p class="text-xs text-slate-400 mt-1">Visualize predicted crystalline phase distributions across parameter axes.</p>
+        </div>
+        <div class="flex items-center space-x-3 mt-4 md:mt-0">
+            <select id="mapParamX" class="bg-slate-850 border border-slate-700 text-xs text-white rounded-lg px-3 py-2">
+                <option value="rf_power">RF Power</option>
+                <option value="working_pressure">Working Pressure</option>
+            </select>
+            <span class="text-xs text-slate-400">vs</span>
+            <select id="mapParamY" class="bg-slate-850 border border-slate-700 text-xs text-white rounded-lg px-3 py-2">
+                <option value="working_pressure" selected>Working Pressure</option>
+                <option value="rf_power">RF Power</option>
+            </select>
+            <button id="btnLoadPhaseMap" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs px-4 py-2 rounded-lg transition">Generate Map</button>
+        </div>
+    </div>
+    <div id="phaseMapChart" class="w-full h-[400px] bg-slate-950/50 rounded-xl border border-slate-800"></div>
+</section>
+
+<!-- AUTOMATED NOISE CALIBRATION WIDGET -->
+<section class="bg-slate-900/80 p-6 rounded-2xl border border-slate-800 shadow-xl space-y-4 flex flex-col md:flex-row justify-between items-center">
+    <div>
+        <div class="text-xs font-bold tracking-wider text-amber-400 uppercase">INSTRUMENT DRIFT & VARIANCE</div>
+        <h2 class="text-xl font-bold text-white">Automated Noise Calibration</h2>
+        <p class="text-xs text-slate-400 mt-1">Calibrate Process WhiteKernel noise based on experimental variance.</p>
+    </div>
+    <div class="flex items-center space-x-4 mt-4 md:mt-0">
+        <span id="noiseStatus" class="text-xs font-mono text-slate-300">Noise Level: Uncalibrated</span>
+        <button id="btnCalibrateNoise" class="bg-amber-600 hover:bg-amber-500 text-slate-950 font-bold text-xs px-5 py-2.5 rounded-xl transition shadow-lg">Calibrate Noise</button>
+    </div>
+</section>
+
+<!-- PVD RECIPE MODAL -->
+<div id="recipeModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden z-[70] flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700 p-6 rounded-3xl shadow-2xl w-full max-w-2xl relative space-y-4">
+        <button id="btnCloseRecipe" class="absolute top-4 right-4 text-slate-400 hover:text-white transition bg-slate-800 rounded-full p-1">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+        <h3 class="text-2xl font-bold text-white">Generated PVD Recipe Script</h3>
+        <pre id="recipeContent" class="bg-slate-950 p-4 rounded-xl text-xs text-slate-300 font-mono h-80 overflow-y-auto border border-slate-800 whitespace-pre-wrap"></pre>
+        <button id="btnCopyRecipe" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs py-3 rounded-xl transition">Copy Recipe to Clipboard</button>
+    </div>
+</div>
+
+<!-- AI SCIENTIFIC CO-PILOT DRAWER -->
+<button id="btnChatToggle" class="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-tr from-blue-600 to-purple-600 rounded-full shadow-lg shadow-purple-500/30 flex items-center justify-center text-white hover:scale-105 transition-transform z-50">
+    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
+</button>
+
+<div id="chatDrawer" class="fixed top-0 right-0 w-full sm:w-[400px] h-full bg-slate-900 border-l border-slate-800 shadow-2xl transform translate-x-full transition-transform duration-300 ease-in-out z-[60] flex flex-col">
+    <div class="h-16 border-b border-slate-800 flex items-center justify-between px-4 bg-slate-850">
+        <div class="flex items-center space-x-2">
+            <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold">AI</div>
+            <span class="font-bold text-white">Scientific Co-Pilot</span>
+        </div>
+        <button id="btnCloseChat" class="text-slate-400 hover:text-white transition">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+    </div>
+    <div id="chatHistory" class="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-950/50">
+        <div class="flex items-start space-x-3">
+            <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-500 to-purple-600 flex-shrink-0 flex items-center justify-center text-xs text-white">AI</div>
+            <div class="bg-slate-800 border border-slate-700 rounded-2xl rounded-tl-none px-4 py-2.5 text-sm text-slate-200">
+                Hello! I'm your MatrixAI Co-Pilot. I have access to your recent experiments. How can I help you optimize your process today?
+            </div>
+        </div>
+    </div>
+    <div class="p-4 bg-slate-850 border-t border-slate-800">
+        <div class="flex items-center space-x-2 mb-2">
+            <label class="text-xs text-slate-400 font-semibold">Model:</label>
+            <select id="aiProvider" class="bg-slate-900 border border-slate-700 text-xs text-white rounded px-2 py-1 focus:outline-none focus:border-blue-500">
+                <option value="gemini">Google Gemini 2.5 (Deep Reasoning)</option>
+                <option value="groq">Groq LLaMA 3 (Fast Responses)</option>
+            </select>
+        </div>
+        <div class="relative">
+            <textarea id="chatInput" rows="2" placeholder="Ask about physics, parameters, or outcomes..." class="w-full bg-slate-900 border border-slate-700 rounded-xl py-2 px-3 pr-12 text-sm text-white focus:outline-none focus:border-blue-500 resize-none transition"></textarea>
+            <button id="btnSendChat" class="absolute right-2 bottom-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg p-1.5 transition">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+    let latestSuggestion = null;
+
+    // AI SUGGEST BUTTON TRIGGER
+    document.getElementById('btnSuggest')?.addEventListener('click', async () => {
+        const btn = document.getElementById('btnSuggest');
+        const btnText = document.getElementById('btnText');
+        const btnSpinner = document.getElementById('btnSpinner');
+        
+        const targetMaterial = document.getElementById('targetMaterialSuggest')?.value || 'Generic';
+        const branchName = document.getElementById('branch_name')?.value || 'main';
+        const modelType = document.getElementById('modelType')?.value || 'standard';
+        const acqStrategy = document.getElementById('acqStrategy')?.value || 'ucb';
+
+        btn.disabled = true;
+        btnText.innerText = "Analyzing experiments...";
+        btnSpinner.classList.remove('hidden');
+
+        try {
+            const response = await fetch('/suggest', { 
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    target_material: targetMaterial, 
+                    branch: branchName,
+                    model_type: modelType,
+                    acquisition: acqStrategy
+                }) 
+            });
+            const data = await response.json();
+
+            if (response.ok) {
+                latestSuggestion = data;
+                document.getElementById('runNum').innerText = data.run_number;
+                
+                if (data.batch_options) {
+                    const grid = document.getElementById('batchOptionsGrid');
+                    grid.innerHTML = '';
+                    data.batch_options.forEach((opt, idx) => {
+                        let colorClass = idx === 0 ? 'border-blue-500/50 bg-blue-900/20' : (idx === 1 ? 'border-emerald-500/50 bg-emerald-900/20' : 'border-purple-500/50 bg-purple-900/20');
+                        let titleColor = idx === 0 ? 'text-blue-400' : (idx === 1 ? 'text-emerald-400' : 'text-purple-400');
+                        let badgeText = idx === 0 ? '🏆 Max Quality' : (idx === 1 ? '⚡ High Efficiency' : '🗺️ Pure Exploration');
+                        
+                        grid.innerHTML += `
+                            <div class="border ${colorClass} rounded-xl p-4 flex flex-col justify-between relative overflow-hidden">
+                                <div class="absolute top-0 left-0 w-full h-1 ${idx === 0 ? 'bg-blue-500' : (idx === 1 ? 'bg-emerald-500' : 'bg-purple-500')}"></div>
+                                <div>
+                                    <h4 class="font-bold ${titleColor} text-sm mb-3">${badgeText}</h4>
+                                    <div class="space-y-1.5 text-xs text-slate-300">
+                                        <div class="flex justify-between"><span>RF Power:</span> <span class="font-bold text-white">${opt.data.rf_power} W</span></div>
+                                        <div class="flex justify-between"><span>Pressure:</span> <span class="font-bold text-white">${opt.data.working_pressure} mT</span></div>
+                                        <div class="flex justify-between"><span>Distance:</span> <span class="font-bold text-white">${opt.data.target_distance} cm</span></div>
+                                        <div class="flex justify-between"><span>Ar Flow:</span> <span class="font-bold text-white">${opt.data.ar_flow} sccm</span></div>
+                                        <div class="flex justify-between"><span>Thickness:</span> <span class="font-bold text-white">${opt.data.film_thickness} nm</span></div>
+                                        <hr class="border-slate-700/50 my-2">
+                                        <div class="flex justify-between ${titleColor} font-bold"><span>Expected Shift:</span> <span>${opt.data.expected_shift} pm</span></div>
+                                    </div>
+                                </div>
+                                <button type="button" onclick="applyBatch(${idx})" class="mt-4 w-full bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white font-semibold text-xs py-2 rounded-lg transition shadow-sm">
+                                    Use These Parameters
+                                </button>
+                            </div>
+                        `;
+                    });
+                    window.latestBatch = data.batch_options;
+                }
+                
+                document.getElementById('expText').innerText = data.explanation;
+
+                const badge = document.getElementById('confBadge');
+                badge.innerText = (data.confidence?.label || 'READY') + " CONFIDENCE";
+                badge.className = "px-3 py-1 rounded-full text-xs font-bold bg-blue-500/20 text-blue-400 border border-blue-500/30";
+
+                const c = data.convergence;
+                document.getElementById('convText').innerText = c.convergence_score + "%";
+                document.getElementById('convBar').style.width = c.convergence_score + "%";
+                if (c.converged) {
+                    document.getElementById('convBanner').innerHTML = '<span class="text-emerald-400 font-bold">✓ Optimization converged — run confirmation experiments.</span>';
+                } else {
+                    document.getElementById('convBanner').innerText = `Estimated ${c.runs_to_convergence_estimate} more runs to convergence`;
+                }
+
+                const uContainer = document.getElementById('uncertaintyBars');
+                uContainer.innerHTML = '';
+                for (const [pName, uVal] of Object.entries(data.parameter_uncertainties)) {
+                    const pct = Math.round(uVal * 100);
+                    const barColor = pct > 60 ? 'bg-amber-500' : 'bg-emerald-500';
+                    uContainer.innerHTML += `
+                        <div class="space-y-1">
+                            <div class="flex justify-between text-[11px] text-slate-400">
+                                <span>${pName}</span>
+                                <span>${pct}%</span>
+                            </div>
+                            <div class="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                                <div class="${barColor} h-full" style="width: ${pct}%"></div>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                if (data.digital_twin) {
+                    const plotLayout = {
+                        paper_bgcolor: 'transparent', plot_bgcolor: 'transparent',
+                        margin: { t: 20, l: 40, r: 20, b: 40 },
+                        font: { color: '#94a3b8', size: 10 },
+                        showlegend: false,
+                        xaxis: { gridcolor: '#1e293b' },
+                        yaxis: { gridcolor: '#1e293b' }
+                    };
+
+                    const plotCurve = (divId, curveData, xLabel) => {
+                        const upper = curveData.y.map((val, i) => val + curveData.std[i]);
+                        const lower = curveData.y.map((val, i) => val - curveData.std[i]);
+                        
+                        const traces = [
+                            { x: curveData.x, y: curveData.y, type: 'scatter', mode: 'lines', line: {color: '#3b82f6', width: 2} },
+                            { x: curveData.x, y: upper, type: 'scatter', mode: 'lines', line: {color: 'transparent'}, showlegend: false },
+                            { x: curveData.x, y: lower, type: 'scatter', mode: 'lines', fill: 'tonexty', fillcolor: 'rgba(59, 130, 246, 0.1)', line: {color: 'transparent'}, showlegend: false }
+                        ];
+                        
+                        Plotly.newPlot(divId, traces, { ...plotLayout, xaxis: { ...plotLayout.xaxis, title: xLabel } }, {displayModeBar: false, responsive: true});
+                    };
+
+                    plotCurve('plotRfCurve', data.digital_twin.rf_curve, 'RF Power (W)');
+                    plotCurve('plotPressCurve', data.digital_twin.pressure_curve, 'Pressure (mTorr)');
+                }
+
+                document.getElementById('resultCard').classList.remove('hidden');
+            } else {
+                alert(data.message || "Error calculating suggestion.");
+            }
+        } catch (err) {
+            alert("Error connecting to optimization service.");
+        } finally {
+            btn.disabled = false;
+            btnText.innerText = "✦ Suggest Next Parameters";
+            btnSpinner.classList.add('hidden');
+        }
+    });
+
+    // APPLY BATCH AND REDIRECT TO EXPERIMENT LEDGER
+    function applyBatch(index) {
+        if(!window.latestBatch) return;
+        const s = window.latestBatch[index].data;
+        // Save parameters to local storage to be picked up by the experiments page
+        localStorage.setItem('matrixAutoFill', JSON.stringify(s));
+        window.location.href = '/experiments-view';
+    }
+
+    // GENERATE PDF LAB REPORT
+    document.getElementById('btnPdf')?.addEventListener('click', () => {
+        if (!latestSuggestion) return;
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        const s = latestSuggestion;
+        
+        doc.setFillColor(15, 23, 42); 
+        doc.rect(0, 0, 210, 297, 'F');
+        doc.setTextColor(255, 255, 255);
+        
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(22);
+        doc.text("MatrixAI Lab Report", 20, 30);
+        
+        doc.setFontSize(12);
+        doc.setFont("helvetica", "normal");
+        doc.text(`Run Number: #${s.run_number} (${s.target_material})`, 20, 45);
+        doc.text(`Date: ${new Date().toLocaleDateString()}`, 20, 52);
+        
+        doc.setFont("helvetica", "bold");
+        doc.text("Suggested Processing Parameters (Max Quality):", 20, 70);
+        doc.setFont("helvetica", "normal");
+        const p = s.suggested;
+        let y = 80;
+        const params = [
+            `RF Power: ${p.rf_power} W`,
+            `Working Pressure: ${p.working_pressure} mTorr`,
+            `Target Distance: ${p.target_distance} cm`,
+            `Film Thickness: ${p.film_thickness} nm`,
+            `Rotation Speed: ${p.rotation_speed} rpm`,
+            `Ar Flow: ${p.ar_flow} sccm`
+        ];
+        params.forEach(param => { doc.text(param, 25, y); y += 8; });
+        
+        doc.setFont("helvetica", "bold");
+        doc.text("Expected Material Outcomes:", 20, y + 10);
+        doc.setFont("helvetica", "normal");
+        y += 20;
+        doc.text(`Target XRD Phase: ${s.expected.xrd_phase}`, 25, y);
+        doc.text(`Expected Wavelength Shift: ${s.expected.wavelength_shift_estimate} pm`, 25, y+8);
+        
+        doc.setFont("helvetica", "bold");
+        doc.text("Scientific Rationale:", 20, y + 25);
+        doc.setFont("helvetica", "normal");
+        const lines = doc.splitTextToSize(s.explanation, 170);
+        doc.text(lines, 20, y + 35);
+        
+        doc.save(`MatrixAI_Lab_Report_Run${s.run_number}.pdf`);
+    });
+
+    // DIGITAL TWIN SANDBOX SLIDER HANDLER 
+    const sliders = ['Rf', 'Press', 'Dist', 'Thick', 'Rot', 'Ar', 'Time'].map(name => document.getElementById('slider' + name));
+
+    function triggerSimulation() {
+        if (!document.getElementById('sliderRf')) return;
+
+        const params = [
+            parseFloat(document.getElementById('sliderRf').value),
+            parseFloat(document.getElementById('sliderPress').value),
+            parseFloat(document.getElementById('sliderDist').value),
+            parseFloat(document.getElementById('sliderThick').value),
+            parseFloat(document.getElementById('sliderRot').value),
+            parseFloat(document.getElementById('sliderAr').value)
+        ];
+
+        document.getElementById('valRf').innerText = params[0] + " W";
+        document.getElementById('valPress').innerText = params[1] + " mTorr";
+        document.getElementById('valDist').innerText = params[2] + " cm";
+        document.getElementById('valThick').innerText = params[3] + " nm";
+        document.getElementById('valRot').innerText = params[4] + " rpm";
+        document.getElementById('valAr').innerText = params[5] + " sccm";
+        
+        const timeSlider = document.getElementById('sliderTime');
+        if(timeSlider) {
+            document.getElementById('valTime').innerText = timeSlider.value + " s";
+        }
+
+        const targetMaterial = document.getElementById('targetMaterialSuggest')?.value || 'Generic';
+        const branchName = document.getElementById('branch_name')?.value || 'main'; 
+
+        fetch('/api/sandbox/simulate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ target_material: targetMaterial, params: params, branch: branchName })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if(data.success) {
+                document.getElementById('simShift').innerText = data.simulation.predicted_wavelength_shift + " pm (±" + data.simulation.uncertainty + ")";
+                document.getElementById('simPhase').innerText = data.simulation.expected_phase;
+            }
+        })
+        .catch(err => console.error("Sandbox simulation error:", err));
+
+        fetch('/api/sensor/predict', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ params: { rf_power: params[0], working_pressure: params[1] } })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if(data.success) {
+                document.getElementById('predLimit').innerText = data.predictions.detection_limit_h2 + " %";
+                document.getElementById('predResp').innerText = data.predictions.response_time_s + " s";
+                document.getElementById('predRecov').innerText = data.predictions.recovery_time_s + " s";
+                document.getElementById('predStab').innerText = data.predictions.stability_score + " / 1.0";
+            }
+        });
+    }
+
+    sliders.forEach(slider => {
+        if(slider) {
+            slider.addEventListener('input', triggerSimulation);
+        }
+    });
+
+    setTimeout(triggerSimulation, 500);
+
+    // ACTIVE PHASE MAPS
+    async function loadPhaseMap() {
+        const paramX = document.getElementById('mapParamX').value;
+        const paramY = document.getElementById('mapParamY').value;
+        const targetMaterial = document.getElementById('targetMaterialSuggest')?.value || 'Generic';
+
+        try {
+            const res = await fetch('/api/optimizer/phase-map', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ target_material: targetMaterial, param_x: paramX, param_y: paramY })
+            });
+            const data = await res.json();
+            if(data.success && data.phase_map) {
+                const m = data.phase_map;
+                const trace = { z: m.z, x: m.x, y: m.y, type: 'heatmap', colorscale: 'Viridis' };
+                Plotly.newPlot('phaseMapChart', [trace], { paper_bgcolor: 'transparent', plot_bgcolor: 'transparent', font: { color: '#94a3b8' }, margin: { t: 20, l: 60, r: 20, b: 40 } }, {displayModeBar: false, responsive: true});
+            }
+        } catch(err) { console.error(err); }
+    }
+    document.getElementById('btnLoadPhaseMap')?.addEventListener('click', loadPhaseMap);
+    setTimeout(loadPhaseMap, 1000);
+
+    // AUTOMATED NOISE CALIBRATION WIDGET
+    document.getElementById('btnCalibrateNoise')?.addEventListener('click', async () => {
+        const status = document.getElementById('noiseStatus');
+        status.innerText = "Calibrating...";
+        const res = await fetch('/api/optimizer/calibrate-noise', { method: 'POST' });
+        const data = await res.json();
+        if(data.success) {
+            status.innerText = `Noise Level: ${data.calibration.calibrated_noise} (Var: ${data.calibration.sample_variance})`;
+        }
+    });
+
+    // SYNTHESIS RECIPE SCRIPT GENERATOR
+    document.getElementById('btnRecipe')?.addEventListener('click', async () => {
+        if(!latestSuggestion) return;
+        const targetMaterial = document.getElementById('targetMaterialSuggest')?.value || 'Generic';
+        const res = await fetch('/api/optimizer/recipe', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ target_material: targetMaterial, params: latestSuggestion.suggested })
+        });
+        const data = await res.json();
+        if(data.success) {
+            document.getElementById('recipeContent').innerText = data.recipe;
+            document.getElementById('recipeModal').classList.remove('hidden');
+        }
+    });
+
+    document.getElementById('btnCloseRecipe')?.addEventListener('click', () => document.getElementById('recipeModal').classList.add('hidden'));
+    document.getElementById('btnCopyRecipe')?.addEventListener('click', () => {
+        const text = document.getElementById('recipeContent').innerText;
+        navigator.clipboard.writeText(text);
+        alert("Recipe copied to clipboard!");
+    });
+
+    // CHAT DRAWER LOGIC
+    const chatDrawer = document.getElementById('chatDrawer');
+    const btnChatToggle = document.getElementById('btnChatToggle');
+    const btnCloseChat = document.getElementById('btnCloseChat');
+    const chatHistory = document.getElementById('chatHistory');
+    const chatInput = document.getElementById('chatInput');
+    const btnSendChat = document.getElementById('btnSendChat');
+    const aiProvider = document.getElementById('aiProvider');
+
+    const toggleDrawer = () => chatDrawer.classList.toggle('translate-x-full');
+    btnChatToggle.addEventListener('click', toggleDrawer);
+    btnCloseChat.addEventListener('click', toggleDrawer);
+
+    chatInput.addEventListener('input', function() {
+        this.style.height = 'auto';
+        this.style.height = (this.scrollHeight) + 'px';
+        if (this.value === '') this.style.height = 'auto';
+    });
+
+    function appendMessage(role, text) {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'flex items-start space-x-3 ' + (role === 'user' ? 'flex-row-reverse space-x-reverse' : '');
+        
+        const avatar = document.createElement('div');
+        avatar.className = role === 'user' 
+            ? 'w-8 h-8 rounded-full bg-slate-700 border border-slate-600 flex-shrink-0 flex items-center justify-center text-xs text-white' 
+            : 'w-8 h-8 rounded-full bg-gradient-to-tr from-blue-500 to-purple-600 flex-shrink-0 flex items-center justify-center text-xs text-white';
+        avatar.innerText = role === 'user' ? 'U' : 'AI';
+
+        const bubble = document.createElement('div');
+        bubble.className = role === 'user'
+            ? 'bg-blue-600 text-white rounded-2xl rounded-tr-none px-4 py-2.5 text-sm'
+            : 'bg-slate-800 border border-slate-700 rounded-2xl rounded-tl-none px-4 py-2.5 text-sm text-slate-200';
+        
+        let formattedText = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+        formattedText = formattedText.replace(/\n/g, '<br>');
+        bubble.innerHTML = formattedText;
+
+        wrapper.appendChild(avatar);
+        wrapper.appendChild(bubble);
+        chatHistory.appendChild(wrapper);
+        chatHistory.scrollTop = chatHistory.scrollHeight;
+    }
+
+    async function sendChatMessage() {
+        const message = chatInput.value.trim();
+        if (!message) return;
+
+        const provider = aiProvider.value;
+        appendMessage('user', message);
+        chatInput.value = '';
+        chatInput.style.height = 'auto';
+
+        const loadingId = 'loading-' + Date.now();
+        const loadingWrapper = document.createElement('div');
+        loadingWrapper.id = loadingId;
+        loadingWrapper.className = 'flex items-start space-x-3';
+        loadingWrapper.innerHTML = `
+            <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-500 to-purple-600 flex-shrink-0 flex items-center justify-center text-xs text-white animate-pulse">AI</div>
+            <div class="bg-slate-800 border border-slate-700 rounded-2xl rounded-tl-none px-4 py-2.5 text-sm text-slate-400 flex space-x-1 items-center h-10">
+                <div class="w-1.5 h-1.5 bg-slate-500 rounded-full animate-bounce"></div>
+                <div class="w-1.5 h-1.5 bg-slate-500 rounded-full animate-bounce" style="animation-delay: 0.1s"></div>
+                <div class="w-1.5 h-1.5 bg-slate-500 rounded-full animate-bounce" style="animation-delay: 0.2s"></div>
+            </div>
+        `;
+        chatHistory.appendChild(loadingWrapper);
+        chatHistory.scrollTop = chatHistory.scrollHeight;
+
+        try {
+            const res = await fetch('/api/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: message, provider: provider })
+            });
+            
+            const data = await res.json();
+            document.getElementById(loadingId).remove();
+
+            if (res.ok && data.reply) {
+                appendMessage('ai', data.reply);
+            } else {
+                appendMessage('ai', `**Error:** ${data.error || 'Failed to connect to AI.'}`);
+            }
+        } catch (err) {
+            document.getElementById(loadingId).remove();
+            appendMessage('ai', '**Error:** Could not reach the server.');
+        }
+    }
+
+    btnSendChat.addEventListener('click', sendChatMessage);
+    chatInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            sendChatMessage();
+        }
+    });
+</script>
+{% endblock %}
