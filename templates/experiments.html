@@ -403,15 +403,20 @@
         const ctxRadar = document.getElementById('radarCanvas').getContext('2d');
         if (radarChartObj) radarChartObj.destroy();
         
+        // VISUAL NORMALIZATION FIX: Scale everything so it fits neatly on one chart
         const getVals = (e) => [
-            e.rf_power, e.working_pressure * 10, e.target_distance, 
-            e.sputter_time_s, (e.film_thickness || 100) * 0.1, e.ar_flow
+            e.rf_power,                          // Usually 50-150
+            e.working_pressure * 10,             // 5mT becomes 50
+            e.target_distance * 10,              // 7cm becomes 70
+            e.sputter_time_s / 60,               // 1800s becomes 30 (Minutes)
+            (e.film_thickness || 100) * 0.5,     // 100nm becomes 50
+            e.ar_flow                            // Usually 30-50
         ];
 
         radarChartObj = new Chart(ctxRadar, {
             type: 'radar',
             data: {
-                labels: ['RF Power', 'Pressure (x10)', 'Target Dist', 'Sputter Time (s)', 'Thickness (x0.1)', 'Ar Flow'],
+                labels: ['RF Power (W)', 'Pressure (x10)', 'Target Dist (x10)', 'Sputter Time (Min)', 'Thickness (x0.5)', 'Ar Flow'],
                 datasets: [
                     {
                         label: `Run (Score: ${exp1.quality_score || 50})`,
