@@ -816,7 +816,7 @@ async def analyze_image_vision(request: Request, image: UploadFile = File(...), 
         return JSONResponse({"error": str(e)}, status_code=500)
 
 # ==============================================================================
-# LITERATURE INGESTION ENDPOINT
+# LITERATURE INGESTION ENDPOINT (WITH MODEL FALLBACK)
 # ==============================================================================
 @app.post("/api/literature/upload")
 async def upload_literature_pdf(request: Request, file: UploadFile = File(...)):
@@ -836,27 +836,45 @@ async def upload_literature_pdf(request: Request, file: UploadFile = File(...)):
         prompt = (
             "You are an expert Materials Scientist. Read this research paper and extract the optimal or primary "
             "experimental parameters for thin-film deposition. "
-            "Return strictly a JSON object with the following keys and numerical values (no units): "
+            "Return strictly a valid JSON object with the following keys and numerical values (no units): "
             "'target_material' (string), 'rf_power' (float), 'working_pressure' (float), 'ar_flow' (float), "
             "'o2_flow' (float), 'substrate_temp' (float), 'target_distance' (float), 'sputter_time_s' (float in seconds), "
             "'film_thickness' (float), 'rotation_speed' (float), 'xrd_phase' (string: Monoclinic, Partial, or Amorphous), "
             "'grain_size' (float), 'h2_response_time' (float), 'wavelength_shift' (float)."
         )
         
-        response = client.models.generate_content(
-            model='gemini-2.5-flash',
-            contents=[
-                prompt,
-                genai.types.Part.from_bytes(data=pdf_bytes, mime_type="application/pdf")
-            ],
-        )
+        # Fallback model strategy for high-demand 503 errors
+        models_to_try = ['gemini-2.5-flash', 'gemini-1.5-flash']
+        response = None
+        last_exception = None
+        
+        for model_name in models_to_try:
+            try:
+                response = client.models.generate_content(
+                    model=model_name,
+                    contents=[
+                        prompt,
+                        genai.types.Part.from_bytes(data=pdf_bytes, mime_type="application/pdf")
+                    ],
+                )
+                if response and response.text:
+                    break
+            except Exception as model_err:
+                last_exception = model_err
+                print(f"Model {model_name} unavailable: {model_err}. Trying fallback model...")
+                continue
+                
+        if not response or not response.text:
+            error_msg = str(last_exception) if last_exception else "All Gemini endpoints experiencing high demand."
+            return JSONResponse({"error": f"Extraction Failed (503): {error_msg}"}, status_code=503)
         
         reply_text = response.text
         match = re.search(r'\{.*\}', reply_text, re.DOTALL)
         if not match:
-            return JSONResponse({"error": "Failed to parse AI output."}, status_code=500)
+            return JSONResponse({"error": "Failed to parse AI JSON response structure."}, status_code=500)
             
-        data = json.loads(match.group(0))
+        cleaned_json_str = re.sub(r'```json|```', '', match.group(0)).strip()
+        data = json.loads(cleaned_json_str)
         
         conn = get_db_connection()
         try:
@@ -924,7 +942,6 @@ def export_csv(request: Request):
             row_dict = dict(zip(cols, row))
             if isinstance(row_dict.get("created_at"), datetime.datetime):
                 row_dict["created_at"] = row_dict["created_at"].isoformat()
-            # Dynamic header rename fallback if needed
             if "sputter_time" in row_dict:
                 row_dict["sputter_time_s"] = row_dict.pop("sputter_time")
             experiments.append(row_dict)
@@ -1236,14 +1253,12 @@ def verify_api_key(x_api_key: str = Header(...)):
 async def api_v1_suggest(request: Request, body: dict, api_user: str = Depends(verify_api_key)):
     target_material = body.get("material", "Generic")
     experiments = body.get("experiments", [])
-    # Utilize existing optimizer logic formatting for API
     result = optimizer.generate_bayesian_suggestion(experiments, [], target_material=target_material)
     return JSONResponse(result)
 
 @app.post("/api/v1/predict")
 async def api_v1_predict(body: dict, api_user: str = Depends(verify_api_key)):
     params = body.get("parameters", {})
-    # Using the sensor predictor as a mock for the API prediction
     predictions = advanced_features.predict_sensor_performance(params)
     return JSONResponse({"predicted": predictions})
 
@@ -1283,7 +1298,6 @@ async def calculate_whatif(request: Request):
     params = body.get("params", [])
     target_material = body.get("material", "Generic")
     
-    # Use existing sandbox simulator for counterfactuals
     sim = optimizer.simulate_sandbox_point([], target_material, params)
     return JSONResponse({"success": True, "simulation": sim})
 
