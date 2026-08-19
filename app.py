@@ -816,7 +816,7 @@ async def analyze_image_vision(request: Request, image: UploadFile = File(...), 
         return JSONResponse({"error": str(e)}, status_code=500)
 
 # ==============================================================================
-# LITERATURE INGESTION ENDPOINT (WITH AUTOMATIC RETRY LOGIC)
+# LITERATURE INGESTION ENDPOINT (WITH MULTI-MODEL ROTATION)
 # ==============================================================================
 @app.post("/api/literature/upload")
 async def upload_literature_pdf(request: Request, file: UploadFile = File(...)):
@@ -843,14 +843,15 @@ async def upload_literature_pdf(request: Request, file: UploadFile = File(...)):
             "'grain_size' (float), 'h2_response_time' (float), 'wavelength_shift' (float)."
         )
         
+        # Automatically rotate through stable production models if a 503 spike occurs
+        models_to_try = ['gemini-3.7-flash', 'gemini-3.5-flash', 'gemini-2.5-flash']
         response = None
         last_exception = None
         
-        # Retry loop for transient 503 high-demand errors on gemini-2.5-flash
-        for attempt in range(3):
+        for model_name in models_to_try:
             try:
                 response = client.models.generate_content(
-                    model='gemini-2.5-flash',
+                    model=model_name,
                     contents=[
                         prompt,
                         genai.types.Part.from_bytes(data=pdf_bytes, mime_type="application/pdf")
@@ -860,13 +861,11 @@ async def upload_literature_pdf(request: Request, file: UploadFile = File(...)):
                     break
             except Exception as model_err:
                 last_exception = model_err
-                print(f"Attempt {attempt+1} failed: {model_err}. Retrying in 2 seconds...")
-                import asyncio
-                await asyncio.sleep(2)
+                print(f"Model {model_name} busy: {model_err}. Rotating to alternative endpoint...")
                 continue
                 
         if not response or not response.text:
-            error_msg = str(last_exception) if last_exception else "Gemini endpoint experiencing high demand."
+            error_msg = str(last_exception) if last_exception else "All Gemini endpoints experiencing high traffic demand."
             return JSONResponse({"error": f"Extraction Failed (503): {error_msg}"}, status_code=503)
         
         reply_text = response.text
