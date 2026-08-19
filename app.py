@@ -168,7 +168,7 @@ class ChatRequest(BaseModel):
     provider: str  
 
 # ==============================================================================
-# DASHBOARD ROUTE
+# DASHBOARD ROUTE (COMMAND CENTER)
 # ==============================================================================
 @app.get("/", response_class=HTMLResponse)
 def index(request: Request, branch: str = 'main'):
@@ -277,6 +277,51 @@ def index(request: Request, branch: str = 'main'):
         "current_branch": branch,
         "failure_analysis": latest_failure
     })
+
+# ==============================================================================
+# MULTI-PAGE VIEWS (EXPERIMENTS & OPTIMIZER)
+# ==============================================================================
+@app.get("/experiments-view", response_class=HTMLResponse)
+def experiments_page(request: Request, branch: str = 'main'):
+    user = request.session.get("user")
+    if not user: return RedirectResponse("/login/google", status_code=303)
+    user_email = user.get("email")
+
+    experiments = []
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT id, user_email, target_material, rf_power, working_pressure, ar_flow, o2_flow,
+                   substrate_temp, target_distance, sputter_time_s, film_thickness,
+                   rotation_speed, substrate_type, xrd_phase, grain_size,
+                   h2_response_time, wavelength_shift, batch_notes, quality_score, created_at, branch_name
+            FROM experiments
+            WHERE user_email = %s AND branch_name = %s
+            ORDER BY created_at DESC
+        """, (user_email, branch))
+        rows = cur.fetchall()
+        cols = [desc[0] for desc in cur.description]
+        for row in rows:
+            row_dict = dict(zip(cols, row))
+            if isinstance(row_dict.get("created_at"), datetime.datetime):
+                row_dict["created_at"] = row_dict["created_at"].isoformat()
+            experiments.append(row_dict)
+        cur.close()
+    except Exception as e:
+        print(f"Error fetching experiments for view: {e}")
+    finally:
+        release_db_connection(conn)
+
+    return templates.TemplateResponse(request, "experiments.html", {
+        "user": user, "experiments": experiments, "current_branch": branch
+    })
+
+@app.get("/optimizer-view", response_class=HTMLResponse)
+def optimizer_page(request: Request, branch: str = 'main'):
+    user = request.session.get("user")
+    if not user: return RedirectResponse("/login/google", status_code=303)
+    return templates.TemplateResponse(request, "optimizer.html", {"user": user, "current_branch": branch})
 
 # ==============================================================================
 # AUTH ROUTING
@@ -646,11 +691,11 @@ async def get_experiments(request: Request, branch: str = "main"):
         release_db_connection(conn)
 
 # ==============================================================================
-# BAYESIAN OPTIMIZER ENDPOINT
+# AI OPTIMIZER ENDPOINT
 # ==============================================================================
 @app.get("/suggest")
 @app.post("/suggest")
-async def get_bayes_suggestion(request: Request):
+async def get_ai_suggestion(request: Request):
     user_session = request.session.get("user")
     if not user_session:
         return JSONResponse(status_code=401, content={"message": "Unauthorized"})
@@ -1267,7 +1312,8 @@ async def generate_campaign(request: Request):
 def apidocs_page(request: Request):
     user = request.session.get("user")
     return templates.TemplateResponse(request, "apidocs.html", {"user": user})
-    # ==============================================================================
+
+# ==============================================================================
 # MISSING DASHBOARD API ENDPOINTS (PHASE MAP, NOISE, RECIPE)
 # ==============================================================================
 @app.post("/api/optimizer/phase-map")
