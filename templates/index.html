@@ -75,16 +75,12 @@
                         <a href="/admin/users" class="text-xs font-semibold px-3 py-1.5 rounded-lg bg-purple-500/10 text-purple-400 border border-purple-500/20 hover:bg-purple-500/20 transition">Admin Panel</a>
                     {% endif %}
                     
-                    <!-- NEW NAVIGATION LINKS START HERE -->
                     <a href="/" class="text-xs font-semibold text-blue-400 transition">Dashboard</a>
                     <a href="/scheduler" class="text-xs font-semibold text-slate-300 hover:text-blue-400 transition">Scheduler</a>
                     <a href="/thesis" class="text-xs font-semibold text-slate-300 hover:text-blue-400 transition">Thesis</a>
                     <a href="/publication" class="text-xs font-semibold text-slate-300 hover:text-blue-400 transition">Publication</a>
-                    
-                    <!-- NEW AGENT AND API LINKS -->
                     <a href="/agent" class="text-xs font-semibold text-slate-300 hover:text-blue-400 transition">Agent</a>
                     <a href="/api/docs" class="text-xs font-semibold text-slate-300 hover:text-blue-400 transition">API</a>
-                    <!-- NEW NAVIGATION LINKS END HERE -->
 
                     <div class="flex items-center space-x-3 bg-slate-850 px-3 py-1.5 rounded-xl border border-slate-800 ml-2">
                         {% if user.picture %}
@@ -106,7 +102,7 @@
     <main class="max-w-7xl mx-auto px-6 py-8 space-y-8">
 
         {% if not user %}
-            <!-- LANDING HERO FOR UNAUTHENTICATED USERS -->
+            <!-- LANDING HERO -->
             <div class="text-center py-20 space-y-6 max-w-3xl mx-auto">
                 <div class="inline-flex items-center space-x-2 px-3.5 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-semibold">
                     <span>✨ Intelligent Materials Science Engine</span>
@@ -117,13 +113,6 @@
                 <p class="text-slate-400 text-base leading-relaxed">
                     MatrixAI uses advanced AI process optimization to intelligently guide your thin-film deposition experiments. Compatible with any PVD or CVD process — WO₃, TiO₂, ZnO, Pd, SnO₂, and beyond.
                 </p>
-                
-                <div class="flex flex-wrap justify-center gap-3 pt-2">
-                    <span class="px-3 py-1 rounded-lg bg-slate-900 border border-slate-800 text-xs text-blue-400 font-semibold">⚡ AI Optimization</span>
-                    <span class="px-3 py-1 rounded-lg bg-slate-900 border border-slate-800 text-xs text-purple-400 font-semibold">🎯 Multi-Objective</span>
-                    <span class="px-3 py-1 rounded-lg bg-slate-900 border border-slate-800 text-xs text-emerald-400 font-semibold">📊 Convergence Detection</span>
-                </div>
-
                 <div class="pt-4">
                     <a href="/login/google" class="inline-flex items-center space-x-2 bg-blue-500 hover:bg-blue-400 text-slate-950 font-bold px-6 py-3 rounded-xl transition shadow-lg shadow-blue-500/25">
                         <span>Get Started with Google</span>
@@ -148,7 +137,7 @@
             <!-- HERO STATS BAR -->
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div class="bg-slate-900/80 p-5 rounded-2xl border border-slate-800 border-l-4 border-l-blue-500 shadow-xl">
-                    <div class="text-3xl font-extrabold text-white">{{ stats.total_runs }}</div>
+                    <div class="text-3xl font-extrabold text-white" id="totalRunsStat">{{ stats.total_runs }}</div>
                     <div class="text-xs font-medium text-slate-400 mt-1">Total Experiments Logged</div>
                 </div>
                 <div class="bg-slate-900/80 p-5 rounded-2xl border border-slate-800 border-l-4 border-l-emerald-500 shadow-xl">
@@ -165,9 +154,8 @@
                 </div>
             </div>
 
-            <!-- FEATURE 4 & 7: EQUIPMENT HEALTH & CALIBRATION -->
+            <!-- EQUIPMENT HEALTH & CALIBRATION -->
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <!-- Equipment Health -->
                 <section class="bg-slate-900/80 p-6 rounded-2xl border border-slate-800 shadow-xl" id="healthWidget">
                     <div class="flex justify-between items-center mb-4">
                         <h2 class="text-xl font-bold text-white tracking-tight">Equipment Health</h2>
@@ -178,7 +166,6 @@
                     </div>
                 </section>
 
-                <!-- Model Calibration Dashboard -->
                 <section class="bg-slate-900/80 p-6 rounded-2xl border border-slate-800 shadow-xl" id="calibrationWidget">
                     <div class="flex justify-between items-center mb-4">
                         <h2 class="text-xl font-bold text-white tracking-tight">Model Calibration</h2>
@@ -190,7 +177,7 @@
                 </section>
             </div>
 
-            <!-- FEATURE 1: SMART FAILURE ANALYSIS ALERT -->
+            <!-- SMART FAILURE ANALYSIS ALERT -->
             {% if failure_analysis and failure_analysis.is_failure %}
             <div class="bg-red-950/40 border border-red-900 rounded-2xl p-6 shadow-xl space-y-4">
                 <div class="flex items-center space-x-3">
@@ -239,7 +226,7 @@
                             </select>
                         </div>
                         
-                        <!-- NEW MODEL SETTINGS TOGGLE (DKL AND ACQUISITION STRATEGY) -->
+                        <!-- MODEL SETTINGS TOGGLE -->
                         <div class="flex items-center justify-end space-x-3 mb-4 w-full">
                             <label class="text-xs text-slate-400 font-semibold">Model Architecture:</label>
                             <select id="modelType" class="bg-slate-850 border border-slate-700 text-xs text-white rounded-lg px-3 py-1.5 focus:border-blue-500">
@@ -269,9 +256,7 @@
                     </div>
 
                     <!-- BATCH OPTIONS GRID -->
-                    <div id="batchOptionsGrid" class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <!-- Injected by Javascript -->
-                    </div>
+                    <div id="batchOptionsGrid" class="grid grid-cols-1 md:grid-cols-3 gap-4"></div>
                     
                     <!-- DIGITAL TWIN SANDBOX (STATIC PLOTLY CURVES) -->
                     <div id="digitalTwinSection" class="bg-slate-950/50 rounded-xl p-4 border border-slate-800 space-y-4">
@@ -390,9 +375,18 @@
                         </div>
                         <input type="range" id="sliderAr" min="20" max="40" step="1" value="30" class="w-full accent-blue-500 cursor-pointer">
                     </div>
+
+                    <!-- NEW SPUTTER TIME SLIDER -->
+                    <div class="space-y-2">
+                        <div class="flex justify-between text-xs font-semibold">
+                            <span class="text-slate-300">Sputter Time</span>
+                            <span class="text-blue-400 font-mono" id="valTime">1800 s</span>
+                        </div>
+                        <input type="range" id="sliderTime" min="10" max="7200" step="10" value="1800" class="w-full accent-blue-500 cursor-pointer">
+                    </div>
                 </div>
                 
-                <!-- FEATURE 6: SENSOR PERFORMANCE PREDICTOR -->
+                <!-- SENSOR PERFORMANCE PREDICTOR -->
                 <div class="mt-6 pt-6 border-t border-slate-800">
                     <div class="text-xs font-bold tracking-wider text-amber-400 uppercase mb-4">ML Sensor Performance Predictions</div>
                     <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
@@ -489,10 +483,8 @@
 
                 <form action="/add" method="POST" class="grid grid-cols-1 md:grid-cols-3 gap-4 bg-slate-900/80 p-6 rounded-2xl border border-slate-800 text-white shadow-xl">
                     
-                    <!-- FEATURE 5: HIDDEN BRANCH INPUT -->
                     <input type="hidden" name="branch_name" id="branch_name" value="{{ current_branch|default('main') }}">
 
-                    <!-- Target Material Dropdown -->
                     <div class="md:col-span-3 pb-2 border-b border-slate-800 mb-2">
                         <label class="block text-xs font-semibold text-slate-400 mb-1">Target Material Domain</label>
                         <select name="target_material" id="target_material" class="w-full md:w-1/3 bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-blue-500 transition">
@@ -527,10 +519,16 @@
                         <label class="block text-xs font-semibold text-slate-400 mb-1">Target Distance (cm)</label>
                         <input type="number" step="0.1" name="target_substrate_distance_cm" id="target_substrate_distance_cm" required placeholder="e.g. 7" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-blue-500 transition">
                     </div>
+                    
+                    <!-- UPDATED DUAL SPUTTER TIME INPUT -->
                     <div>
-                        <label class="block text-xs font-semibold text-slate-400 mb-1">Sputter Time (min)</label>
-                        <input type="number" step="0.1" name="sputtering_time_min" id="sputtering_time_min" required placeholder="e.g. 30" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-blue-500 transition">
+                        <label class="block text-xs font-semibold text-slate-400 mb-1">Sputter Time</label>
+                        <div class="flex space-x-2">
+                            <input type="number" step="0.1" name="sputtering_time_min" placeholder="Min (e.g. 30)" class="w-1/2 bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-blue-500 transition">
+                            <input type="number" step="0.1" name="sputtering_time_sec" placeholder="Sec (e.g. 40)" class="w-1/2 bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-blue-500 transition">
+                        </div>
                     </div>
+
                     <div>
                         <label class="block text-xs font-semibold text-slate-400 mb-1">Film Thickness (nm)</label>
                         <input type="number" step="0.1" name="film_thickness_nm" id="film_thickness_nm" placeholder="e.g. 100" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-blue-500 transition">
@@ -619,18 +617,17 @@
                                 <th class="p-3">RF Power</th>
                                 <th class="p-3">Pressure</th>
                                 <th class="p-3">Target Dist</th>
+                                <th class="p-3">Sputter Time (s)</th>
                                 <th class="p-3">Rotation</th>
                                 <th class="p-3">XRD Phase</th>
-                                <th class="p-3">Grain Size</th>
                                 <th class="p-3">H₂ Response</th>
                                 <th class="p-3">Wavelength Shift</th>
-                                <!-- NEW FINGERPRINT/WHATIF HEADER -->
                                 <th class="p-3 text-center">Actions</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-800/60 text-xs">
                             {% for exp in experiments %}
-                            <tr class="hover:bg-slate-800/40 transition">
+                            <tr id="exp-row-{{ exp.id }}" class="hover:bg-slate-800/40 transition">
                                 <td class="p-3 text-center">
                                     <input type="checkbox" class="compare-cbk w-4 h-4 rounded border-slate-700 bg-slate-800 text-blue-500 focus:ring-blue-500 cursor-pointer" value="{{ loop.index0 }}">
                                 </td>
@@ -651,6 +648,7 @@
                                 <td class="p-3">{{ exp.rf_power }} W</td>
                                 <td class="p-3">{{ exp.working_pressure }} mTorr</td>
                                 <td class="p-3">{{ exp.target_distance }} cm</td>
+                                <td class="p-3 font-mono text-emerald-400">{{ exp.sputter_time_s }}s</td>
                                 <td class="p-3">{{ exp.rotation_speed }} rpm</td>
                                 <td class="p-3">
                                     {% if exp.xrd_phase == 'Monoclinic' %}
@@ -661,14 +659,15 @@
                                         <span class="px-2 py-1 rounded-md text-[10px] font-bold bg-red-500/10 text-red-400 border border-red-500/20">Amorphous</span>
                                     {% endif %}
                                 </td>
-                                <td class="p-3">{{ exp.grain_size if exp.grain_size is not none else '-' }}</td>
                                 <td class="p-3 font-semibold text-blue-400">{{ exp.h2_response_time }}s</td>
                                 <td class="p-3">{{ exp.wavelength_shift if exp.wavelength_shift is not none else '-' }}</td>
                                 
-                                <!-- NEW FINGERPRINT/WHATIF ACTIONS -->
                                 <td class="p-3 text-center space-x-2 whitespace-nowrap">
                                     <button onclick='openWhatIf({{ loop.index0 }})' class="bg-blue-600/20 text-blue-400 hover:bg-blue-600 hover:text-white border border-blue-500/30 px-2 py-1 rounded text-[10px] font-bold transition">What-If?</button>
                                     <button onclick='checkFingerprint({{ loop.index0 }})' class="bg-purple-600/20 text-purple-400 hover:bg-purple-600 hover:text-white border border-purple-500/30 px-2 py-1 rounded text-[10px] font-bold transition">DNA Match</button>
+                                    <button onclick='deleteExperiment({{ exp.id }})' class="bg-red-600/20 text-red-400 hover:bg-red-600 hover:text-white border border-red-500/30 p-1.5 rounded transition" title="Delete Run">
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                                    </button>
                                 </td>
                             </tr>
                             {% else %}
@@ -822,6 +821,29 @@
             document.getElementById('calibAlerts').innerHTML = '<p class="text-sm font-medium text-slate-400">Model ECE is 0.08 (Good). No isotonic regression required.</p>';
         }
         setTimeout(loadHealth, 1500);
+
+        // NEW SECURE DELETE LOGIC
+        async function deleteExperiment(id) {
+            if(!confirm(`Delete Run #${id}? This cannot be undone and will affect your optimization model.`)) return;
+            
+            try {
+                const res = await fetch(`/experiments/${id}`, { method: 'DELETE' });
+                const data = await res.json();
+                
+                if(res.ok && data.success) {
+                    const row = document.getElementById(`exp-row-${id}`);
+                    if(row) row.remove();
+                    const statEl = document.getElementById('totalRunsStat');
+                    if(statEl) statEl.innerText = parseInt(statEl.innerText) - 1;
+                    
+                    alert(`Run #${id} deleted successfully. Note: Optimization model will update on next suggestion.`);
+                } else {
+                    alert(`Failed to delete run: ${data.message || data.error}`);
+                }
+            } catch(err) {
+                alert("Server error occurred while attempting to delete the run.");
+            }
+        }
 
         // NEW WHAT-IF LOGIC
         let activeWhatIfExp = null;
@@ -1172,13 +1194,13 @@
             
             const getVals = (e) => [
                 e.rf_power, e.working_pressure * 10, e.target_distance, 
-                e.sputter_time, (e.film_thickness || 100) * 0.1, e.ar_flow
+                e.sputter_time_s, (e.film_thickness || 100) * 0.1, e.ar_flow
             ];
 
             radarChartObj = new Chart(ctxRadar, {
                 type: 'radar',
                 data: {
-                    labels: ['RF Power', 'Pressure (x10)', 'Target Dist', 'Sputter Time', 'Thickness (x0.1)', 'Ar Flow'],
+                    labels: ['RF Power', 'Pressure (x10)', 'Target Dist', 'Sputter Time (s)', 'Thickness (x0.1)', 'Ar Flow'],
                     datasets: [
                         {
                             label: `Run (Score: ${exp1.quality_score || 50})`,
@@ -1230,8 +1252,8 @@
             return num / den;
         }
 
-        const features = ['rf_power', 'working_pressure', 'target_distance', 'sputter_time', 'ar_flow', 'quality_score', 'wavelength_shift'];
-        const labels = ['RF Power', 'Pressure', 'Distance', 'Time', 'Ar Flow', 'Quality Score', 'Wave Shift'];
+        const features = ['rf_power', 'working_pressure', 'target_distance', 'sputter_time_s', 'ar_flow', 'quality_score', 'wavelength_shift'];
+        const labels = ['RF Power', 'Pressure', 'Distance', 'Time (s)', 'Ar Flow', 'Quality Score', 'Wave Shift'];
         
         const matrix = [];
         for (let i = 0; i < features.length; i++) {
@@ -1307,8 +1329,8 @@
             e.target.value = '';
         });
 
-        // 8. DIGITAL TWIN SANDBOX SLIDER HANDLER (Now with Branching)
-        const sliders = ['Rf', 'Press', 'Dist', 'Thick', 'Rot', 'Ar'].map(name => document.getElementById('slider' + name));
+        // 8. DIGITAL TWIN SANDBOX SLIDER HANDLER 
+        const sliders = ['Rf', 'Press', 'Dist', 'Thick', 'Rot', 'Ar', 'Time'].map(name => document.getElementById('slider' + name));
 
         function triggerSimulation() {
             if (!document.getElementById('sliderRf')) return;
@@ -1329,14 +1351,20 @@
             document.getElementById('valThick').innerText = params[3] + " nm";
             document.getElementById('valRot').innerText = params[4] + " rpm";
             document.getElementById('valAr').innerText = params[5] + " sccm";
+            
+            const timeSlider = document.getElementById('sliderTime');
+            if(timeSlider) {
+                document.getElementById('valTime').innerText = timeSlider.value + " s";
+            }
 
             const targetMaterial = document.getElementById('targetMaterialSuggest')?.value || 'Generic';
-            const branchName = document.getElementById('branch_name')?.value || 'main'; // ADDED BRANCH
+            const branchName = document.getElementById('branch_name')?.value || 'main'; 
 
+            // Send standard 6 parameters to simulation
             fetch('/api/sandbox/simulate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ target_material: targetMaterial, params: params, branch: branchName }) // ADDED BRANCH
+                body: JSON.stringify({ target_material: targetMaterial, params: params, branch: branchName })
             })
             .then(res => res.json())
             .then(data => {
