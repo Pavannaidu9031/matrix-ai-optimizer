@@ -43,7 +43,7 @@ def analyze_failure(experiments, current_run):
     }
 
 def schedule_experiments(experiments, available_hours, available_days):
-    """Experiment Scheduler: Groups Bayesian suggestions into 5.5hr blocks."""
+    """Experiment Scheduler: Groups AI suggestions into 5.5hr blocks."""
     cycle_time_hrs = 5.5
     total_capacity = int(available_hours // cycle_time_hrs)
     
@@ -75,7 +75,7 @@ def generate_thesis_content(experiments, section):
     prompts = {
         "results": f"Write an academic results chapter paragraph summarizing this PVD optimization data: {context}",
         "discussion": f"Generate 5 academic discussion points for this PVD sputtering data: {context}",
-        "abstract": f"Write a 250-word academic abstract for a paper optimizing thin films using Bayesian ML: {context}",
+        "abstract": f"Write a 250-word academic abstract for a paper optimizing thin films using advanced Machine Learning algorithms: {context}",
         "novelty": f"Analyze the novelty of these findings compared to standard WO3 PVD literature and suggest 5 journals: {context}"
     }
     
@@ -153,7 +153,7 @@ def check_publication_readiness(experiments):
     status = "GREEN" if score > 80 else ("AMBER" if score > 50 else "RED")
     
     claims = [
-        "To the best of our knowledge this is the first study to systematically optimize this material using Bayesian Methods.",
+        "To the best of our knowledge this is the first study to systematically optimize this material using advanced Machine Learning Methods.",
         "Demonstrated optimal wavelength shifts significantly exceeding baseline literature parameters."
     ]
     journals = [
@@ -162,7 +162,7 @@ def check_publication_readiness(experiments):
         {"name": "Journal of Materials Chemistry C", "if": "7.3"}
     ]
     patents = [
-        "The Bayesian optimization methodology for specific parameter combinations.",
+        "The Machine Learning optimization methodology for specific parameter combinations.",
         "The specific parameter combination achieving optimal crystal structure."
     ]
     outline = "1. Introduction\n2. Experimental Methods\n   2.1. Deposition Parameters\n   2.2. Characterization\n3. Results & Discussion\n   3.1. Optimization Trajectory\n4. Conclusion"
