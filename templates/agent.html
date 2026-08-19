@@ -1,48 +1,47 @@
-<!DOCTYPE html>
-<html lang="en" class="dark">
-<head>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <title>Autonomous Agent - MatrixAI</title>
-</head>
-<body class="bg-slate-950 text-slate-100 min-h-screen p-8">
-    <div class="max-w-4xl mx-auto space-y-6">
-        <h1 class="text-3xl font-bold">Autonomous Optimization Agent</h1>
-        <p class="text-slate-400">Define your constraints and let the AI plan your experimental campaign.</p>
-        
-        <div class="bg-slate-900 border border-slate-800 p-6 rounded-2xl grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-                <label class="block text-xs font-semibold text-slate-400 mb-1">Total Run Budget</label>
-                <input type="number" id="budget" value="25" class="w-full bg-slate-800 rounded-lg p-2 text-white border border-slate-700">
-            </div>
-            <div>
-                <label class="block text-xs font-semibold text-slate-400 mb-1">Deadline</label>
-                <input type="date" id="deadline" class="w-full bg-slate-800 rounded-lg p-2 text-white border border-slate-700">
-            </div>
-            <div class="md:col-span-2">
-                <button onclick="planCampaign()" class="bg-purple-600 hover:bg-purple-500 font-bold py-3 px-6 rounded-xl transition w-full">Generate Campaign Plan</button>
-            </div>
-        </div>
+{% extends "base.html" %}
 
-        <div id="campaignResult" class="hidden bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-4 shadow-xl">
-            <h3 class="text-xl font-bold text-white">Campaign Strategy</h3>
-            <div class="space-y-3" id="phaseOutput"></div>
+{% block title %}Autonomous Agent | MatrixAI{% endblock %}
+{% block header_title %}Autonomous Agent{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto space-y-6">
+    <h1 class="text-3xl font-bold">Autonomous Optimization Agent</h1>
+    <p class="text-slate-400">Define your constraints and let the AI plan your experimental campaign.</p>
+    
+    <div class="bg-slate-900 border border-slate-800 p-6 rounded-2xl grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+            <label class="block text-xs font-semibold text-slate-400 mb-1">Total Run Budget</label>
+            <input type="number" id="budget" value="25" class="w-full bg-slate-800 rounded-lg p-2 text-white border border-slate-700">
+        </div>
+        <div>
+            <label class="block text-xs font-semibold text-slate-400 mb-1">Deadline</label>
+            <input type="date" id="deadline" class="w-full bg-slate-800 rounded-lg p-2 text-white border border-slate-700">
+        </div>
+        <div class="md:col-span-2">
+            <button onclick="planCampaign()" class="bg-purple-600 hover:bg-purple-500 font-bold py-3 px-6 rounded-xl transition w-full">Generate Campaign Plan</button>
         </div>
     </div>
-    <script>
-        async function planCampaign() {
-            const b = document.getElementById('budget').value;
-            const res = await fetch('/api/agent/campaign', {
-                method: 'POST', headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({budget: b})
-            });
-            const data = await res.json();
-            document.getElementById('campaignResult').classList.remove('hidden');
-            document.getElementById('phaseOutput').innerHTML = `
-                <div class="p-4 bg-slate-800 rounded-lg border-l-4 border-blue-500"><strong class="text-blue-400">Current Phase:</strong> ${data.campaign.current_phase}</div>
-                <div class="p-4 bg-slate-800 rounded-lg border-l-4 border-amber-500"><strong class="text-amber-400">Runs Remaining:</strong> ${data.campaign.budget_remaining}</div>
-                <div class="p-4 bg-slate-800 rounded-lg border-l-4 border-emerald-500"><strong class="text-emerald-400">Agent Directive:</strong> ${data.campaign.next_step}</div>
-            `;
-        }
-    </script>
-</body>
-</html>
+
+    <div id="campaignResult" class="hidden bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-4 shadow-xl">
+        <h3 class="text-xl font-bold text-white">Campaign Strategy</h3>
+        <div class="space-y-3" id="phaseOutput"></div>
+    </div>
+</div>
+
+<script>
+    async function planCampaign() {
+        const b = document.getElementById('budget').value;
+        const res = await fetch('/api/agent/campaign', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({budget: b})
+        });
+        const data = await res.json();
+        document.getElementById('campaignResult').classList.remove('hidden');
+        document.getElementById('phaseOutput').innerHTML = `
+            <div class="p-4 bg-slate-800 rounded-lg border-l-4 border-blue-500"><strong class="text-blue-400">Current Phase:</strong> ${data.campaign.current_phase}</div>
+            <div class="p-4 bg-slate-800 rounded-lg border-l-4 border-amber-500"><strong class="text-amber-400">Runs Remaining:</strong> ${data.campaign.budget_remaining}</div>
+            <div class="p-4 bg-slate-800 rounded-lg border-l-4 border-emerald-500"><strong class="text-emerald-400">Agent Directive:</strong> ${data.campaign.next_step}</div>
+        `;
+    }
+</script>
+{% endblock %}
