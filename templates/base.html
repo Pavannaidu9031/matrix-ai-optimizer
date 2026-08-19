@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}MatrixAI — Materials Optimizer{% endblock %}</title>
+    <link rel="manifest" href="/static/manifest.json">
+    <meta name="theme-color" content="#3B82F6">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        slate: { 850: '#0f172a', 900: '#0b0f19', 950: '#030712' },
+                        brand: { blue: '#3B82F6', purple: '#7C3AED' }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 12px rgba(59, 130, 246, 0.4), 0 0 24px rgba(124, 58, 237, 0.2); }
+            50% { box-shadow: 0 0 24px rgba(59, 130, 246, 0.8), 0 0 40px rgba(124, 58, 237, 0.5); }
+        }
+        .btn-glow { background: linear-gradient(135deg, #3B82F6, #7C3AED); animation: pulse-glow 3s infinite ease-in-out; }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen font-sans antialiased flex">
+
+    <!-- SIDEBAR NAVIGATION -->
+    <aside class="w-64 bg-slate-900 border-r border-slate-800 flex flex-col fixed h-screen z-50">
+        <div class="h-16 flex items-center px-6 border-b border-slate-800 space-x-3">
+            <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-blue-500 to-purple-600 flex items-center justify-center font-extrabold text-white shadow-lg">M</div>
+            <span class="font-bold text-lg bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-400">MatrixAI</span>
+        </div>
+
+        <div class="flex-1 py-6 px-4 space-y-2 overflow-y-auto">
+            <div class="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-3 mb-2">Workspace</div>
+            <a href="/" class="flex items-center space-x-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-300 hover:bg-slate-800 hover:text-white transition">
+                <span>🏠 Command Center</span>
+            </a>
+            <a href="/experiments-view" class="flex items-center space-x-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-300 hover:bg-slate-800 hover:text-white transition">
+                <span>🗄️ Experiment Ledger</span>
+            </a>
+            
+            <div class="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-3 mt-6 mb-2">Advanced Tools</div>
+            <a href="/scheduler" class="flex items-center space-x-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-300 hover:bg-slate-800 hover:text-white transition">
+                <span>📅 Lab Scheduler</span>
+            </a>
+            <a href="/thesis" class="flex items-center space-x-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-300 hover:bg-slate-800 hover:text-white transition">
+                <span>📝 Thesis Writer</span>
+            </a>
+            <a href="/publication" class="flex items-center space-x-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-300 hover:bg-slate-800 hover:text-white transition">
+                <span>🏆 Publication Readiness</span>
+            </a>
+            <a href="/agent" class="flex items-center space-x-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-300 hover:bg-slate-800 hover:text-white transition">
+                <span>🤖 Autonomous Agent</span>
+            </a>
+            <a href="/api/docs" class="flex items-center space-x-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-300 hover:bg-slate-800 hover:text-white transition">
+                <span>🔌 Public API</span>
+            </a>
+        </div>
+
+        {% if user %}
+        <div class="p-4 border-t border-slate-800 bg-slate-900/50 flex items-center justify-between">
+            <div class="flex items-center space-x-2 overflow-hidden">
+                {% if user.picture %}<img src="{{ user.picture }}" class="w-6 h-6 rounded-full flex-shrink-0">{% endif %}
+                <span class="text-xs font-medium text-slate-300 truncate">{{ user.name }}</span>
+            </div>
+            <a href="/logout" class="text-xs text-red-400 hover:text-red-300 transition">Logout</a>
+        </div>
+        {% endif %}
+    </aside>
+
+    <!-- MAIN CONTENT AREA -->
+    <div class="flex-1 ml-64 min-h-screen flex flex-col bg-slate-950">
+        <header class="h-16 border-b border-slate-800 bg-slate-900/60 backdrop-blur-md sticky top-0 z-40 px-8 flex items-center justify-between">
+            <div class="text-sm font-bold text-slate-200">{% block header_title %}Dashboard{% endblock %}</div>
+            <div class="flex items-center space-x-3">
+                <span class="text-xs px-2.5 py-1 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 font-semibold">Branch: {{ current_branch|default('main') }}</span>
+            </div>
+        </header>
+
+        <main class="flex-1 p-8 space-y-8 max-w-7xl w-full mx-auto">
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+
+</body>
+</html>
