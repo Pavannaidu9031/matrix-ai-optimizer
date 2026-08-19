@@ -35,6 +35,20 @@
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen font-sans antialiased flex">
 
+    <!-- STARTUP SPLASH SCREEN ANIMATION -->
+    <div id="splashScreen" class="fixed inset-0 bg-slate-950 z-[100] flex flex-col items-center justify-center transition-opacity duration-700 ease-out">
+        <div class="relative flex items-center justify-center mb-6">
+            <div class="absolute w-20 h-20 rounded-full bg-gradient-to-tr from-blue-500 to-purple-600 opacity-75 animate-ping"></div>
+            <div class="relative w-16 h-16 rounded-2xl bg-gradient-to-tr from-blue-600 to-purple-600 flex items-center justify-center font-extrabold text-white text-3xl shadow-2xl btn-glow">
+                M
+            </div>
+        </div>
+        <h1 class="text-xl font-bold tracking-wider bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-400 animate-pulse">
+            MatrixAI
+        </h1>
+        <p class="text-xs text-slate-500 mt-2 tracking-widest uppercase">Initializing Materials Engine...</p>
+    </div>
+
     <!-- SIDEBAR NAVIGATION -->
     <aside class="w-64 bg-slate-900 border-r border-slate-800 flex flex-col fixed h-screen z-50">
         <div class="h-16 flex items-center px-6 border-b border-slate-800 space-x-3">
@@ -276,6 +290,19 @@
                 });
             });
         }
+    </script>
+
+    <!-- STARTUP SPLASH SCREEN SCRIPT -->
+    <script>
+        window.addEventListener('load', () => {
+            const splash = document.getElementById('splashScreen');
+            setTimeout(() => {
+                splash.style.opacity = '0';
+                setTimeout(() => {
+                    splash.style.display = 'none';
+                }, 700);
+            }, 600);
+        });
     </script>
 </body>
 </html>
