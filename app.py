@@ -1267,3 +1267,52 @@ async def generate_campaign(request: Request):
 def apidocs_page(request: Request):
     user = request.session.get("user")
     return templates.TemplateResponse(request, "apidocs.html", {"user": user})
+    # ==============================================================================
+# MISSING DASHBOARD API ENDPOINTS (PHASE MAP, NOISE, RECIPE)
+# ==============================================================================
+@app.post("/api/optimizer/phase-map")
+async def api_phase_map(request: Request):
+    user = request.session.get("user")
+    if not user: return JSONResponse({"error": "not_authenticated"}, status_code=401)
+    
+    body = await request.json()
+    target_material = body.get("target_material", "Generic")
+    param_x = body.get("param_x", "rf_power")
+    param_y = body.get("param_y", "working_pressure")
+    
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT * FROM experiments WHERE user_email = %s", (user.get("email"),))
+        cols = [desc[0] for desc in cur.description]
+        experiments = [dict(zip(cols, row)) for row in cur.fetchall()]
+    finally:
+        release_db_connection(conn)
+        
+    phase_map = optimizer.generate_phase_map(experiments, target_material, param_x, param_y)
+    return JSONResponse({"success": True, "phase_map": phase_map})
+
+@app.post("/api/optimizer/calibrate-noise")
+async def api_calibrate_noise(request: Request):
+    user = request.session.get("user")
+    if not user: return JSONResponse({"error": "not_authenticated"}, status_code=401)
+    
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT wavelength_shift, wavelength_shift_pm FROM experiments WHERE user_email = %s", (user.get("email"),))
+        cols = [desc[0] for desc in cur.description]
+        experiments = [dict(zip(cols, row)) for row in cur.fetchall()]
+    finally:
+        release_db_connection(conn)
+        
+    calib = optimizer.calibrate_noise_variance(experiments)
+    return JSONResponse({"success": True, "calibration": calib})
+
+@app.post("/api/optimizer/recipe")
+async def api_generate_recipe(request: Request):
+    body = await request.json()
+    target_material = body.get("target_material", "Generic")
+    params = body.get("params", {})
+    recipe = optimizer.generate_synthesis_recipe(params, target_material)
+    return JSONResponse({"success": True, "recipe": recipe})
