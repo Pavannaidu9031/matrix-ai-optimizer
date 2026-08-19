@@ -312,7 +312,7 @@
         }
     </script>
 
-    <!-- ADVANCED ANIMATION & ATOMIC LATTICE SCRIPT -->
+    <!-- ROBUST ANIMATION & ATOMIC LATTICE SCRIPT -->
     <script>
         // 1. Terminal Text & Progress Sequence
         const loadingTexts = [
@@ -330,84 +330,85 @@
         const textInterval = setInterval(() => {
             textIndex++;
             if (textIndex < loadingTexts.length) {
-                textElement.innerText = loadingTexts[textIndex];
-                barElement.style.width = ((textIndex + 1) * 20) + '%';
+                if (textElement) textElement.innerText = loadingTexts[textIndex];
+                if (barElement) barElement.style.width = ((textIndex + 1) * 20) + '%';
             } else {
                 clearInterval(textInterval);
+                // Guaranteed Fade-Out once sequence finishes
+                setTimeout(() => {
+                    const splash = document.getElementById('splashScreen');
+                    if (splash) {
+                        splash.style.opacity = '0';
+                        setTimeout(() => {
+                            splash.style.display = 'none';
+                        }, 1000);
+                    }
+                }, 400);
             }
         }, 300);
 
         // 2. Interactive Atomic Lattice Canvas Animation
         const canvas = document.getElementById('latticeCanvas');
-        const ctx = canvas.getContext('2d');
-        
-        function resizeCanvas() {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-        }
-        window.addEventListener('resize', resizeCanvas);
-        resizeCanvas();
-
-        const particles = [];
-        const particleCount = 35;
-
-        for (let i = 0; i < particleCount; i++) {
-            particles.push({
-                x: Math.random() * canvas.width,
-                y: Math.random() * canvas.height,
-                vx: (Math.random() - 0.5) * 1.2,
-                vy: (Math.random() - 0.5) * 1.2,
-                radius: Math.random() * 2 + 1.5
-            });
-        }
-
-        function animateLattice() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        if (canvas) {
+            const ctx = canvas.getContext('2d');
             
-            for (let i = 0; i < particles.length; i++) {
-                for (let j = i + 1; j < particles.length; j++) {
-                    const dx = particles[i].x - particles[j].x;
-                    const dy = particles[i].y - particles[j].y;
-                    const dist = Math.sqrt(dx * dx + dy * dy);
-                    
-                    if (dist < 130) {
-                        ctx.beginPath();
-                        ctx.moveTo(particles[i].x, particles[i].y);
-                        ctx.lineTo(particles[j].x, particles[j].y);
-                        ctx.strokeStyle = `rgba(59, 130, 246, ${1 - dist / 130})`;
-                        ctx.lineWidth = 0.6;
-                        ctx.stroke();
-                    }
-                }
+            function resizeCanvas() {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+            }
+            window.addEventListener('resize', resizeCanvas);
+            resizeCanvas();
+
+            const particles = [];
+            const particleCount = 35;
+
+            for (let i = 0; i < particleCount; i++) {
+                particles.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height,
+                    vx: (Math.random() - 0.5) * 1.2,
+                    vy: (Math.random() - 0.5) * 1.2,
+                    radius: Math.random() * 2 + 1.5
+                });
             }
 
-            particles.forEach(p => {
-                p.x += p.vx;
-                p.y += p.vy;
+            function animateLattice() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                
+                for (let i = 0; i < particles.length; i++) {
+                    for (let j = i + 1; j < particles.length; j++) {
+                        const dx = particles[i].x - particles[j].x;
+                        const dy = particles[i].y - particles[j].y;
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+                        
+                        if (dist < 130) {
+                            ctx.beginPath();
+                            ctx.moveTo(particles[i].x, particles[i].y);
+                            ctx.lineTo(particles[j].x, particles[j].y);
+                            ctx.strokeStyle = `rgba(59, 130, 246, ${1 - dist / 130})`;
+                            ctx.lineWidth = 0.6;
+                            ctx.stroke();
+                        }
+                    }
+                }
 
-                if (p.x < 0 || p.x > canvas.width) p.vx *= -1;
-                if (p.y < 0 || p.y > canvas.height) p.vy *= -1;
+                particles.forEach(p => {
+                    p.x += p.vx;
+                    p.y += p.vy;
 
-                ctx.beginPath();
-                ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
-                ctx.fillStyle = '#7C3AED';
-                ctx.fill();
-            });
+                    if (p.x < 0 || p.x > canvas.width) p.vx *= -1;
+                    if (p.y < 0 || p.y > canvas.height) p.vy *= -1;
 
-            requestAnimationFrame(animateLattice);
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                    ctx.fillStyle = '#7C3AED';
+                    ctx.fill();
+                });
+
+                requestAnimationFrame(animateLattice);
+            }
+            animateLattice();
         }
-        animateLattice();
-
-        // 3. Smooth Fade Out on Window Load
-        window.addEventListener('load', () => {
-            setTimeout(() => {
-                const splash = document.getElementById('splashScreen');
-                splash.style.opacity = '0';
-                setTimeout(() => {
-                    splash.style.display = 'none';
-                }, 1000);
-            }, 1500);
-        });
     </script>
 </body>
 </html>
