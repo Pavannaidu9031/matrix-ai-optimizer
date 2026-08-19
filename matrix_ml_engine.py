@@ -1,42 +1,49 @@
 import numpy as np
 import pandas as pd
-import torch
-import gpytorch
 from scipy.spatial.distance import euclidean
 from scipy.stats import mannwhitneyu
 from sklearn.isotonic import IsotonicRegression
 import copy
 
 # ==============================================================================
-# UPGRADE 1: DEEP KERNEL LEARNING (GPYTORCH)
+# UPGRADE 1: DEEP KERNEL LEARNING (LAZY LOADED TO PREVENT RENDER CRASH)
 # ==============================================================================
-class DeepFeatureExtractor(torch.nn.Module):
-    def __init__(self, input_dim):
-        super().__init__()
-        self.network = torch.nn.Sequential(
-            torch.nn.Linear(input_dim, 32),
-            torch.nn.ReLU(),
-            torch.nn.Linear(32, 16),
-            torch.nn.ReLU(),
-            torch.nn.Linear(16, 8)
-        )
-    def forward(self, x):
-        return self.network(x)
-
-class DeepKernelGP(gpytorch.models.ExactGP):
-    def __init__(self, train_x, train_y, likelihood):
-        super().__init__(train_x, train_y, likelihood)
-        self.feature_extractor = DeepFeatureExtractor(train_x.shape[1])
-        self.mean_module = gpytorch.means.ConstantMean()
-        self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel())
+def get_dkl_classes():
+    """Lazy imports PyTorch to save hundreds of megabytes of RAM on startup."""
+    import torch
+    import gpytorch
     
-    def forward(self, x):
-        features = self.feature_extractor(x)
-        mean_x = self.mean_module(features)
-        covar_x = self.covar_module(features)
-        return gpytorch.distributions.MultivariateNormal(mean_x, covar_x)
+    class DeepFeatureExtractor(torch.nn.Module):
+        def __init__(self, input_dim):
+            super().__init__()
+            self.network = torch.nn.Sequential(
+                torch.nn.Linear(input_dim, 32),
+                torch.nn.ReLU(),
+                torch.nn.Linear(32, 16),
+                torch.nn.ReLU(),
+                torch.nn.Linear(16, 8)
+            )
+        def forward(self, x):
+            return self.network(x)
+
+    class DeepKernelGP(gpytorch.models.ExactGP):
+        def __init__(self, train_x, train_y, likelihood):
+            super().__init__(train_x, train_y, likelihood)
+            self.feature_extractor = DeepFeatureExtractor(train_x.shape[1])
+            self.mean_module = gpytorch.means.ConstantMean()
+            self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel())
+        
+        def forward(self, x):
+            features = self.feature_extractor(x)
+            mean_x = self.mean_module(features)
+            covar_x = self.covar_module(features)
+            return gpytorch.distributions.MultivariateNormal(mean_x, covar_x)
+            
+    return torch, gpytorch, DeepKernelGP
 
 def train_dkl_model(X, y, epochs=50):
+    torch, gpytorch, DeepKernelGP = get_dkl_classes()
+    
     train_x = torch.tensor(X, dtype=torch.float32)
     train_y = torch.tensor(y, dtype=torch.float32)
     likelihood = gpytorch.likelihoods.GaussianLikelihood()
@@ -86,6 +93,8 @@ def apply_physical_constraints(candidates, expected_thickness=200, planned_sputt
     return valid
 
 def thompson_sampling(model, likelihood, candidates, n_samples=100):
+    import torch
+    import gpytorch
     c_tensor = torch.tensor(candidates, dtype=torch.float32)
     with torch.no_grad(), gpytorch.settings.fast_pred_var():
         posterior = likelihood(model(c_tensor))
@@ -98,7 +107,6 @@ def thompson_sampling(model, likelihood, candidates, n_samples=100):
 def get_dna_fingerprint(target_run, all_runs):
     weights = np.array([0.25, 0.10, 0.25, 0.20, 0.15, 0.05])
     
-    # Safely convert to float, falling back to defaults if the database value is None/NULL
     t_rf = float(target_run.get('rf_power') or 120.0)
     t_press = float(target_run.get('working_pressure') or 5.0)
     t_dist = float(target_run.get('target_distance') or 7.0)
@@ -112,7 +120,6 @@ def get_dna_fingerprint(target_run, all_runs):
     for r in all_runs:
         if r.get('id') == target_run.get('id'): continue
         
-        # Safely convert comparison runs
         r_rf = float(r.get('rf_power') or 120.0)
         r_press = float(r.get('working_pressure') or 5.0)
         r_dist = float(r.get('target_distance') or 7.0)
@@ -147,14 +154,12 @@ def analyze_reproducibility_and_calibration(experiments):
     df = pd.DataFrame(experiments)
     if len(df) < 5: return {"status": "Needs more data"}
     
-    # Isotonic Regression Calibration for Quality Scores
-    scores_pred = np.linspace(0, 100, len(df)) # Mock predicted for ECE demo
+    scores_pred = np.linspace(0, 100, len(df)) 
     scores_actual = df['quality_score'].fillna(50).values
     
     calibrator = IsotonicRegression(out_of_bounds='clip')
     calibrator.fit(scores_pred, scores_actual)
     
-    # Statistical validation (Best vs Second Best)
     top_two = df.nlargest(2, 'quality_score')
     if len(top_two) == 2:
         try:
