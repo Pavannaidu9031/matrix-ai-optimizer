@@ -6,11 +6,16 @@
 {% block content %}
 <!-- EXPERIMENT INPUT FORM SECTION -->
 <section id="formSection" class="space-y-4">
-    <div class="flex items-center justify-between">
+    <div class="flex items-center justify-between mb-4">
         <div>
             <h2 class="text-xl font-bold text-white">Log Experimental Run</h2>
             <p class="text-xs text-slate-400">Enter process parameters and thin-film characterization results</p>
         </div>
+        <!-- LITERATURE INGESTION UPLOAD -->
+        <label class="cursor-pointer bg-slate-800 hover:bg-slate-700 border border-slate-700 text-purple-400 text-xs font-bold py-2 px-4 rounded-xl transition flex items-center space-x-2 shadow-sm">
+            <span id="litUploadLabel">📄 Auto-Fill from Research Paper</span>
+            <input type="file" id="uploadLiterature" accept="application/pdf" class="hidden">
+        </label>
     </div>
 
     <form action="/add" method="POST" class="grid grid-cols-1 md:grid-cols-3 gap-4 bg-slate-900/80 p-6 rounded-2xl border border-slate-800 text-white shadow-xl">
@@ -491,6 +496,98 @@
     document.getElementById('uploadSEM')?.addEventListener('change', (e) => {
         handleVisionUpload(e.target.files[0], 'SEM/FESEM micrograph', 'grain_size_nm');
         e.target.value = '';
+    });
+
+    // LITERATURE AI PDF UPLOAD LOGIC
+    document.getElementById('uploadLiterature')?.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const btnLabel = document.getElementById('litUploadLabel');
+        const originalText = btnLabel.innerText;
+        btnLabel.innerText = "⏳ Extracting AI Parameters...";
+        btnLabel.parentElement.classList.add('animate-pulse', 'border-purple-500');
+
+        try {
+            const res = await fetch('/api/literature/upload', {
+                method: 'POST',
+                body: formData
+            });
+            const data = await res.json();
+            
+            if (data.success && data.extracted_data) {
+                const s = data.extracted_data;
+                const fields = [
+                    { id: 'target_material', val: s.target_material },
+                    { id: 'rf_power_w', val: s.rf_power },
+                    { id: 'working_pressure_mtorr', val: s.working_pressure },
+                    { id: 'ar_flow_sccm', val: s.ar_flow },
+                    { id: 'o2_flow_sccm', val: s.o2_flow },
+                    { id: 'substrate_temp_c', val: s.substrate_temp },
+                    { id: 'target_substrate_distance_cm', val: s.target_distance },
+                    { id: 'film_thickness_nm', val: s.film_thickness },
+                    { id: 'rotation_speed_rpm', val: s.rotation_speed },
+                    { id: 'xrd_phase', val: s.xrd_phase },
+                    { id: 'grain_size_nm', val: s.grain_size },
+                    { id: 'h2_response_time_s', val: s.h2_response_time },
+                    { id: 'wavelength_shift_pm', val: s.wavelength_shift }
+                ];
+                
+                // Handle the new dual Sputter Time format
+                if (s.sputter_time_s) {
+                    const mins = Math.floor(s.sputter_time_s / 60);
+                    const secs = s.sputter_time_s % 60;
+                    document.querySelector('input[name="sputtering_time_min"]').value = mins;
+                    document.querySelector('input[name="sputtering_time_sec"]').value = secs;
+                }
+
+                fields.forEach(f => {
+                    const el = document.getElementById(f.id);
+                    if (el && f.val !== undefined) {
+                        el.value = f.val;
+                        el.classList.add('flash-highlight');
+                        setTimeout(() => el.classList.remove('flash-highlight'), 1200);
+                    }
+                });
+                alert("Success! Parameters extracted from the PDF and populated.");
+            } else {
+                alert('AI extraction failed: ' + (data.message || data.error));
+            }
+        } catch (err) {
+            alert('Error connecting to Literature Parsing API.');
+        } finally {
+            btnLabel.innerText = originalText;
+            btnLabel.parentElement.classList.remove('animate-pulse', 'border-purple-500');
+            e.target.value = ''; // Reset input so you can upload again if needed
+        }
+    });
+
+    // CHECK IF WE CAME FROM THE OPTIMIZER WITH A SUGGESTED BATCH
+    document.addEventListener("DOMContentLoaded", () => {
+        const storedBatch = localStorage.getItem('matrixAutoFill');
+        if (storedBatch) {
+            const s = JSON.parse(storedBatch);
+            const fields = [
+                { id: 'rf_power_w', val: s.rf_power },
+                { id: 'working_pressure_mtorr', val: s.working_pressure },
+                { id: 'target_substrate_distance_cm', val: s.target_distance },
+                { id: 'film_thickness_nm', val: s.film_thickness },
+                { id: 'rotation_speed_rpm', val: s.rotation_speed },
+                { id: 'ar_flow_sccm', val: s.ar_flow }
+            ];
+            fields.forEach(f => {
+                const el = document.getElementById(f.id);
+                if (el) {
+                    el.value = f.val;
+                    el.classList.add('flash-highlight');
+                    setTimeout(() => el.classList.remove('flash-highlight'), 1200);
+                }
+            });
+            localStorage.removeItem('matrixAutoFill'); // Clear it so it doesn't auto-fill every time
+        }
     });
 </script>
 {% endblock %}
