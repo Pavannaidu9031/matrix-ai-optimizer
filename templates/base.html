@@ -3,15 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}MatrixAI — Materials Optimizer{% endblock %}</title>
+    <title>{% block title %}MATRIX_AI // CORE{% endblock %}</title>
     <link rel="manifest" href="/static/manifest.json">
-    <meta name="theme-color" content="#020617">
+    <meta name="theme-color" content="#000000">
     <link rel="apple-touch-icon" href="/static/icon-192.png">
     
-    <!-- VisionOS Typography: Inter -->
+    <!-- Google Fonts for Brutalist/Hacker Aesthetic -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -25,202 +25,146 @@
             theme: {
                 extend: {
                     fontFamily: {
-                        sans: ['Inter', 'sans-serif'],
+                        sans: ['"JetBrains Mono"', 'monospace'],
+                        display: ['"Space Grotesk"', 'sans-serif'],
                     },
                     colors: {
-                        brand: {
-                            50: '#eef2ff',
-                            100: '#e0e7ff',
-                            400: '#818cf8',
-                            500: '#6366f1',
-                            600: '#4f46e5',
-                            700: '#4338ca',
-                        },
-                        slate: { 850: '#151e2e', 900: '#0f172a', 950: '#020617' }
+                        black: '#000000',
+                        gray: { 900: '#0a0a0a', 800: '#171717', 700: '#262626' },
+                        matrix: { green: '#00FF41', dark: '#003B00' }
                     },
                     boxShadow: {
-                        'glass': '0 8px 32px 0 rgba(0, 0, 0, 0.37)',
-                        'glow': '0 0 30px rgba(99, 102, 241, 0.25)',
+                        'hard': '4px 4px 0px 0px rgba(0, 255, 65, 0.2)',
+                        'hard-hover': '2px 2px 0px 0px rgba(0, 255, 65, 0.4)',
                     }
                 }
             }
         }
     </script>
     <style>
-        /* VisionOS Aurora Background Gradients */
-        body { 
-            background-color: #020617; 
-            background-image: 
-                radial-gradient(at 0% 0%, rgba(79, 70, 229, 0.15) 0px, transparent 50%),
-                radial-gradient(at 100% 0%, rgba(147, 51, 234, 0.12) 0px, transparent 50%),
-                radial-gradient(at 50% 100%, rgba(59, 130, 246, 0.1) 0px, transparent 50%);
-            background-attachment: fixed;
-            transition: background-color 0.4s ease, color 0.4s ease; 
-        }
-        
-        /* Frosted Glass Effect */
-        .glass-panel {
-            background: rgba(15, 23, 42, 0.55);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
-        }
-
-        body.force-light-mode .glass-panel {
-            background: rgba(255, 255, 255, 0.7);
-            border: 1px solid rgba(0, 0, 0, 0.06);
-            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
-        }
-
+        body { background-color: #000; color: #e5e5e5; }
+        ::selection { background: #00FF41; color: #000; }
         ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 10px; }
+        ::-webkit-scrollbar-track { background: #000; border-left: 1px solid #171717; }
+        ::-webkit-scrollbar-thumb { background: #262626; }
+        ::-webkit-scrollbar-thumb:hover { background: #00FF41; }
         
-        input:focus, select:focus, textarea:focus { 
-            outline: none !important; 
-            box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.4) !important; 
-            border-color: #6366f1 !important; 
+        /* Scanline effect for headers */
+        .scanline { position: relative; overflow: hidden; }
+        .scanline::after {
+            content: " ";
+            display: block; position: absolute; top: 0; left: 0; bottom: 0; right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            z-index: 20; background-size: 100% 2px, 3px 100%; pointer-events: none;
         }
+        
+        /* Remove soft focus outlines, use hard strict borders */
+        input:focus, select:focus, textarea:focus { outline: none !important; box-shadow: none !important; border-color: #00FF41 !important; }
     </style>
 </head>
-<body class="text-slate-100 min-h-screen font-sans antialiased flex">
+<body class="bg-black text-gray-300 min-h-screen font-sans antialiased flex selection:bg-matrix-green selection:text-black">
 
-    <!-- INTERACTIVE LIGHTBULB THEME SWITCHER -->
-    <div class="fixed top-0 right-16 z-[200] flex flex-col items-center">
-        <div class="w-10 h-2 bg-slate-800 rounded-b-md shadow-sm relative z-30"></div>
-        <div class="w-0.5 h-8 bg-slate-700 relative z-30"></div>
-        <div class="relative flex flex-col items-center">
-            <div class="w-5 h-4 bg-slate-600 rounded-t-sm z-30 flex flex-col justify-evenly py-0.5">
-                <div class="w-full h-px bg-slate-800"></div>
-                <div class="w-full h-px bg-slate-800"></div>
+    <!-- BRUTALIST TERMINAL BOOT SEQUENCE -->
+    <div id="splashScreen" class="fixed inset-0 bg-black z-[100] flex flex-col items-center justify-center overflow-hidden transition-opacity duration-700 ease-out">
+        <canvas id="latticeCanvas" class="absolute inset-0 w-full h-full opacity-20 pointer-events-none"></canvas>
+        
+        <div class="relative z-10 w-full max-w-xl mx-4 p-8 border border-gray-800 bg-gray-900/90 shadow-hard flex flex-col space-y-6">
+            <div class="flex justify-between items-center border-b border-gray-800 pb-2">
+                <span class="text-matrix-green font-bold tracking-widest text-sm">SYS_INIT // MATRIX_CORE</span>
+                <span class="text-gray-500 text-xs">v2.0.4-stable</span>
             </div>
-            <div id="theme-bulb" class="w-12 h-12 rounded-full -mt-1.5 transition-all duration-500 z-40 relative overflow-hidden flex items-center justify-center cursor-pointer bg-slate-800 border-2 border-slate-600 shadow-inner">
-                <div id="filament" class="w-2 h-3 border-b-2 border-l-2 border-r-2 rounded-b-md transition-all duration-300 border-slate-500 opacity-50"></div>
+            
+            <div class="font-display text-4xl font-extrabold text-white tracking-tighter uppercase">
+                >_MATRIX<span class="text-matrix-green text-opacity-80">AI</span>
             </div>
-            <div class="absolute top-0 -left-10 flex flex-col items-center cursor-pointer group z-50" onclick="pullThemeCord('on')">
-                <div class="text-[9px] font-bold text-slate-500 mb-1 group-hover:text-yellow-400 transition-colors select-none">ON</div>
-                <div id="cord-on" class="w-[1.5px] h-16 bg-slate-600 flex flex-col justify-end items-center origin-top transition-transform duration-200">
-                    <div class="w-2.5 h-3 bg-yellow-400 rounded-full translate-y-1.5 shadow-sm"></div>
-                </div>
+            
+            <div class="bg-black border border-gray-800 p-4 h-32 flex flex-col justify-end overflow-hidden">
+                <p id="loadingText" class="text-xs text-matrix-green font-mono tracking-tight leading-relaxed animate-pulse">root@matrix:~# execution context started...</p>
             </div>
-            <div class="absolute top-0 -right-10 flex flex-col items-center cursor-pointer group z-50" onclick="pullThemeCord('off')">
-                <div class="text-[9px] font-bold text-slate-500 mb-1 group-hover:text-slate-300 transition-colors select-none">OFF</div>
-                <div id="cord-off" class="w-[1.5px] h-16 bg-slate-600 flex flex-col justify-end items-center origin-top transition-transform duration-200">
-                    <div class="w-2.5 h-3 bg-slate-800 border border-slate-500 rounded-full translate-y-1.5 shadow-sm"></div>
-                </div>
+
+            <div class="w-full bg-black h-1 border border-gray-800">
+                <div id="loadingBar" class="bg-matrix-green h-full w-0 transition-all duration-[50ms] ease-linear"></div>
             </div>
         </div>
     </div>
 
-    <!-- STARTUP SPLASH SCREEN -->
-    <div id="splashScreen" class="fixed inset-0 bg-slate-950 z-[100] flex flex-col items-center justify-center overflow-hidden transition-opacity duration-700 ease-out">
-        <div class="relative z-10 flex flex-col items-center text-center space-y-6">
-            <div class="relative flex items-center justify-center">
-                <div class="absolute w-20 h-20 rounded-3xl bg-brand-500 opacity-30 animate-ping"></div>
-                <div class="relative w-16 h-16 rounded-3xl bg-gradient-to-tr from-brand-600 to-indigo-400 flex items-center justify-center font-extrabold text-white text-3xl shadow-glow">M</div>
-            </div>
-            <div>
-                <h1 class="text-2xl font-extrabold tracking-tight text-white">MatrixAI Engine</h1>
-                <p id="loadingText" class="text-sm text-slate-400 mt-2 font-medium">Initializing VisionOS Workspace...</p>
-            </div>
-            <div class="w-64 bg-slate-900 rounded-full h-1.5 overflow-hidden border border-white/5">
-                <div id="loadingBar" class="bg-gradient-to-r from-brand-500 to-indigo-400 h-full w-0 transition-all duration-300 ease-out rounded-full"></div>
-            </div>
-        </div>
-    </div>
-
-    <!-- VISIONOS SIDEBAR -->
+    <!-- HACKER SIDEBAR (NO EMOJIS, SHARP BORDERS) -->
     {% if user %}
-    <aside class="w-64 glass-panel border-r border-white/10 flex flex-col fixed h-screen z-50">
-        <div class="h-16 flex items-center px-6 border-b border-white/10 space-x-3">
-            <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-brand-600 to-indigo-500 flex items-center justify-center font-extrabold text-white shadow-glow">M</div>
-            <span class="font-bold text-lg text-white tracking-tight">MatrixAI</span>
+    <aside class="w-64 bg-black border-r border-gray-800 flex flex-col fixed h-screen z-50">
+        <div class="h-16 flex items-center px-6 border-b border-gray-800 space-x-4 bg-gray-900 scanline">
+            <div class="w-8 h-8 bg-matrix-green text-black flex items-center justify-center font-extrabold text-xl shadow-[2px_2px_0px_#171717]">M</div>
+            <span class="font-display font-bold text-lg tracking-widest text-gray-200">MATRIX</span>
         </div>
 
-        <div class="flex-1 py-6 px-4 space-y-1.5 overflow-y-auto">
-            <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-3 mb-2">Workspace</div>
+        <div class="flex-1 py-6 space-y-1 overflow-y-auto px-3">
+            <div class="text-[10px] font-bold text-gray-600 uppercase tracking-widest px-3 mb-3 border-b border-gray-800 pb-1">Primary Modules</div>
             
-            <a href="/" class="flex items-center space-x-3 px-3 py-2.5 rounded-2xl text-sm font-medium text-slate-300 hover:bg-white/10 hover:text-white transition-all">
-                <svg class="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
-                <span>Command Center</span>
+            <a href="/" class="flex items-center px-3 py-2 text-xs font-medium text-gray-400 hover:text-matrix-green hover:bg-gray-900 border-l-2 border-transparent hover:border-matrix-green transition-colors">
+                <span class="w-8 inline-block text-gray-600">[~]</span> <span>Command Center</span>
             </a>
-            <a href="/experiments-view" class="flex items-center space-x-3 px-3 py-2.5 rounded-2xl text-sm font-medium text-slate-300 hover:bg-white/10 hover:text-white transition-all">
-                <svg class="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
-                <span>Experiment Ledger</span>
+            <a href="/experiments-view" class="flex items-center px-3 py-2 text-xs font-medium text-gray-400 hover:text-matrix-green hover:bg-gray-900 border-l-2 border-transparent hover:border-matrix-green transition-colors">
+                <span class="w-8 inline-block text-gray-600">[+]</span> <span>Experiment Ledger</span>
             </a>
-            <a href="/optimizer-view" class="flex items-center space-x-3 px-3 py-2.5 rounded-2xl text-sm font-medium text-slate-300 hover:bg-white/10 hover:text-white transition-all">
-                <svg class="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-                <span>Process Engine</span>
+            <a href="/optimizer-view" class="flex items-center px-3 py-2 text-xs font-medium text-gray-400 hover:text-matrix-green hover:bg-gray-900 border-l-2 border-transparent hover:border-matrix-green transition-colors">
+                <span class="w-8 inline-block text-gray-600">[*]</span> <span>Process Engine</span>
             </a>
             
-            <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-3 mt-6 mb-2">Advanced Tools</div>
+            <div class="text-[10px] font-bold text-gray-600 uppercase tracking-widest px-3 mt-8 mb-3 border-b border-gray-800 pb-1">Simulation & Logic</div>
             
-            <button onclick="toggleSandbox()" class="w-full flex items-center space-x-3 px-3 py-2.5 rounded-2xl text-sm font-medium text-slate-300 hover:bg-white/10 hover:text-white transition-all text-left">
-                <svg class="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
-                <span>Digital Twin Env</span>
+            <button onclick="toggleSandbox()" class="w-full flex items-center px-3 py-2 text-xs font-medium text-gray-400 hover:text-matrix-green hover:bg-gray-900 border-l-2 border-transparent hover:border-matrix-green transition-colors text-left">
+                <span class="w-8 inline-block text-gray-600">[>]</span> <span>Digital Twin Env</span>
             </button>
-            <a href="/scheduler" class="flex items-center space-x-3 px-3 py-2.5 rounded-2xl text-sm font-medium text-slate-300 hover:bg-white/10 hover:text-white transition-all">
-                <svg class="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
-                <span>Lab Scheduler</span>
+            <a href="/scheduler" class="flex items-center px-3 py-2 text-xs font-medium text-gray-400 hover:text-matrix-green hover:bg-gray-900 border-l-2 border-transparent hover:border-matrix-green transition-colors">
+                <span class="w-8 inline-block text-gray-600">[t]</span> <span>Lab Scheduler</span>
             </a>
-            <a href="/thesis" class="flex items-center space-x-3 px-3 py-2.5 rounded-2xl text-sm font-medium text-slate-300 hover:bg-white/10 hover:text-white transition-all">
-                <svg class="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                <span>Thesis Compiler</span>
+            <a href="/thesis" class="flex items-center px-3 py-2 text-xs font-medium text-gray-400 hover:text-matrix-green hover:bg-gray-900 border-l-2 border-transparent hover:border-matrix-green transition-colors">
+                <span class="w-8 inline-block text-gray-600">[w]</span> <span>Thesis Compiler</span>
             </a>
-            <a href="/publication" class="flex items-center space-x-3 px-3 py-2.5 rounded-2xl text-sm font-medium text-slate-300 hover:bg-white/10 hover:text-white transition-all">
-                <svg class="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z"></path></svg>
-                <span>Pub Readiness</span>
+            <a href="/publication" class="flex items-center px-3 py-2 text-xs font-medium text-gray-400 hover:text-matrix-green hover:bg-gray-900 border-l-2 border-transparent hover:border-matrix-green transition-colors">
+                <span class="w-8 inline-block text-gray-600">[p]</span> <span>Pub Readiness</span>
             </a>
-            <a href="/agent" class="flex items-center space-x-3 px-3 py-2.5 rounded-2xl text-sm font-medium text-slate-300 hover:bg-white/10 hover:text-white transition-all">
-                <svg class="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
-                <span>Auto-Agent</span>
+            <a href="/agent" class="flex items-center px-3 py-2 text-xs font-medium text-gray-400 hover:text-matrix-green hover:bg-gray-900 border-l-2 border-transparent hover:border-matrix-green transition-colors">
+                <span class="w-8 inline-block text-gray-600">[a]</span> <span>Auto-Agent</span>
             </a>
-            <a href="/api/docs" class="flex items-center space-x-3 px-3 py-2.5 rounded-2xl text-sm font-medium text-slate-300 hover:bg-white/10 hover:text-white transition-all">
-                <svg class="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path></svg>
-                <span>API Endpoints</span>
+            <a href="/api/docs" class="flex items-center px-3 py-2 text-xs font-medium text-gray-400 hover:text-matrix-green hover:bg-gray-900 border-l-2 border-transparent hover:border-matrix-green transition-colors">
+                <span class="w-8 inline-block text-gray-600">[/]</span> <span>API Endpoints</span>
             </a>
 
-            <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-3 mt-6 mb-2">Data & Ops</div>
-            <a href="/bulk-import" class="flex items-center space-x-3 px-3 py-2.5 rounded-2xl text-sm font-medium text-slate-300 hover:bg-white/10 hover:text-white transition-all">
-                <svg class="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
-                <span>Bulk Ingestion</span>
+            <div class="text-[10px] font-bold text-gray-600 uppercase tracking-widest px-3 mt-8 mb-3 border-b border-gray-800 pb-1">Data & Ops</div>
+            <a href="/bulk-import" class="flex items-center px-3 py-2 text-xs font-medium text-gray-400 hover:text-matrix-green hover:bg-gray-900 border-l-2 border-transparent hover:border-matrix-green transition-colors">
+                <span class="w-8 inline-block text-gray-600">[v]</span> <span>Bulk Ingestion</span>
             </a>
-            <a href="/cost-tracker" class="flex items-center space-x-3 px-3 py-2.5 rounded-2xl text-sm font-medium text-slate-300 hover:bg-white/10 hover:text-white transition-all">
-                <svg class="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                <span>Resource Burn</span>
+            <a href="/cost-tracker" class="flex items-center px-3 py-2 text-xs font-medium text-gray-400 hover:text-matrix-green hover:bg-gray-900 border-l-2 border-transparent hover:border-matrix-green transition-colors">
+                <span class="w-8 inline-block text-gray-600">[$]</span> <span>Resource Burn</span>
             </a>
-            
+
             {% if user and user.email.lower() == 'pavannaidu9031@gmail.com' %}
-            <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-3 mt-6 mb-2">Administration</div>
-            <a href="/admin/users" class="flex items-center space-x-3 px-3 py-2.5 rounded-2xl text-sm font-medium text-red-400 hover:bg-red-500/10 transition-all">
-                <svg class="w-4 h-4 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8V7z"></path></svg>
-                <span>Admin Panel</span>
+            <div class="text-[10px] font-bold text-gray-600 uppercase tracking-widest px-3 mt-8 mb-3 border-b border-gray-800 pb-1">Root Access</div>
+            <a href="/admin/users" class="flex items-center px-3 py-2 text-xs font-bold text-red-500 hover:bg-gray-900 border-l-2 border-transparent hover:border-red-500 transition-colors">
+                <span class="w-8 inline-block text-red-800">[#]</span> <span>Admin Override</span>
             </a>
             {% endif %}
         </div>
 
-        <div class="p-4 border-t border-white/10 bg-slate-900/40 flex flex-col space-y-3">
+        <div class="p-4 border-t border-gray-800 bg-gray-900 scanline flex flex-col space-y-3">
             <div class="flex items-center justify-between">
-                <div class="flex items-center space-x-2 overflow-hidden">
-                    {% if user.picture %}<img src="{{ user.picture }}" class="w-7 h-7 rounded-full flex-shrink-0 shadow-sm">{% endif %}
-                    <span class="text-sm font-semibold text-slate-200 truncate">{{ user.name }}</span>
+                <div class="flex items-center space-x-3 overflow-hidden">
+                    <div class="w-2 h-2 bg-matrix-green rounded-full animate-pulse"></div>
+                    <span class="text-[10px] font-bold text-gray-400 tracking-wider truncate uppercase">USR: {{ user.name }}</span>
                 </div>
-                <a href="/logout" class="text-xs text-slate-400 hover:text-red-400 font-medium transition-colors" title="Logout">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
-                </a>
+                <a href="/logout" class="text-[10px] text-gray-600 hover:text-red-500 font-bold tracking-widest uppercase transition">KILL</a>
             </div>
         </div>
     </aside>
     {% endif %}
 
     <!-- MAIN CONTENT AREA -->
-    <div class="flex-1 {% if user %}ml-64{% endif %} min-h-screen flex flex-col">
+    <div class="flex-1 {% if user %}ml-64{% endif %} min-h-screen flex flex-col bg-black">
         {% if user %}
-        <header class="h-16 border-b border-white/10 glass-panel sticky top-0 z-40 px-8 flex items-center justify-between">
-            <div class="text-base font-bold text-white tracking-wide">{% block header_title %}Dashboard{% endblock %}</div>
-            <div class="flex items-center space-x-4 pr-24">
-                <span class="text-xs px-3 py-1 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 font-semibold tracking-wide shadow-sm">Branch: {{ current_branch|default('main') }}</span>
+        <header class="h-16 border-b border-gray-800 bg-black/90 backdrop-blur-md sticky top-0 z-40 px-8 flex items-center justify-between">
+            <div class="text-sm font-display font-bold tracking-widest uppercase text-gray-300">{% block header_title %}SYSTEM DASHBOARD{% endblock %}</div>
+            <div class="flex items-center space-x-4">
+                <span class="text-[10px] px-2 py-1 bg-gray-900 text-matrix-green border border-gray-700 font-mono tracking-widest uppercase">BR: {{ current_branch|default('MAIN') }}</span>
             </div>
         </header>
         {% endif %}
@@ -230,183 +174,114 @@
         </main>
     </div>
 
-    <!-- DIGITAL TWIN SANDBOX MODAL -->
-    <div id="sandboxModal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-slate-950/80 backdrop-blur-md opacity-0 transition-opacity duration-300">
-        <div class="glass-panel rounded-3xl shadow-2xl max-w-4xl w-full mx-4 overflow-hidden flex flex-col md:flex-row transform scale-95 transition-all duration-300 border border-white/10" id="sandboxContent">
-            <div class="p-8 md:w-1/2 border-b md:border-b-0 md:border-r border-white/10 bg-slate-900/40">
-                <div class="flex justify-between items-center mb-6">
-                    <h2 class="text-xl font-bold text-white flex items-center gap-2">
-                        <svg class="w-5 h-5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
-                        Digital Twin Sandbox
+    <!-- INDUSTRIAL DIGITAL TWIN SANDBOX (BRUTALIST MODAL) -->
+    <div id="sandboxModal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-black/90 backdrop-blur-sm opacity-0 transition-opacity duration-200">
+        <div class="bg-black border border-gray-700 shadow-hard max-w-4xl w-full mx-4 overflow-hidden flex flex-col md:flex-row transform scale-95 transition-transform duration-200" id="sandboxContent">
+            
+            <div class="p-8 md:w-1/2 border-b md:border-b-0 md:border-r border-gray-800 bg-gray-900/50">
+                <div class="flex justify-between items-center mb-8 border-b border-gray-800 pb-4">
+                    <h2 class="text-lg font-display font-bold text-gray-200 tracking-widest uppercase">
+                        [SIM] Digital_Twin
                     </h2>
-                    <button onclick="toggleSandbox()" class="text-slate-400 hover:text-white md:hidden">
-                        <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-                    </button>
+                    <button onclick="toggleSandbox()" class="text-gray-500 hover:text-red-500 font-bold md:hidden">X</button>
                 </div>
                 
                 <div class="space-y-5">
                     <div>
-                        <div class="flex justify-between text-xs mb-1.5"><span class="text-slate-400 font-semibold">RF Power (W)</span><span id="val_rf" class="text-indigo-400 font-medium">120</span></div>
-                        <input type="range" id="sim_rf" min="50" max="300" value="120" class="w-full accent-indigo-500 cursor-pointer" oninput="updateSim()">
+                        <div class="flex justify-between text-[10px] uppercase tracking-widest font-bold mb-2"><span class="text-gray-500">RF Power_W</span><span id="val_rf" class="text-matrix-green">120</span></div>
+                        <input type="range" id="sim_rf" min="50" max="300" value="120" class="w-full accent-matrix-green bg-gray-800 h-1 appearance-none outline-none" oninput="updateSim()">
                     </div>
                     <div>
-                        <div class="flex justify-between text-xs mb-1.5"><span class="text-slate-400 font-semibold">Pressure (mTorr)</span><span id="val_pres" class="text-indigo-400 font-medium">5.0</span></div>
-                        <input type="range" id="sim_pres" min="1.0" max="20.0" step="0.5" value="5.0" class="w-full accent-indigo-500 cursor-pointer" oninput="updateSim()">
+                        <div class="flex justify-between text-[10px] uppercase tracking-widest font-bold mb-2"><span class="text-gray-500">Pressure_mT</span><span id="val_pres" class="text-matrix-green">5.0</span></div>
+                        <input type="range" id="sim_pres" min="1.0" max="20.0" step="0.5" value="5.0" class="w-full accent-matrix-green bg-gray-800 h-1 appearance-none outline-none" oninput="updateSim()">
                     </div>
                     <div>
-                        <div class="flex justify-between text-xs mb-1.5"><span class="text-slate-400 font-semibold">Target Distance (cm)</span><span id="val_dist" class="text-indigo-400 font-medium">7.0</span></div>
-                        <input type="range" id="sim_dist" min="3.0" max="15.0" step="0.1" value="7.0" class="w-full accent-indigo-500 cursor-pointer" oninput="updateSim()">
+                        <div class="flex justify-between text-[10px] uppercase tracking-widest font-bold mb-2"><span class="text-gray-500">Dist_cm</span><span id="val_dist" class="text-matrix-green">7.0</span></div>
+                        <input type="range" id="sim_dist" min="3.0" max="15.0" step="0.1" value="7.0" class="w-full accent-matrix-green bg-gray-800 h-1 appearance-none outline-none" oninput="updateSim()">
                     </div>
                     <div>
-                        <div class="flex justify-between text-xs mb-1.5"><span class="text-slate-400 font-semibold">Sputter Time (s)</span><span id="val_time" class="text-indigo-400 font-medium">600</span></div>
-                        <input type="range" id="sim_time" min="10" max="3600" step="10" value="600" class="w-full accent-indigo-500 cursor-pointer" oninput="updateSim()">
+                        <div class="flex justify-between text-[10px] uppercase tracking-widest font-bold mb-2"><span class="text-gray-500">Time_sec</span><span id="val_time" class="text-matrix-green">600</span></div>
+                        <input type="range" id="sim_time" min="10" max="3600" step="10" value="600" class="w-full accent-matrix-green bg-gray-800 h-1 appearance-none outline-none" oninput="updateSim()">
                     </div>
                     <div>
-                        <div class="flex justify-between text-xs mb-1.5"><span class="text-slate-400 font-semibold">Ar Flow (sccm)</span><span id="val_ar" class="text-indigo-400 font-medium">20</span></div>
-                        <input type="range" id="sim_ar" min="5" max="100" value="20" class="w-full accent-indigo-500 cursor-pointer" oninput="updateSim()">
+                        <div class="flex justify-between text-[10px] uppercase tracking-widest font-bold mb-2"><span class="text-gray-500">Ar_sccm</span><span id="val_ar" class="text-matrix-green">20</span></div>
+                        <input type="range" id="sim_ar" min="5" max="100" value="20" class="w-full accent-matrix-green bg-gray-800 h-1 appearance-none outline-none" oninput="updateSim()">
                     </div>
                     <div>
-                        <div class="flex justify-between text-xs mb-1.5"><span class="text-slate-400 font-semibold">Substrate Temp (°C)</span><span id="val_temp" class="text-indigo-400 font-medium">300</span></div>
-                        <input type="range" id="sim_temp" min="25" max="800" step="25" value="300" class="w-full accent-indigo-500 cursor-pointer" oninput="updateSim()">
+                        <div class="flex justify-between text-[10px] uppercase tracking-widest font-bold mb-2"><span class="text-gray-500">Temp_C</span><span id="val_temp" class="text-matrix-green">300</span></div>
+                        <input type="range" id="sim_temp" min="25" max="800" step="25" value="300" class="w-full accent-matrix-green bg-gray-800 h-1 appearance-none outline-none" oninput="updateSim()">
                     </div>
                 </div>
             </div>
 
-            <div class="p-8 md:w-1/2 flex flex-col justify-center relative bg-slate-900/60">
-                <button onclick="toggleSandbox()" class="absolute top-6 right-6 text-slate-400 hover:text-white hidden md:block transition-colors">
-                    <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            <div class="p-8 md:w-1/2 flex flex-col justify-center relative bg-black scanline">
+                <button onclick="toggleSandbox()" class="absolute top-6 right-6 text-gray-600 hover:text-red-500 font-mono text-sm hidden md:block">
+                    [CLOSE]
                 </button>
-                <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-6">Real-Time Surrogate Predictions</h3>
-                <div class="space-y-4">
-                    <div class="bg-slate-950/60 border border-white/5 rounded-2xl p-5 flex justify-between items-center shadow-sm">
-                        <span class="text-sm font-semibold text-slate-300">Predicted Thickness</span>
-                        <div class="text-right"><div class="text-2xl font-extrabold text-indigo-400" id="pred_thick">-- nm</div></div>
+                
+                <h3 class="text-[10px] font-bold text-gray-600 uppercase tracking-widest mb-8 border-b border-gray-800 pb-2">Output Telemetry</h3>
+                
+                <div class="space-y-6">
+                    <div class="border-l-2 border-gray-700 pl-4 py-1">
+                        <span class="text-[10px] font-bold text-gray-500 uppercase tracking-widest block mb-1">Thickness</span>
+                        <div class="text-2xl font-bold text-gray-200" id="pred_thick">-- nm</div>
                     </div>
-                    <div class="bg-slate-950/60 border border-white/5 rounded-2xl p-5 flex justify-between items-center shadow-sm">
-                        <span class="text-sm font-semibold text-slate-300">Wavelength Shift</span>
-                        <div class="text-right"><div class="text-2xl font-extrabold text-purple-400" id="pred_shift">-- pm</div></div>
+                    <div class="border-l-2 border-gray-700 pl-4 py-1">
+                        <span class="text-[10px] font-bold text-gray-500 uppercase tracking-widest block mb-1">Lambda Shift</span>
+                        <div class="text-2xl font-bold text-gray-200" id="pred_shift">-- pm</div>
                     </div>
-                    <div class="bg-slate-950/60 border border-white/5 rounded-2xl p-5 flex justify-between items-center shadow-sm relative overflow-hidden">
-                        <div class="absolute left-0 top-0 bottom-0 w-1.5 bg-emerald-500"></div>
-                        <span class="text-sm font-semibold text-slate-300 pl-3">Est. Quality Score</span>
-                        <div class="text-right"><div class="text-2xl font-extrabold text-emerald-400" id="pred_score">-- / 100</div></div>
+                    <div class="border-l-2 border-matrix-green pl-4 py-1 bg-matrix-green/5">
+                        <span class="text-[10px] font-bold text-matrix-green uppercase tracking-widest block mb-1">Est. Score</span>
+                        <div class="text-3xl font-extrabold text-matrix-green" id="pred_score">-- / 100</div>
                     </div>
                 </div>
+                
+                <p class="text-[9px] text-gray-700 mt-10 tracking-widest uppercase">Sys: Proprietary Engine Active</p>
             </div>
         </div>
     </div>
 
-    <!-- AI SCIENTIFIC CO-PILOT DRAWER -->
-    <button id="btnChatToggle" class="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-tr from-brand-600 to-indigo-500 rounded-full shadow-glow flex items-center justify-center text-white hover:scale-105 transition-all z-50">
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
+    <!-- TERMINAL CHAT DRAWER -->
+    <button id="btnChatToggle" class="fixed bottom-6 right-6 w-12 h-12 bg-matrix-green text-black border border-matrix-green shadow-hard font-bold flex items-center justify-center hover:bg-green-400 hover:-translate-y-1 transition-all z-50">
+        >_
     </button>
 
-    <div id="chatDrawer" class="fixed top-0 right-0 w-full sm:w-[400px] h-full glass-panel border-l border-white/10 shadow-2xl transform translate-x-full transition-transform duration-300 ease-in-out z-[60] flex flex-col">
-        <div class="h-16 border-b border-white/10 flex items-center justify-between px-6 bg-slate-900/60">
+    <div id="chatDrawer" class="fixed top-0 right-0 w-full sm:w-[450px] h-full bg-black border-l border-gray-800 shadow-2xl transform translate-x-full transition-transform duration-200 ease-out z-[60] flex flex-col">
+        <div class="h-16 border-b border-gray-800 flex items-center justify-between px-6 bg-gray-900 scanline">
             <div class="flex items-center space-x-3">
-                <div class="w-8 h-8 rounded-xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold border border-indigo-500/30">AI</div>
-                <span class="font-bold text-white">Scientific Co-Pilot</span>
+                <span class="font-display font-bold text-gray-300 tracking-widest uppercase">Terminal_Uplink</span>
             </div>
-            <button id="btnCloseChat" class="text-slate-400 hover:text-white transition">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            <button id="btnCloseChat" class="text-gray-500 hover:text-red-500 font-bold tracking-widest text-xs">
+                [X]
             </button>
         </div>
-        <div id="chatHistory" class="flex-1 overflow-y-auto p-6 space-y-5 bg-slate-950/40">
-            <div class="flex items-start space-x-3">
-                <div class="w-8 h-8 rounded-full bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 flex-shrink-0 flex items-center justify-center text-xs font-bold">AI</div>
-                <div class="bg-slate-900/80 border border-white/10 rounded-2xl rounded-tl-none px-4 py-3 text-sm text-slate-200 shadow-sm">
-                    Hello! I'm your MatrixAI Co-Pilot. I have access to your recent experiments. How can I help you optimize your process today?
+        
+        <div id="chatHistory" class="flex-1 overflow-y-auto p-6 space-y-6 bg-black">
+            <div class="flex flex-col space-y-1">
+                <div class="text-[10px] text-gray-600 font-bold uppercase tracking-widest">System_Message</div>
+                <div class="border border-gray-800 bg-gray-900/50 p-3 text-sm text-matrix-green font-mono leading-relaxed">
+                    Root access verified. Material logic loaded. Input query parameters below.
                 </div>
             </div>
         </div>
-        <div class="p-5 bg-slate-900/60 border-t border-white/10">
+        
+        <div class="p-4 bg-gray-900 border-t border-gray-800">
             <div class="flex items-center space-x-2 mb-3">
-                <label class="text-xs text-slate-400 font-semibold">Model:</label>
-                <select id="aiProvider" class="bg-slate-950 border border-white/10 text-xs text-white rounded-xl px-3 py-1.5 focus:border-indigo-500">
-                    <option value="gemini">Google Gemini 2.5</option>
-                    <option value="groq">Groq LLaMA 3</option>
+                <label class="text-[10px] text-gray-500 uppercase tracking-widest font-bold">Node:</label>
+                <select id="aiProvider" class="bg-black border border-gray-700 text-xs text-matrix-green p-1 uppercase focus:border-matrix-green outline-none">
+                    <option value="gemini">Gemini-Core</option>
+                    <option value="groq">Llama-Fast</option>
                 </select>
             </div>
-            <div class="relative">
-                <textarea id="chatInput" rows="2" placeholder="Ask about physics or parameters..." class="w-full bg-slate-950 border border-white/10 rounded-xl py-3 px-4 pr-12 text-sm text-white focus:border-indigo-500 resize-none transition shadow-sm"></textarea>
-                <button id="btnSendChat" class="absolute right-2 bottom-2 bg-brand-600 hover:bg-brand-500 text-white rounded-lg p-2 transition shadow-sm">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
+            <div class="relative flex space-x-2">
+                <textarea id="chatInput" rows="1" placeholder="enter sequence..." class="w-full bg-black border border-gray-700 p-3 text-sm text-gray-200 focus:border-matrix-green transition-colors resize-none placeholder-gray-700 outline-none"></textarea>
+                <button id="btnSendChat" class="bg-gray-800 hover:bg-matrix-green hover:text-black border border-gray-700 text-gray-400 font-bold p-3 transition-colors uppercase text-xs tracking-widest">
+                    Run
                 </button>
             </div>
         </div>
     </div>
 
-    <!-- SCRIPTS -->
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const html = document.documentElement;
-            const isDark = localStorage.getItem('matrix_theme') !== 'light';
-            const bulb = document.getElementById('theme-bulb');
-            const filament = document.getElementById('filament');
-            if (!isDark) {
-                html.classList.remove('dark');
-                bulb.className = "w-12 h-12 rounded-full -mt-1.5 transition-all duration-300 z-40 relative overflow-hidden flex items-center justify-center cursor-pointer bg-yellow-100 border-2 border-yellow-300 shadow-[0_0_30px_10px_rgba(250,204,21,0.4)]";
-                filament.className = "w-2 h-3 border-b-2 border-l-2 border-r-2 rounded-b-md transition-all duration-300 border-yellow-500 opacity-100";
-            }
-        });
-
-        function pullThemeCord(action) {
-            const cord = document.getElementById(`cord-${action}`);
-            const html = document.documentElement;
-            const bulb = document.getElementById('theme-bulb');
-            const filament = document.getElementById('filament');
-            cord.style.transform = 'scaleY(1.5)';
-            setTimeout(() => {
-                cord.style.transform = 'scaleY(1)';
-                if (action === 'on') {
-                    html.classList.remove('dark');
-                    localStorage.setItem('matrix_theme', 'light');
-                    bulb.className = "w-12 h-12 rounded-full -mt-1.5 transition-all duration-300 z-40 relative overflow-hidden flex items-center justify-center cursor-pointer bg-yellow-100 border-2 border-yellow-300 shadow-[0_0_30px_10px_rgba(250,204,21,0.4)]";
-                    filament.className = "w-2 h-3 border-b-2 border-l-2 border-r-2 rounded-b-md transition-all duration-300 border-yellow-500 opacity-100";
-                } else {
-                    html.classList.add('dark');
-                    localStorage.setItem('matrix_theme', 'dark');
-                    bulb.className = "w-12 h-12 rounded-full -mt-1.5 transition-all duration-300 z-40 relative overflow-hidden flex items-center justify-center cursor-pointer bg-slate-800 border-2 border-slate-600 shadow-inner";
-                    filament.className = "w-2 h-3 border-b-2 border-l-2 border-r-2 rounded-b-md transition-all duration-300 border-slate-500 opacity-50";
-                }
-            }, 200);
-        }
-    </script>
-    <script>
-        const sandboxModal = document.getElementById('sandboxModal');
-        const sandboxContent = document.getElementById('sandboxContent');
-        let simTimeout;
-        function toggleSandbox() {
-            if (sandboxModal.classList.contains('hidden')) {
-                sandboxModal.classList.remove('hidden');
-                setTimeout(() => { sandboxModal.classList.remove('opacity-0'); sandboxContent.classList.remove('scale-95'); runSimulation(); }, 10);
-            } else {
-                sandboxModal.classList.add('opacity-0'); sandboxContent.classList.add('scale-95');
-                setTimeout(() => sandboxModal.classList.add('hidden'), 300);
-            }
-        }
-        function updateSim() {
-            document.getElementById('val_rf').innerText = document.getElementById('sim_rf').value;
-            document.getElementById('val_pres').innerText = document.getElementById('sim_pres').value;
-            document.getElementById('val_dist').innerText = document.getElementById('sim_dist').value;
-            document.getElementById('val_time').innerText = document.getElementById('sim_time').value;
-            document.getElementById('val_ar').innerText = document.getElementById('sim_ar').value;
-            document.getElementById('val_temp').innerText = document.getElementById('sim_temp').value;
-            clearTimeout(simTimeout); simTimeout = setTimeout(runSimulation, 300);
-        }
-        async function runSimulation() {
-            const params = [document.getElementById('sim_rf').value, document.getElementById('sim_pres').value, document.getElementById('sim_dist').value, document.getElementById('sim_time').value, document.getElementById('sim_ar').value, document.getElementById('sim_temp').value];
-            try {
-                const res = await fetch('/api/sandbox/simulate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ params: params, target_material: 'Generic', branch: 'main' }) });
-                const data = await res.json();
-                if (data.success && data.simulation) {
-                    document.getElementById('pred_thick').innerText = parseFloat(data.simulation.thickness || 50).toFixed(1) + ' nm';
-                    document.getElementById('pred_shift').innerText = parseFloat(data.simulation.shift || 2).toFixed(2) + ' pm';
-                    document.getElementById('pred_score').innerText = parseFloat(data.simulation.score || 50).toFixed(1) + ' / 100';
-                }
-            } catch (e) { console.error('Sim error:', e); }
-        }
-    </script>
     <script>
         const chatDrawer = document.getElementById('chatDrawer');
         const btnChatToggle = document.getElementById('btnChatToggle');
@@ -415,44 +290,254 @@
         const chatInput = document.getElementById('chatInput');
         const btnSendChat = document.getElementById('btnSendChat');
         const aiProvider = document.getElementById('aiProvider');
+
         const toggleDrawer = () => chatDrawer.classList.toggle('translate-x-full');
         btnChatToggle.addEventListener('click', toggleDrawer);
         btnCloseChat.addEventListener('click', toggleDrawer);
 
+        chatInput.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = (this.scrollHeight) + 'px';
+            if (this.value === '') this.style.height = 'auto';
+        });
+
         function appendMessage(role, text) {
             const wrapper = document.createElement('div');
-            wrapper.className = 'flex items-start space-x-3 ' + (role === 'user' ? 'flex-row-reverse space-x-reverse' : '');
-            const avatar = document.createElement('div');
-            avatar.className = role === 'user' ? 'w-8 h-8 rounded-full bg-slate-700 flex-shrink-0 flex items-center justify-center text-xs font-bold text-white' : 'w-8 h-8 rounded-full bg-indigo-500/20 border border-indigo-500/30 flex-shrink-0 flex items-center justify-center text-xs font-bold text-indigo-400';
-            avatar.innerText = role === 'user' ? 'U' : 'AI';
+            wrapper.className = 'flex flex-col space-y-1 mb-4';
+            
+            const header = document.createElement('div');
+            header.className = role === 'user' 
+                ? 'text-[10px] text-gray-500 font-bold uppercase tracking-widest text-right' 
+                : 'text-[10px] text-matrix-green font-bold uppercase tracking-widest';
+            header.innerText = role === 'user' ? 'Local_User' : 'Matrix_Response';
+
             const bubble = document.createElement('div');
-            bubble.className = role === 'user' ? 'bg-indigo-600 text-white rounded-2xl rounded-tr-none px-4 py-3 text-sm shadow-sm' : 'glass-panel border border-white/10 rounded-2xl rounded-tl-none px-4 py-3 text-sm text-slate-200 shadow-sm';
-            bubble.innerHTML = text.replace(/\*\*(.*?)\*\*/g, '<strong class="font-bold">$1</strong>').replace(/\n/g, '<br>');
-            wrapper.appendChild(avatar); wrapper.appendChild(bubble); chatHistory.appendChild(wrapper);
+            bubble.className = role === 'user'
+                ? 'border border-gray-700 bg-gray-900 p-3 text-sm text-gray-300 ml-8'
+                : 'border border-gray-800 bg-gray-900/50 p-3 text-sm text-gray-300 mr-8';
+            
+            let formattedText = text.replace(/\*\*(.*?)\*\*/g, '<strong class="text-white">$1</strong>');
+            formattedText = formattedText.replace(/\n/g, '<br>');
+            bubble.innerHTML = formattedText;
+
+            wrapper.appendChild(header);
+            wrapper.appendChild(bubble);
+            chatHistory.appendChild(wrapper);
             chatHistory.scrollTop = chatHistory.scrollHeight;
         }
 
         async function sendChatMessage() {
-            const message = chatInput.value.trim(); if (!message) return;
-            const provider = aiProvider.value; appendMessage('user', message); chatInput.value = '';
+            const message = chatInput.value.trim();
+            if (!message) return;
+
+            const provider = aiProvider.value;
+            appendMessage('user', message);
+            chatInput.value = '';
+            chatInput.style.height = 'auto';
+
             const loadingId = 'loading-' + Date.now();
-            const loadingWrapper = document.createElement('div'); loadingWrapper.id = loadingId; loadingWrapper.className = 'flex items-start space-x-3';
-            loadingWrapper.innerHTML = `<div class="w-8 h-8 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center text-xs font-bold animate-pulse">AI</div><div class="glass-panel px-4 py-3 rounded-2xl text-sm flex space-x-1 items-center h-10"><div class="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce"></div><div class="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style="animation-delay: 0.1s"></div></div>`;
-            chatHistory.appendChild(loadingWrapper); chatHistory.scrollTop = chatHistory.scrollHeight;
+            const loadingWrapper = document.createElement('div');
+            loadingWrapper.id = loadingId;
+            loadingWrapper.className = 'flex flex-col space-y-1 mb-4';
+            loadingWrapper.innerHTML = `
+                <div class="text-[10px] text-matrix-green font-bold uppercase tracking-widest animate-pulse">Matrix_Computing...</div>
+            `;
+            chatHistory.appendChild(loadingWrapper);
+            chatHistory.scrollTop = chatHistory.scrollHeight;
+
             try {
-                const res = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: message, provider: provider }) });
-                const data = await res.json(); document.getElementById(loadingId).remove();
-                if (res.ok && data.reply) appendMessage('ai', data.reply); else appendMessage('ai', 'Error connecting to AI.');
-            } catch (err) { document.getElementById(loadingId).remove(); appendMessage('ai', 'Server unreachable.'); }
+                const res = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: message, provider: provider })
+                });
+                
+                const data = await res.json();
+                document.getElementById(loadingId).remove();
+
+                if (res.ok && data.reply) {
+                    appendMessage('ai', data.reply);
+                } else {
+                    appendMessage('ai', `[ERROR]: ${data.error || 'Connection refused.'}`);
+                }
+            } catch (err) {
+                document.getElementById(loadingId).remove();
+                appendMessage('ai', '[ERROR]: Packet loss. Server unreachable.');
+            }
         }
+
         btnSendChat.addEventListener('click', sendChatMessage);
-        chatInput.addEventListener('keypress', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChatMessage(); } });
+        chatInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendChatMessage();
+            }
+        });
     </script>
+
+    <!-- BRUTALIST ANIMATION SCRIPT -->
     <script>
-        setTimeout(() => {
-            const splash = document.getElementById('splashScreen');
-            if (splash) { splash.style.opacity = '0'; setTimeout(() => { splash.style.display = 'none'; }, 700); }
-        }, 500);
+        const loadingTexts = [
+            "root@matrix:~# mounting secure partitions...",
+            "root@matrix:~# establishing connection to DB cluster...",
+            "root@matrix:~# calibrating logic parameters...",
+            "root@matrix:~# bypassing safety interlocks...",
+            "root@matrix:~# SYSTEM ONLINE."
+        ];
+        
+        let textIndex = 0;
+        const textElement = document.getElementById('loadingText');
+        const barElement = document.getElementById('loadingBar');
+        
+        const textInterval = setInterval(() => {
+            textIndex++;
+            if (textIndex < loadingTexts.length) {
+                if (textElement) {
+                    textElement.innerText += "\n" + loadingTexts[textIndex];
+                }
+                if (barElement) barElement.style.width = ((textIndex + 1) * 20) + '%';
+            } else {
+                clearInterval(textInterval);
+                setTimeout(() => {
+                    const splash = document.getElementById('splashScreen');
+                    if (splash) {
+                        splash.style.opacity = '0';
+                        setTimeout(() => {
+                            splash.style.display = 'none';
+                        }, 700);
+                    }
+                }, 500);
+            }
+        }, 400);
+
+        const canvas = document.getElementById('latticeCanvas');
+        if (canvas) {
+            const ctx = canvas.getContext('2d');
+            
+            function resizeCanvas() {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+            }
+            window.addEventListener('resize', resizeCanvas);
+            resizeCanvas();
+
+            const particles = [];
+            const particleCount = 40;
+
+            for (let i = 0; i < particleCount; i++) {
+                particles.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height,
+                    vx: (Math.random() - 0.5) * 1.5,
+                    vy: (Math.random() - 0.5) * 1.5,
+                    size: Math.random() * 2 + 1
+                });
+            }
+
+            function animateLattice() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                
+                for (let i = 0; i < particles.length; i++) {
+                    for (let j = i + 1; j < particles.length; j++) {
+                        const dx = particles[i].x - particles[j].x;
+                        const dy = particles[i].y - particles[j].y;
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+                        
+                        if (dist < 150) {
+                            ctx.beginPath();
+                            ctx.moveTo(particles[i].x, particles[i].y);
+                            ctx.lineTo(particles[j].x, particles[j].y);
+                            ctx.strokeStyle = `rgba(0, 255, 65, ${0.5 - dist / 300})`;
+                            ctx.lineWidth = 1;
+                            ctx.stroke();
+                        }
+                    }
+                }
+
+                particles.forEach(p => {
+                    p.x += p.vx;
+                    p.y += p.vy;
+
+                    if (p.x < 0 || p.x > canvas.width) p.vx *= -1;
+                    if (p.y < 0 || p.y > canvas.height) p.vy *= -1;
+
+                    // Draw square hacker nodes instead of circles
+                    ctx.fillStyle = '#00FF41';
+                    ctx.fillRect(p.x - p.size, p.y - p.size, p.size * 2, p.size * 2);
+                });
+
+                requestAnimationFrame(animateLattice);
+            }
+            animateLattice();
+        }
+
+        // PDF GENERATOR WITH BRUTALIST AESTHETIC
+        function downloadLabDossier(expData) {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF('p', 'mm', 'a4');
+            
+            // Brutalist PDF Colors
+            const black = [0, 0, 0];
+            const gray = [50, 50, 50];
+            
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(24);
+            doc.text("MATRIX_AI // LAB DOSSIER", 14, 22);
+            
+            doc.setFontSize(12);
+            doc.setTextColor(gray[0], gray[1], gray[2]);
+            doc.text(`Run ID: [${expData.id || 'N/A'}] | Timestamp: ${new Date().toLocaleString()}`, 14, 30);
+
+            doc.setDrawColor(0, 0, 0);
+            doc.setLineWidth(1);
+            doc.line(14, 35, 196, 35);
+
+            doc.autoTable({
+                startY: 45,
+                head: [['Target Material', 'Phase', 'Shift (pm)', 'Score']],
+                body: [[ expData.target_material || 'Generic', expData.xrd_phase || 'Amorphous', expData.wavelength_shift || '0.0', expData.quality_score || '0.0' ]],
+                headStyles: { fillColor: black, textColor: 255, fontStyle: 'bold', halign: 'center' },
+                theme: 'grid',
+                styles: { fontSize: 10, halign: 'center' }
+            });
+
+            doc.autoTable({
+                startY: doc.lastAutoTable.finalY + 15,
+                head: [['Parameter', 'Value', 'Unit']],
+                body: [
+                    ['RF Power', expData.rf_power || 'N/A', 'W'],
+                    ['Working Pressure', expData.working_pressure || 'N/A', 'mTorr'],
+                    ['Target Distance', expData.target_distance || 'N/A', 'cm'],
+                    ['Sputter Time', expData.sputter_time_s || 'N/A', 's'],
+                    ['Argon Flow', expData.ar_flow || 'N/A', 'sccm'],
+                    ['Oxygen Flow', expData.o2_flow || 'N/A', 'sccm'],
+                    ['Substrate Temp', expData.substrate_temp || 'N/A', '°C'],
+                    ['Rotation Speed', expData.rotation_speed || 'N/A', 'RPM']
+                ],
+                headStyles: { fillColor: gray, textColor: 255 },
+                theme: 'striped',
+                styles: { fontSize: 10 }
+            });
+
+            let finalY = doc.lastAutoTable.finalY + 14;
+            doc.setFont("helvetica", "bold");
+            doc.text("SYS_LOGS & DIAGNOSTICS", 14, finalY);
+            
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(10);
+            const notes = expData.batch_notes || "No operational notes provided for this physical run.";
+            const splitNotes = doc.splitTextToSize(notes, 175); 
+            doc.text(splitNotes, 14, finalY + 6);
+
+            const pageCount = doc.internal.getNumberOfPages();
+            for(let i = 1; i <= pageCount; i++) {
+                doc.setPage(i);
+                doc.setFontSize(8);
+                doc.text(`[SYS_AUTH: PROPRIETARY ENGINE] - PG ${i}/${pageCount}`, 105, 285, null, null, "center");
+            }
+
+            doc.save(`MATRIX_RUN_${expData.id || 'EXPORT'}.pdf`);
+        }
     </script>
 </body>
 </html>
