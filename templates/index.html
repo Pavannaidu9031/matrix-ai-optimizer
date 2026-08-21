@@ -5,73 +5,62 @@
 
 {% block content %}
 {% if not user %}
-    <!-- LANDING HERO -->
-    <style>
-        @media (min-width: 768px) {
-            body::before {
-                content: ""; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-                background-image: linear-gradient(180deg, rgba(3, 7, 18, 0.95) 0%, rgba(15, 23, 42, 0.8) 100%), url('/static/hero-bg.jpg');
-                background-size: cover; background-position: center; background-repeat: no-repeat;
-                opacity: 0.15; z-index: -1;
-            }
-        }
-    </style>
-    <div class="text-center py-20 space-y-6 max-w-3xl mx-auto">
-        <div class="inline-flex items-center space-x-2 px-3.5 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-semibold">
-            <span>✨ Intelligent Materials Science Engine</span>
+    <div class="text-center py-24 space-y-8 max-w-3xl mx-auto">
+        <div class="inline-flex items-center space-x-2 px-4 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-semibold shadow-glow">
+            <span>✨ VisionOS Spatial Materials Engine</span>
         </div>
-        <h1 class="text-4xl md:text-5xl font-extrabold text-white tracking-tight leading-tight">
+        <h1 class="text-5xl font-extrabold text-white tracking-tight leading-tight">
             From first experiment to optimal parameters — intelligently.
         </h1>
-        <p class="text-slate-400 text-base leading-relaxed">
+        <p class="text-slate-300 text-base leading-relaxed">
             MatrixAI uses advanced AI process optimization to intelligently guide your thin-film deposition experiments. Compatible with any PVD or CVD process — WO₃, TiO₂, ZnO, Pd, SnO₂, and beyond.
         </p>
         <div class="pt-4">
-            <a href="/login/google" class="inline-flex items-center space-x-2 bg-blue-500 hover:bg-blue-400 text-slate-950 font-bold px-6 py-3 rounded-xl transition shadow-lg shadow-blue-500/25">
+            <a href="/login/google" class="inline-flex items-center space-x-2 bg-brand-600 hover:bg-brand-500 text-white font-bold px-8 py-4 rounded-2xl transition shadow-glow">
                 <span>Get Started with Google</span>
             </a>
         </div>
     </div>
 {% else %}
 
-    <!-- FEATURE 5: OPTIMIZATION BRANCHING TABS -->
-    <div class="flex items-center space-x-2 overflow-x-auto pb-4 border-b border-slate-800">
-        <span class="text-xs font-bold text-slate-500 uppercase tracking-wider mr-2">Branches:</span>
+    <!-- BRANCHING TABS -->
+    <div class="flex items-center space-x-3 overflow-x-auto pb-2">
+        <span class="text-xs font-bold text-slate-400 uppercase tracking-wider mr-1">Branches:</span>
         {% for b in branches %}
-            <a href="/?branch={{ b }}" class="px-4 py-2 rounded-lg text-sm font-semibold transition whitespace-nowrap {% if b == current_branch %}bg-blue-600 text-white shadow-lg shadow-blue-500/25{% else %}bg-slate-800 text-slate-400 hover:bg-slate-700{% endif %}">
+            <a href="/?branch={{ b }}" class="px-4 py-2 rounded-2xl text-sm font-semibold transition whitespace-nowrap {% if b == current_branch %}bg-indigo-600 text-white shadow-glow border border-indigo-500/50{% else %}glass-panel text-slate-300 hover:bg-white/10{% endif %}">
                 {{ b }}
             </a>
         {% endfor %}
-        <button onclick="createNewBranch()" class="px-3 py-2 rounded-lg text-sm font-bold text-blue-400 border border-blue-500/30 hover:bg-blue-500/10 border-dashed flex items-center whitespace-nowrap transition">
+        <button onclick="createNewBranch()" class="px-4 py-2 rounded-2xl text-sm font-bold text-indigo-400 border border-indigo-500/30 hover:bg-indigo-500/10 border-dashed flex items-center whitespace-nowrap transition">
             + New Branch
         </button>
     </div>
 
-    <!-- HERO STATS BAR -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div class="bg-slate-900/80 p-5 rounded-2xl border border-slate-800 border-l-4 border-l-blue-500 shadow-xl">
-            <div class="text-3xl font-extrabold text-white" id="totalRunsStat">{{ stats.total_runs }}</div>
-            <div class="text-xs font-medium text-slate-400 mt-1">Total Experiments Logged</div>
+    <!-- HERO STATS BAR (VisionOS Glass Cards) -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div class="glass-panel p-6 rounded-3xl border-l-4 border-l-indigo-500 relative overflow-hidden group hover:border-white/20 transition-all">
+            <div class="text-4xl font-extrabold text-white" id="totalRunsStat">{{ stats.total_runs }}</div>
+            <div class="text-xs font-medium text-slate-400 mt-2 tracking-wide uppercase">Total Experiments Logged</div>
         </div>
-        <div class="bg-slate-900/80 p-5 rounded-2xl border border-slate-800 border-l-4 border-l-emerald-500 shadow-xl">
-            <div class="text-3xl font-extrabold text-emerald-400">{{ stats.monoclinic_runs }}</div>
-            <div class="text-xs font-medium text-slate-400 mt-1">Monoclinic Phase Runs</div>
+        <div class="glass-panel p-6 rounded-3xl border-l-4 border-l-emerald-500 relative overflow-hidden group hover:border-white/20 transition-all">
+            <div class="text-4xl font-extrabold text-emerald-400">{{ stats.monoclinic_runs }}</div>
+            <div class="text-xs font-medium text-slate-400 mt-2 tracking-wide uppercase">Monoclinic Phase Runs</div>
         </div>
-        <div class="bg-slate-900/80 p-5 rounded-2xl border border-slate-800 border-l-4 border-l-purple-500 shadow-xl">
-            <div class="text-3xl font-extrabold text-purple-400">{{ stats.best_shift }} <span class="text-sm font-normal text-slate-400">pm</span></div>
-            <div class="text-xs font-medium text-slate-400 mt-1">Best Wavelength Shift</div>
+        <div class="glass-panel p-6 rounded-3xl border-l-4 border-l-purple-500 relative overflow-hidden group hover:border-white/20 transition-all">
+            <div class="text-4xl font-extrabold text-purple-400">{{ stats.best_shift }} <span class="text-sm font-normal text-slate-400">pm</span></div>
+            <div class="text-xs font-medium text-slate-400 mt-2 tracking-wide uppercase">Best Wavelength Shift</div>
         </div>
-        <div class="bg-slate-900/80 p-5 rounded-2xl border border-slate-800 border-l-4 border-l-amber-500 shadow-xl">
-            <div class="text-3xl font-extrabold text-amber-400">{{ stats.runs_remaining }}</div>
-            <div class="text-xs font-medium text-slate-400 mt-1">Optimization Runs Remaining</div>
+        <div class="glass-panel p-6 rounded-3xl border-l-4 border-l-amber-500 relative overflow-hidden group hover:border-white/20 transition-all">
+            <div class="text-4xl font-extrabold text-amber-400">{{ stats.runs_remaining }}</div>
+            <div class="text-xs font-medium text-slate-400 mt-2 tracking-wide uppercase">Optimization Runs Remaining</div>
         </div>
     </div>
 
     <!-- EQUIPMENT HEALTH & CALIBRATION -->
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <section class="bg-slate-900/80 p-6 rounded-2xl border border-slate-800 shadow-xl" id="healthWidget">
+        <section class="glass-panel p-6 rounded-3xl shadow-xl" id="healthWidget">
             <div class="flex justify-between items-center mb-4">
-                <h2 class="text-xl font-bold text-white tracking-tight">Equipment Health</h2>
+                <h2 class="text-lg font-bold text-white tracking-tight">Equipment Health</h2>
                 <span id="healthBadge" class="px-3 py-1 rounded-full text-xs font-bold bg-slate-800 text-slate-400">Loading...</span>
             </div>
             <div id="healthAlerts" class="space-y-3">
@@ -79,9 +68,9 @@
             </div>
         </section>
 
-        <section class="bg-slate-900/80 p-6 rounded-2xl border border-slate-800 shadow-xl" id="calibrationWidget">
+        <section class="glass-panel p-6 rounded-3xl shadow-xl" id="calibrationWidget">
             <div class="flex justify-between items-center mb-4">
-                <h2 class="text-xl font-bold text-white tracking-tight">Model Calibration</h2>
+                <h2 class="text-lg font-bold text-white tracking-tight">Model Calibration</h2>
                 <span id="calibBadge" class="px-3 py-1 rounded-full text-xs font-bold bg-slate-800 text-slate-400">Checking...</span>
             </div>
             <div id="calibAlerts" class="space-y-3">
@@ -92,22 +81,22 @@
 
     <!-- SMART FAILURE ANALYSIS ALERT -->
     {% if failure_analysis and failure_analysis.is_failure %}
-    <div class="bg-red-950/40 border border-red-900 rounded-2xl p-6 shadow-xl space-y-4">
+    <div class="bg-red-950/30 border border-red-500/30 backdrop-blur-xl rounded-3xl p-6 shadow-xl space-y-4">
         <div class="flex items-center space-x-3">
-            <div class="w-10 h-10 bg-red-900/50 rounded-full flex items-center justify-center text-red-500 border border-red-800">
+            <div class="w-10 h-10 bg-red-900/40 rounded-2xl flex items-center justify-center text-red-400 border border-red-500/30">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
             </div>
             <div>
-                <h3 class="text-xl font-bold text-red-400">Smart Failure Analysis Triggered</h3>
-                <p class="text-xs text-red-300/80">Latest run deviated significantly from the successful optimal region.</p>
+                <h3 class="text-lg font-bold text-red-300">Smart Failure Analysis Triggered</h3>
+                <p class="text-xs text-red-300/70">Latest run deviated significantly from the successful optimal region.</p>
             </div>
         </div>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
             {% for cause in failure_analysis.causes %}
-            <div class="bg-red-900/20 border border-red-800/50 rounded-xl p-4">
+            <div class="bg-red-900/10 border border-red-500/20 rounded-2xl p-4">
                 <div class="flex justify-between items-start mb-2">
-                    <h4 class="font-bold text-red-400 text-sm">{{ cause.cause }}</h4>
-                    <span class="text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-wider {% if cause.severity == 'CRITICAL' %}bg-red-600 text-white{% else %}bg-amber-600 text-white{% endif %}">{{ cause.severity }}</span>
+                    <h4 class="font-bold text-red-300 text-sm">{{ cause.cause }}</h4>
+                    <span class="text-[10px] px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider {% if cause.severity == 'CRITICAL' %}bg-red-600 text-white shadow-sm{% else %}bg-amber-600 text-white{% endif %}">{{ cause.severity }}</span>
                 </div>
                 <p class="text-xs text-red-200/70"><strong>Diagnostic Action:</strong> {{ cause.action }}</p>
             </div>
@@ -118,9 +107,9 @@
 
     <!-- OPTIMIZATION HISTORY LEARNING CURVE CHART -->
     {% if experiments %}
-    <section class="bg-slate-900/80 p-6 rounded-2xl border border-slate-800 shadow-xl space-y-4">
+    <section class="glass-panel p-6 rounded-3xl shadow-xl space-y-4">
         <div>
-            <h2 class="text-xl font-bold text-white">Optimization Learning Curve</h2>
+            <h2 class="text-lg font-bold text-white">Optimization Learning Curve</h2>
             <p class="text-xs text-slate-400">Calculated quality score trajectory across logged experiments</p>
         </div>
         <div class="h-64">
@@ -130,9 +119,9 @@
     
     <!-- PLOTLY HEATMAP INSIGHTS SECTION -->
     {% if experiments|length > 2 %}
-    <section class="bg-slate-900/80 p-6 rounded-2xl border border-slate-800 shadow-xl space-y-4">
+    <section class="glass-panel p-6 rounded-3xl shadow-xl space-y-4">
         <div>
-            <h2 class="text-xl font-bold text-white">Parameter Correlation Insights</h2>
+            <h2 class="text-lg font-bold text-white">Parameter Correlation Insights</h2>
             <p class="text-xs text-slate-400">Mathematical impact of input parameters on experimental outcomes.</p>
         </div>
         <div id="heatmapChart" class="w-full h-[400px]"></div>
@@ -140,7 +129,7 @@
     {% endif %}
     {% endif %}
 
-    <!-- DASHBOARD SPECIFIC JAVASCRIPT -->
+    <!-- JAVASCRIPT -->
     <script>
         {% if experiments %}
         const expData = {{ experiments | tojson }};
@@ -161,15 +150,15 @@
             if(data.success && data.health) {
                 const badge = document.getElementById('healthBadge');
                 const alerts = document.getElementById('healthAlerts');
-                if(data.health.status === 'GREEN') { badge.className = 'px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-400'; badge.innerText = 'OPTIMAL'; }
-                else if(data.health.status === 'AMBER') { badge.className = 'px-3 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-400'; badge.innerText = 'WARNING'; }
-                else { badge.className = 'px-3 py-1 rounded-full text-xs font-bold bg-red-500/20 text-red-400'; badge.innerText = 'CRITICAL DRIFT'; }
-                alerts.innerHTML = data.health.alerts.map(a => `<p class="text-sm font-medium ${a.severity === 'HIGH' ? 'text-amber-300' : 'text-slate-400'}">${a.message}</p>`).join('');
+                if(data.health.status === 'GREEN') { badge.className = 'px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'; badge.innerText = 'OPTIMAL'; }
+                else if(data.health.status === 'AMBER') { badge.className = 'px-3 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30'; badge.innerText = 'WARNING'; }
+                else { badge.className = 'px-3 py-1 rounded-full text-xs font-bold bg-red-500/20 text-red-400 border border-red-500/30'; badge.innerText = 'CRITICAL DRIFT'; }
+                alerts.innerHTML = data.health.alerts.map(a => `<p class="text-sm font-medium ${a.severity === 'HIGH' ? 'text-amber-300' : 'text-slate-300'}">${a.message}</p>`).join('');
             }
 
-            document.getElementById('calibBadge').className = 'px-3 py-1 rounded-full text-xs font-bold bg-blue-500/20 text-blue-400';
+            document.getElementById('calibBadge').className = 'px-3 py-1 rounded-full text-xs font-bold bg-indigo-500/20 text-indigo-400 border border-indigo-500/30';
             document.getElementById('calibBadge').innerText = 'CALIBRATED';
-            document.getElementById('calibAlerts').innerHTML = '<p class="text-sm font-medium text-slate-400">Model ECE is 0.08 (Good). No isotonic regression required.</p>';
+            document.getElementById('calibAlerts').innerHTML = '<p class="text-sm font-medium text-slate-300">Model ECE is 0.08 (Good). No isotonic regression required.</p>';
         }
         setTimeout(loadHealth, 1500);
 
@@ -186,20 +175,21 @@
                     datasets: [{
                         label: 'Quality Score',
                         data: scores,
-                        borderColor: '#3B82F6',
-                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        borderColor: '#6366f1',
+                        backgroundColor: 'rgba(99, 102, 241, 0.1)',
                         borderWidth: 3,
                         fill: true,
-                        tension: 0.3
+                        tension: 0.4
                     }]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
                     scales: {
-                        y: { min: 0, max: 100, grid: { color: 'rgba(255,255,255,0.05)' } },
-                        x: { grid: { color: 'rgba(255,255,255,0.05)' } }
-                    }
+                        y: { min: 0, max: 100, grid: { color: 'rgba(255,255,255,0.06)' }, ticks: { color: '#94a3b8' } },
+                        x: { grid: { color: 'rgba(255,255,255,0.06)' }, ticks: { color: '#94a3b8' } }
+                    },
+                    plugins: { legend: { labels: { color: '#ffffff' } } }
                 }
             });
         }
@@ -233,7 +223,7 @@
 
         const heatmapData = [{
             z: matrix, x: labels, y: labels,
-            type: 'heatmap', colorscale: 'RdBu', zmin: -1, zmax: 1
+            type: 'heatmap', colorscale: 'Viridis', zmin: -1, zmax: 1
         }];
 
         const heatmapLayout = {
