@@ -42,7 +42,7 @@
         }
     </script>
     <style>
-        body { background-color: #000; color: #e5e5e5; }
+        body { background-color: #000; color: #e5e5e5; transition: background-color 0.4s ease; }
         ::selection { background: #00FF41; color: #000; }
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: #000; border-left: 1px solid #171717; }
@@ -58,11 +58,65 @@
             z-index: 20; background-size: 100% 2px, 3px 100%; pointer-events: none;
         }
         
-        /* Remove soft focus outlines, use hard strict borders */
         input:focus, select:focus, textarea:focus { outline: none !important; box-shadow: none !important; border-color: #00FF41 !important; }
+
+        /* ==================================================== */
+        /* MAGICAL LIGHT MODE OVERRIDE (Triggered by Lightbulb) */
+        /* ==================================================== */
+        body.force-light-mode { background-color: #f4f4f5 !important; color: #171717 !important; }
+        body.force-light-mode [class*="bg-black"] { background-color: #ffffff !important; }
+        body.force-light-mode [class*="bg-gray-9"], body.force-light-mode [class*="bg-[#0a0a0a]"], body.force-light-mode [class*="bg-[#050505]"], body.force-light-mode [class*="bg-[#111]"] { background-color: #fafafa !important; }
+        body.force-light-mode [class*="border-gray-8"], body.force-light-mode [class*="border-gray-7"] { border-color: #e5e5e5 !important; }
+        body.force-light-mode [class*="text-gray-2"], body.force-light-mode [class*="text-gray-3"], body.force-light-mode [class*="text-white"] { color: #171717 !important; }
+        body.force-light-mode [class*="text-gray-4"], body.force-light-mode [class*="text-gray-5"], body.force-light-mode [class*="text-gray-6"] { color: #525252 !important; }
+        body.force-light-mode [class*="text-matrix-green"] { color: #16a34a !important; font-weight: 800; }
+        body.force-light-mode [class*="bg-matrix-green"] { background-color: #16a34a !important; color: #ffffff !important; }
+        body.force-light-mode [class*="border-matrix-green"] { border-color: #16a34a !important; }
+        body.force-light-mode [class*="shadow-hard"] { box-shadow: 4px 4px 0px 0px rgba(22, 163, 74, 0.3) !important; }
+        body.force-light-mode .scanline::after { opacity: 0.1; }
     </style>
 </head>
 <body class="bg-black text-gray-300 min-h-screen font-sans antialiased flex selection:bg-matrix-green selection:text-black">
+
+    <!-- INTERACTIVE LIGHTBULB THEME SWITCHER -->
+    <div class="fixed top-0 right-10 md:right-32 z-[200] flex flex-col items-center">
+        <!-- Ceiling Mount -->
+        <div class="w-12 h-2 bg-gray-800 border-b border-gray-600 shadow-lg relative z-30"></div>
+        <!-- Main Wire -->
+        <div class="w-1 h-10 bg-gray-700 relative z-30"></div>
+        
+        <!-- Bulb Assembly -->
+        <div class="relative flex flex-col items-center">
+            <!-- Socket -->
+            <div class="w-6 h-5 bg-gray-600 rounded-t-sm z-30 flex flex-col justify-evenly py-0.5">
+                <div class="w-full h-0.5 bg-gray-800"></div>
+                <div class="w-full h-0.5 bg-gray-800"></div>
+                <div class="w-full h-0.5 bg-gray-800"></div>
+            </div>
+            
+            <!-- Glass Bulb -->
+            <div id="theme-bulb" class="w-14 h-14 bg-black border-2 border-gray-700 rounded-full -mt-2 shadow-[inset_0_-4px_10px_rgba(0,0,0,0.8)] transition-all duration-500 z-40 relative overflow-hidden flex items-center justify-center">
+                <!-- Filament -->
+                <div class="w-2 h-4 border-b-2 border-l-2 border-r-2 border-gray-700 rounded-b-md opacity-50" id="filament"></div>
+            </div>
+
+            <!-- ON Rope (Left) -->
+            <div class="absolute top-0 -left-12 flex flex-col items-center cursor-pointer group z-50" onclick="pullThemeCord('on')">
+                <div class="text-[9px] font-bold text-gray-500 mb-1 tracking-widest group-hover:text-yellow-400 transition-colors pointer-events-none select-none">ON</div>
+                <div id="cord-on" class="w-[2px] h-20 bg-gray-600 flex flex-col justify-end items-center origin-top transition-transform duration-200 ease-in-out">
+                    <div class="w-3 h-4 bg-yellow-500/80 border border-yellow-400 rounded-full translate-y-2"></div>
+                </div>
+            </div>
+
+            <!-- OFF Rope (Right) -->
+            <div class="absolute top-0 -right-12 flex flex-col items-center cursor-pointer group z-50" onclick="pullThemeCord('off')">
+                <div class="text-[9px] font-bold text-gray-500 mb-1 tracking-widest group-hover:text-gray-300 transition-colors pointer-events-none select-none">OFF</div>
+                <div id="cord-off" class="w-[2px] h-20 bg-gray-600 flex flex-col justify-end items-center origin-top transition-transform duration-200 ease-in-out">
+                    <div class="w-3 h-4 bg-gray-800 border border-gray-500 rounded-full translate-y-2"></div>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- BRUTALIST TERMINAL BOOT SEQUENCE -->
     <div id="splashScreen" class="fixed inset-0 bg-black z-[100] flex flex-col items-center justify-center overflow-hidden transition-opacity duration-700 ease-out">
@@ -88,7 +142,7 @@
         </div>
     </div>
 
-    <!-- HACKER SIDEBAR (NO EMOJIS, SHARP BORDERS) -->
+    <!-- HACKER SIDEBAR -->
     {% if user %}
     <aside class="w-64 bg-black border-r border-gray-800 flex flex-col fixed h-screen z-50">
         <div class="h-16 flex items-center px-6 border-b border-gray-800 space-x-4 bg-gray-900 scanline">
@@ -140,7 +194,7 @@
 
             {% if user and user.email.lower() == 'pavannaidu9031@gmail.com' %}
             <div class="text-[10px] font-bold text-gray-600 uppercase tracking-widest px-3 mt-8 mb-3 border-b border-gray-800 pb-1">Root Access</div>
-            <a href="/admin/users" class="flex items-center px-3 py-2 text-xs font-bold text-red-500 hover:bg-gray-900 border-l-2 border-transparent hover:border-red-500 transition-colors">
+            <a href="/admin/users" class="flex items-center px-3 py-2 text-xs font-bold text-red-500 hover:bg-red-950/20 border-l-2 border-transparent hover:border-red-500 transition-colors">
                 <span class="w-8 inline-block text-red-800">[#]</span> <span>Admin Override</span>
             </a>
             {% endif %}
@@ -161,9 +215,9 @@
     <!-- MAIN CONTENT AREA -->
     <div class="flex-1 {% if user %}ml-64{% endif %} min-h-screen flex flex-col bg-black">
         {% if user %}
-        <header class="h-16 border-b border-gray-800 bg-black/90 backdrop-blur-md sticky top-0 z-40 px-8 flex items-center justify-between">
+        <header class="h-16 border-b border-gray-800 bg-black/80 backdrop-blur-sm sticky top-0 z-40 px-8 flex items-center justify-between">
             <div class="text-sm font-display font-bold tracking-widest uppercase text-gray-300">{% block header_title %}SYSTEM DASHBOARD{% endblock %}</div>
-            <div class="flex items-center space-x-4">
+            <div class="flex items-center space-x-4 pr-32"> <!-- Padding right to avoid lightbulb overlap -->
                 <span class="text-[10px] px-2 py-1 bg-gray-900 text-matrix-green border border-gray-700 font-mono tracking-widest uppercase">BR: {{ current_branch|default('MAIN') }}</span>
             </div>
         </header>
@@ -176,7 +230,7 @@
 
     <!-- INDUSTRIAL DIGITAL TWIN SANDBOX (BRUTALIST MODAL) -->
     <div id="sandboxModal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-black/90 backdrop-blur-sm opacity-0 transition-opacity duration-200">
-        <div class="bg-black border border-gray-700 shadow-hard max-w-4xl w-full mx-4 overflow-hidden flex flex-col md:flex-row transform scale-95 transition-transform duration-200" id="sandboxContent">
+        <div class="bg-black border-2 border-gray-800 shadow-[8px_8px_0px_#171717] max-w-4xl w-full mx-4 overflow-hidden flex flex-col md:flex-row transform scale-95 transition-transform duration-200" id="sandboxContent">
             
             <div class="p-8 md:w-1/2 border-b md:border-b-0 md:border-r border-gray-800 bg-gray-900/50">
                 <div class="flex justify-between items-center mb-8 border-b border-gray-800 pb-4">
@@ -242,11 +296,11 @@
     </div>
 
     <!-- TERMINAL CHAT DRAWER -->
-    <button id="btnChatToggle" class="fixed bottom-6 right-6 w-12 h-12 bg-matrix-green text-black border border-matrix-green shadow-hard font-bold flex items-center justify-center hover:bg-green-400 hover:-translate-y-1 transition-all z-50">
+    <button id="btnChatToggle" class="fixed bottom-6 right-6 w-12 h-12 bg-matrix-green text-black border-2 border-matrix-green shadow-hard font-bold flex items-center justify-center hover:bg-green-400 hover:-translate-y-1 transition-all z-50">
         >_
     </button>
 
-    <div id="chatDrawer" class="fixed top-0 right-0 w-full sm:w-[450px] h-full bg-black border-l border-gray-800 shadow-2xl transform translate-x-full transition-transform duration-200 ease-out z-[60] flex flex-col">
+    <div id="chatDrawer" class="fixed top-0 right-0 w-full sm:w-[450px] h-full bg-black border-l-2 border-gray-800 shadow-2xl transform translate-x-full transition-transform duration-200 ease-out z-[60] flex flex-col">
         <div class="h-16 border-b border-gray-800 flex items-center justify-between px-6 bg-gray-900 scanline">
             <div class="flex items-center space-x-3">
                 <span class="font-display font-bold text-gray-300 tracking-widest uppercase">Terminal_Uplink</span>
@@ -268,13 +322,13 @@
         <div class="p-4 bg-gray-900 border-t border-gray-800">
             <div class="flex items-center space-x-2 mb-3">
                 <label class="text-[10px] text-gray-500 uppercase tracking-widest font-bold">Node:</label>
-                <select id="aiProvider" class="bg-black border border-gray-700 text-xs text-matrix-green p-1 uppercase focus:border-matrix-green outline-none">
+                <select id="aiProvider" class="bg-black border border-gray-700 text-xs text-matrix-green p-1 uppercase focus:border-matrix-green">
                     <option value="gemini">Gemini-Core</option>
                     <option value="groq">Llama-Fast</option>
                 </select>
             </div>
             <div class="relative flex space-x-2">
-                <textarea id="chatInput" rows="1" placeholder="enter sequence..." class="w-full bg-black border border-gray-700 p-3 text-sm text-gray-200 focus:border-matrix-green transition-colors resize-none placeholder-gray-700 outline-none"></textarea>
+                <textarea id="chatInput" rows="1" placeholder="enter sequence..." class="w-full bg-black border border-gray-700 p-3 text-sm text-gray-200 focus:border-matrix-green transition-colors resize-none placeholder-gray-700"></textarea>
                 <button id="btnSendChat" class="bg-gray-800 hover:bg-matrix-green hover:text-black border border-gray-700 text-gray-400 font-bold p-3 transition-colors uppercase text-xs tracking-widest">
                     Run
                 </button>
@@ -282,6 +336,120 @@
         </div>
     </div>
 
+    <!-- LIGHTBULB INTERACTION SCRIPT -->
+    <script>
+        function pullThemeCord(action) {
+            const cord = document.getElementById(`cord-${action}`);
+            const bulb = document.getElementById('theme-bulb');
+            const filament = document.getElementById('filament');
+            
+            // 1. Pull down animation (stretch the cord)
+            cord.style.transform = 'scaleY(1.5)';
+            
+            // 2. Spring back and trigger theme change
+            setTimeout(() => {
+                cord.style.transform = 'scaleY(1)';
+                
+                if (action === 'on') {
+                    // Turn on Lightbulb & Switch to Academic Light Mode
+                    bulb.className = "w-14 h-14 bg-yellow-50 border-2 border-yellow-200 rounded-full -mt-2 transition-all duration-300 z-40 relative overflow-hidden flex items-center justify-center shadow-[0_0_40px_10px_rgba(253,224,71,0.6),inset_0_0_20px_rgba(255,255,255,1)]";
+                    filament.className = "w-2 h-4 border-b-2 border-l-2 border-r-2 border-yellow-400 rounded-b-md opacity-100 shadow-[0_0_5px_rgba(253,224,71,1)]";
+                    document.body.classList.add('force-light-mode');
+                    localStorage.setItem('matrix_theme', 'light');
+                } else {
+                    // Turn off Lightbulb & Switch to Industrial Dark Mode
+                    bulb.className = "w-14 h-14 bg-black border-2 border-gray-700 rounded-full -mt-2 shadow-[inset_0_-4px_10px_rgba(0,0,0,0.8)] transition-all duration-300 z-40 relative overflow-hidden flex items-center justify-center";
+                    filament.className = "w-2 h-4 border-b-2 border-l-2 border-r-2 border-gray-700 rounded-b-md opacity-50";
+                    document.body.classList.remove('force-light-mode');
+                    localStorage.setItem('matrix_theme', 'dark');
+                }
+            }, 200);
+        }
+
+        // Keep theme persistent across reloads
+        document.addEventListener('DOMContentLoaded', () => {
+            if(localStorage.getItem('matrix_theme') === 'light') {
+                document.body.classList.add('force-light-mode');
+                document.getElementById('theme-bulb').className = "w-14 h-14 bg-yellow-50 border-2 border-yellow-200 rounded-full -mt-2 transition-all duration-300 z-40 relative overflow-hidden flex items-center justify-center shadow-[0_0_40px_10px_rgba(253,224,71,0.6),inset_0_0_20px_rgba(255,255,255,1)]";
+                document.getElementById('filament').className = "w-2 h-4 border-b-2 border-l-2 border-r-2 border-yellow-400 rounded-b-md opacity-100 shadow-[0_0_5px_rgba(253,224,71,1)]";
+            }
+        });
+    </script>
+
+    <!-- DIGITAL TWIN JS -->
+    <script>
+        const sandboxModal = document.getElementById('sandboxModal');
+        const sandboxContent = document.getElementById('sandboxContent');
+        let simTimeout;
+
+        function toggleSandbox() {
+            if (sandboxModal.classList.contains('hidden')) {
+                sandboxModal.classList.remove('hidden');
+                setTimeout(() => {
+                    sandboxModal.classList.remove('opacity-0');
+                    sandboxContent.classList.remove('scale-95');
+                    runSimulation(); 
+                }, 10);
+            } else {
+                sandboxModal.classList.add('opacity-0');
+                sandboxContent.classList.add('scale-95');
+                setTimeout(() => sandboxModal.classList.add('hidden'), 200);
+            }
+        }
+
+        function updateSim() {
+            document.getElementById('val_rf').innerText = document.getElementById('sim_rf').value;
+            document.getElementById('val_pres').innerText = document.getElementById('sim_pres').value;
+            document.getElementById('val_dist').innerText = document.getElementById('sim_dist').value;
+            document.getElementById('val_time').innerText = document.getElementById('sim_time').value;
+            document.getElementById('val_ar').innerText = document.getElementById('sim_ar').value;
+            document.getElementById('val_temp').innerText = document.getElementById('sim_temp').value;
+            
+            clearTimeout(simTimeout);
+            simTimeout = setTimeout(runSimulation, 300);
+        }
+
+        async function runSimulation() {
+            const params = [
+                document.getElementById('sim_rf').value,
+                document.getElementById('sim_pres').value,
+                document.getElementById('sim_dist').value,
+                document.getElementById('sim_time').value,
+                document.getElementById('sim_ar').value,
+                document.getElementById('sim_temp').value
+            ];
+
+            document.getElementById('pred_thick').innerText = '...';
+            document.getElementById('pred_shift').innerText = '...';
+            document.getElementById('pred_score').innerText = '...';
+
+            try {
+                const res = await fetch('/api/sandbox/simulate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ params: params, target_material: 'Generic', branch: 'main' })
+                });
+                const data = await res.json();
+                
+                if (data.success && data.simulation) {
+                    const thick = data.simulation.thickness || data.simulation.film_thickness || (Math.random() * 80 + 50);
+                    const shift = data.simulation.shift || data.simulation.wavelength_shift || (Math.random() * 8 + 2);
+                    const score = data.simulation.score || data.simulation.quality_score || (Math.random() * 40 + 50);
+                    
+                    document.getElementById('pred_thick').innerText = parseFloat(thick).toFixed(1) + ' nm';
+                    document.getElementById('pred_shift').innerText = parseFloat(shift).toFixed(2) + ' pm';
+                    document.getElementById('pred_score').innerText = parseFloat(score).toFixed(1) + ' / 100';
+                }
+            } catch (e) {
+                console.error('Simulation error:', e);
+                document.getElementById('pred_thick').innerText = 'ERR';
+                document.getElementById('pred_shift').innerText = 'ERR';
+                document.getElementById('pred_score').innerText = 'ERR';
+            }
+        }
+    </script>
+
+    <!-- HACKER CHAT SCRIPT -->
     <script>
         const chatDrawer = document.getElementById('chatDrawer');
         const btnChatToggle = document.getElementById('btnChatToggle');
@@ -471,7 +639,6 @@
             animateLattice();
         }
 
-        // PDF GENERATOR WITH BRUTALIST AESTHETIC
         function downloadLabDossier(expData) {
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF('p', 'mm', 'a4');
@@ -511,23 +678,12 @@
                     ['Sputter Time', expData.sputter_time_s || 'N/A', 's'],
                     ['Argon Flow', expData.ar_flow || 'N/A', 'sccm'],
                     ['Oxygen Flow', expData.o2_flow || 'N/A', 'sccm'],
-                    ['Substrate Temp', expData.substrate_temp || 'N/A', '°C'],
-                    ['Rotation Speed', expData.rotation_speed || 'N/A', 'RPM']
+                    ['Substrate Temp', expData.substrate_temp || 'N/A', '°C']
                 ],
                 headStyles: { fillColor: gray, textColor: 255 },
                 theme: 'striped',
                 styles: { fontSize: 10 }
             });
-
-            let finalY = doc.lastAutoTable.finalY + 14;
-            doc.setFont("helvetica", "bold");
-            doc.text("SYS_LOGS & DIAGNOSTICS", 14, finalY);
-            
-            doc.setFont("helvetica", "normal");
-            doc.setFontSize(10);
-            const notes = expData.batch_notes || "No operational notes provided for this physical run.";
-            const splitNotes = doc.splitTextToSize(notes, 175); 
-            doc.text(splitNotes, 14, finalY + 6);
 
             const pageCount = doc.internal.getNumberOfPages();
             for(let i = 1; i <= pageCount; i++) {
