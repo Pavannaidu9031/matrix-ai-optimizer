@@ -78,8 +78,8 @@
 </head>
 <body class="bg-black text-gray-300 min-h-screen font-sans antialiased flex selection:bg-matrix-green selection:text-black">
 
-    <!-- INTERACTIVE LIGHTBULB THEME SWITCHER -->
-    <div class="fixed top-0 right-10 md:right-32 z-[200] flex flex-col items-center">
+    <!-- INTERACTIVE LIGHTBULB THEME SWITCHER (PINNED TO CORNER) -->
+    <div class="fixed top-0 right-16 z-[200] flex flex-col items-center">
         <!-- Ceiling Mount -->
         <div class="w-12 h-2 bg-gray-800 border-b border-gray-600 shadow-lg relative z-30"></div>
         <!-- Main Wire -->
@@ -194,7 +194,7 @@
 
             {% if user and user.email.lower() == 'pavannaidu9031@gmail.com' %}
             <div class="text-[10px] font-bold text-gray-600 uppercase tracking-widest px-3 mt-8 mb-3 border-b border-gray-800 pb-1">Root Access</div>
-            <a href="/admin/users" class="flex items-center px-3 py-2 text-xs font-bold text-red-500 hover:bg-red-950/20 border-l-2 border-transparent hover:border-red-500 transition-colors">
+            <a href="/admin/users" class="flex items-center px-3 py-2 text-xs font-bold text-red-500 hover:bg-gray-900 border-l-2 border-transparent hover:border-red-500 transition-colors">
                 <span class="w-8 inline-block text-red-800">[#]</span> <span>Admin Override</span>
             </a>
             {% endif %}
@@ -217,7 +217,7 @@
         {% if user %}
         <header class="h-16 border-b border-gray-800 bg-black/80 backdrop-blur-sm sticky top-0 z-40 px-8 flex items-center justify-between">
             <div class="text-sm font-display font-bold tracking-widest uppercase text-gray-300">{% block header_title %}SYSTEM DASHBOARD{% endblock %}</div>
-            <div class="flex items-center space-x-4 pr-32"> <!-- Padding right to avoid lightbulb overlap -->
+            <div class="flex items-center space-x-4 pr-32"> <!-- Margin applied here to step away from bulb -->
                 <span class="text-[10px] px-2 py-1 bg-gray-900 text-matrix-green border border-gray-700 font-mono tracking-widest uppercase">BR: {{ current_branch|default('MAIN') }}</span>
             </div>
         </header>
@@ -678,7 +678,8 @@
                     ['Sputter Time', expData.sputter_time_s || 'N/A', 's'],
                     ['Argon Flow', expData.ar_flow || 'N/A', 'sccm'],
                     ['Oxygen Flow', expData.o2_flow || 'N/A', 'sccm'],
-                    ['Substrate Temp', expData.substrate_temp || 'N/A', '°C']
+                    ['Substrate Temp', expData.substrate_temp || 'N/A', '°C'],
+                    ['Rotation Speed', expData.rotation_speed || 'N/A', 'RPM']
                 ],
                 headStyles: { fillColor: gray, textColor: 255 },
                 theme: 'striped',
