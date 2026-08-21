@@ -70,7 +70,6 @@
             <a href="/optimizer-view" class="flex items-center space-x-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-300 hover:bg-slate-800 hover:text-white transition"><span>🧠 AI Process Engine</span></a>
             
             <div class="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-3 mt-6 mb-2">Advanced Tools</div>
-            <!-- NEW DIGITAL TWIN SANDBOX BUTTON -->
             <button onclick="toggleSandbox()" class="w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-300 hover:bg-slate-800 hover:text-white transition shadow-sm border border-transparent hover:border-slate-700">
                 <span>🧪 Digital Twin Sandbox</span>
             </button>
@@ -143,12 +142,12 @@
                         <input type="range" id="sim_pres" min="1.0" max="20.0" step="0.5" value="5.0" class="w-full accent-blue-500" oninput="updateSim()">
                     </div>
                     <div>
-                        <div class="flex justify-between text-xs mb-1"><span class="text-slate-400 font-semibold">Target Distance (mm)</span><span id="val_dist" class="text-blue-400 font-mono">50</span></div>
-                        <input type="range" id="sim_dist" min="30" max="100" value="50" class="w-full accent-blue-500" oninput="updateSim()">
+                        <div class="flex justify-between text-xs mb-1"><span class="text-slate-400 font-semibold">Target Distance (cm)</span><span id="val_dist" class="text-blue-400 font-mono">7.0</span></div>
+                        <input type="range" id="sim_dist" min="3.0" max="15.0" step="0.1" value="7.0" class="w-full accent-blue-500" oninput="updateSim()">
                     </div>
                     <div>
                         <div class="flex justify-between text-xs mb-1"><span class="text-slate-400 font-semibold">Sputter Time (s)</span><span id="val_time" class="text-blue-400 font-mono">600</span></div>
-                        <input type="range" id="sim_time" min="60" max="3600" step="60" value="600" class="w-full accent-blue-500" oninput="updateSim()">
+                        <input type="range" id="sim_time" min="10" max="3600" step="10" value="600" class="w-full accent-blue-500" oninput="updateSim()">
                     </div>
                     <div>
                         <div class="flex justify-between text-xs mb-1"><span class="text-slate-400 font-semibold">Ar Flow (sccm)</span><span id="val_ar" class="text-blue-400 font-mono">20</span></div>
@@ -191,7 +190,7 @@
                     </div>
                 </div>
                 
-                <p class="text-[10px] text-slate-500 mt-6 text-center">Powered by Gaussian Process Regression</p>
+                <p class="text-[10px] text-slate-500 mt-6 text-center">Powered by MatrixAI Predictive Engine</p>
             </div>
         </div>
     </div>
@@ -428,7 +427,7 @@
         const loadingTexts = [
             "Establishing secure database connection...",
             "Loading Supabase experimental history...",
-            "Calibrating Bayesian optimization priors...",
+            "Calibrating MatrixAI proprietary engine...",
             "Synthesizing digital twin environment...",
             "MatrixAI Core Ready."
         ];
