@@ -1191,6 +1191,87 @@ async def bulk_import_experiments(request: Request):
     except Exception as e:
         return JSONResponse({"error": f"Import failed: {str(e)}"}, status_code=500)
 
+@app.get("/cost-tracker", response_class=HTMLResponse)
+def cost_tracker_view(request: Request):
+    user = request.session.get("user")
+    if not user: return RedirectResponse("/login/google", status_code=303)
+    current_branch = request.cookies.get("active_branch", "main")
+    
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+        # Fetch physical parameters needed for cost calculation
+        cur.execute("""
+            SELECT target_material, rf_power, sputter_time_s, ar_flow, o2_flow, substrate_temp 
+            FROM experiments WHERE user_email = %s AND branch_name = %s
+        """, (user.get("email"), current_branch))
+        cols = [desc[0] for desc in cur.description]
+        experiments = [dict(zip(cols, row)) for row in cur.fetchall()]
+        cur.close()
+    finally:
+        release_db_connection(conn)
+        
+    total_runs = len(experiments)
+    total_electricity_kwh = 0.0
+    total_gas_l = 0.0
+    
+    # Track Watt-hours applied to each target to estimate erosion depth
+    target_erosion_wh = {"WO3": 0, "TiO2": 0, "ZnO": 0, "Generic": 0}
+    
+    for exp in experiments:
+        time_hrs = float(exp.get("sputter_time_s", 0)) / 3600.0
+        rf_power = float(exp.get("rf_power", 0))
+        temp = float(exp.get("substrate_temp", 25))
+        
+        # Power calculation: RF Generator + Substrate Heater (Approx 4W per °C over ambient)
+        heater_power_w = max(0, (temp - 25) * 4)
+        total_electricity_kwh += ((rf_power + heater_power_w) * time_hrs) / 1000.0
+        
+        # Gas calculation: sccm to Liters
+        ar = float(exp.get("ar_flow", 0))
+        o2 = float(exp.get("o2_flow", 0))
+        total_gas_l += ((ar + o2) * 60 / 1000.0) * time_hrs
+        
+        # Target erosion calculation
+        mat = str(exp.get("target_material", "Generic"))
+        if mat not in target_erosion_wh: target_erosion_wh[mat] = 0
+        target_erosion_wh[mat] += (rf_power * time_hrs)
+        
+    # Standard Academic/Industrial baseline costs
+    RATE_KWH = 0.18    # $0.18 per kWh
+    RATE_GAS_L = 0.08  # $0.08 per Liter of High Purity Gas
+    COST_SUBSTRATE = 15.00 # $15 per Si Wafer
+    
+    electricity_cost = total_electricity_kwh * RATE_KWH
+    gas_cost = total_gas_l * RATE_GAS_L
+    substrates_cost = total_runs * COST_SUBSTRATE
+    
+    # Estimate Target Costs based on Watt-hours (e.g., $0.05 per Wh of target sputtered)
+    target_cost = sum(target_erosion_wh.values()) * 0.05
+    
+    total_cost = electricity_cost + gas_cost + substrates_cost + target_cost
+    avg_run_cost = (total_cost / total_runs) if total_runs > 0 else 0.0
+        
+    stats = {
+        "total_runs": total_runs,
+        "total_electricity_kwh": round(total_electricity_kwh, 2),
+        "total_gas_l": round(total_gas_l, 2),
+        "electricity_cost": round(electricity_cost, 2),
+        "gas_cost": round(gas_cost, 2),
+        "substrates_cost": round(substrates_cost, 2),
+        "target_cost": round(target_cost, 2),
+        "total_cost": round(total_cost, 2),
+        "avg_run_cost": round(avg_run_cost, 2),
+        "target_erosion_wh": target_erosion_wh
+    }
+        
+    return templates.TemplateResponse("cost_tracker.html", {
+        "request": request,
+        "user": user, 
+        "current_branch": current_branch,
+        "stats": stats
+    })
+
 # ==============================================================================
 # NEW ADVANCED MODULE ROUTES
 # ==============================================================================
