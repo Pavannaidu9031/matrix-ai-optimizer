@@ -1115,7 +1115,7 @@ async def chat_with_agent(request: Request, data: ChatRequest):
         return JSONResponse({"error": str(e)}, status_code=500)
 
 # ==============================================================================
-# PHASE 2 - BULK CSV IMPORTER & COST TRACKER (NEW ROUTES)
+# PHASE 2 - BULK CSV IMPORTER & COST TRACKER (BULLETPROOF)
 # ==============================================================================
 @app.get("/bulk-import", response_class=HTMLResponse)
 def bulk_import_view(request: Request):
@@ -1194,20 +1194,33 @@ async def bulk_import_experiments(request: Request):
 @app.get("/cost-tracker", response_class=HTMLResponse)
 def cost_tracker_view(request: Request):
     user = request.session.get("user")
-    if not user: return RedirectResponse("/login/google", status_code=303)
-    current_branch = request.cookies.get("active_branch", "main")
+    if not user: 
+        return RedirectResponse("/login/google", status_code=303)
     
+    current_branch = request.cookies.get("active_branch", "main")
+    user_email = user.get("email")
+    
+    experiments = []
     conn = get_db_connection()
     try:
         cur = conn.cursor()
-        # Fetch physical parameters needed for cost calculation
+        ensure_material_column(cur)
+        ensure_branch_column(cur)
+        conn.commit()
+
         cur.execute("""
             SELECT target_material, rf_power, sputter_time_s, ar_flow, o2_flow, substrate_temp 
-            FROM experiments WHERE user_email = %s AND branch_name = %s
-        """, (user.get("email"), current_branch))
-        cols = [desc[0] for desc in cur.description]
-        experiments = [dict(zip(cols, row)) for row in cur.fetchall()]
+            FROM experiments 
+            WHERE user_email = %s AND branch_name = %s
+        """, (user_email, current_branch))
+        
+        rows = cur.fetchall()
+        cols = [desc[0] for desc in cur.description] if cur.description else []
+        for row in rows:
+            experiments.append(dict(zip(cols, row)))
         cur.close()
+    except Exception as db_err:
+        print(f"Cost tracker DB fetch error: {db_err}")
     finally:
         release_db_connection(conn)
         
@@ -1215,38 +1228,51 @@ def cost_tracker_view(request: Request):
     total_electricity_kwh = 0.0
     total_gas_l = 0.0
     
-    # Track Watt-hours applied to each target to estimate erosion depth
-    target_erosion_wh = {"WO3": 0, "TiO2": 0, "ZnO": 0, "Generic": 0}
+    target_erosion_wh = {"WO3": 0.0, "TiO2": 0.0, "ZnO": 0.0}
     
     for exp in experiments:
-        time_hrs = float(exp.get("sputter_time_s", 0)) / 3600.0
-        rf_power = float(exp.get("rf_power", 0))
-        temp = float(exp.get("substrate_temp", 25))
+        try:
+            # Safely handle None/NULL values from database
+            raw_time = exp.get("sputter_time_s")
+            time_s = float(raw_time) if raw_time is not None else 600.0
+            time_hrs = time_s / 3600.0
+
+            raw_rf = exp.get("rf_power")
+            rf_power = float(raw_rf) if raw_rf is not None else 100.0
+
+            raw_temp = exp.get("substrate_temp")
+            temp = float(raw_temp) if raw_temp is not None else 25.0
+
+            raw_ar = exp.get("ar_flow")
+            ar = float(raw_ar) if raw_ar is not None else 20.0
+
+            raw_o2 = exp.get("o2_flow")
+            o2 = float(raw_o2) if raw_o2 is not None else 2.0
+            
+            # Power calculation: RF generator + substrate heater
+            heater_power_w = max(0.0, (temp - 25.0) * 4.0)
+            total_electricity_kwh += ((rf_power + heater_power_w) * time_hrs) / 1000.0
+            
+            # Gas volume calculation
+            total_gas_l += ((ar + o2) * 60.0 / 1000.0) * time_hrs
+            
+            # Target erosion accumulation
+            mat = str(exp.get("target_material") or "Generic").strip()
+            if mat not in target_erosion_wh: 
+                target_erosion_wh[mat] = 0.0
+            target_erosion_wh[mat] += (rf_power * time_hrs)
+        except Exception as calc_err:
+            print(f"Skipping run calculation due to error: {calc_err}")
+            continue
         
-        # Power calculation: RF Generator + Substrate Heater (Approx 4W per °C over ambient)
-        heater_power_w = max(0, (temp - 25) * 4)
-        total_electricity_kwh += ((rf_power + heater_power_w) * time_hrs) / 1000.0
-        
-        # Gas calculation: sccm to Liters
-        ar = float(exp.get("ar_flow", 0))
-        o2 = float(exp.get("o2_flow", 0))
-        total_gas_l += ((ar + o2) * 60 / 1000.0) * time_hrs
-        
-        # Target erosion calculation
-        mat = str(exp.get("target_material", "Generic"))
-        if mat not in target_erosion_wh: target_erosion_wh[mat] = 0
-        target_erosion_wh[mat] += (rf_power * time_hrs)
-        
-    # Standard Academic/Industrial baseline costs
-    RATE_KWH = 0.18    # $0.18 per kWh
-    RATE_GAS_L = 0.08  # $0.08 per Liter of High Purity Gas
-    COST_SUBSTRATE = 15.00 # $15 per Si Wafer
+    # Baseline standard rates
+    RATE_KWH = 0.18        # $0.18 / kWh
+    RATE_GAS_L = 0.08      # $0.08 / Liter
+    COST_SUBSTRATE = 15.00 # $15 / Si Wafer
     
     electricity_cost = total_electricity_kwh * RATE_KWH
     gas_cost = total_gas_l * RATE_GAS_L
     substrates_cost = total_runs * COST_SUBSTRATE
-    
-    # Estimate Target Costs based on Watt-hours (e.g., $0.05 per Wh of target sputtered)
     target_cost = sum(target_erosion_wh.values()) * 0.05
     
     total_cost = electricity_cost + gas_cost + substrates_cost + target_cost
@@ -1265,8 +1291,7 @@ def cost_tracker_view(request: Request):
         "target_erosion_wh": target_erosion_wh
     }
         
-    return templates.TemplateResponse("cost_tracker.html", {
-        "request": request,
+    return templates.TemplateResponse(request, "cost_tracker.html", {
         "user": user, 
         "current_branch": current_branch,
         "stats": stats
