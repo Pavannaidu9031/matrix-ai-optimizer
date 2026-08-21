@@ -1115,6 +1115,83 @@ async def chat_with_agent(request: Request, data: ChatRequest):
         return JSONResponse({"error": str(e)}, status_code=500)
 
 # ==============================================================================
+# PHASE 2 - BULK CSV IMPORTER & COST TRACKER (NEW ROUTES)
+# ==============================================================================
+@app.get("/bulk-import", response_class=HTMLResponse)
+def bulk_import_view(request: Request):
+    user = request.session.get("user")
+    if not user: return RedirectResponse("/login/google", status_code=303)
+    current_branch = request.cookies.get("active_branch", "main")
+    return templates.TemplateResponse(request, "bulk_import.html", {
+        "user": user,
+        "current_branch": current_branch
+    })
+
+@app.post("/api/experiments/bulk")
+async def bulk_import_experiments(request: Request):
+    user = request.session.get("user")
+    if not user: return JSONResponse({"error": "Unauthorized. Please log in."}, status_code=401)
+    
+    try:
+        payload = await request.json()
+        runs = payload.get("experiments", [])
+        if not runs: return JSONResponse({"error": "No records provided."}, status_code=400)
+
+        current_branch = request.cookies.get("active_branch", "main")
+        
+        conn = get_db_connection()
+        try:
+            cur = conn.cursor()
+            ensure_material_column(cur)
+            ensure_branch_column(cur)
+            
+            # Fetch existing to calculate accurate quality score baseline
+            cur.execute("SELECT * FROM experiments WHERE user_email = %s AND branch_name = %s", (user.get("email"), current_branch))
+            existing_rows = cur.fetchall()
+            cols = [desc[0] for desc in cur.description] if cur.description else []
+            all_exps = [dict(zip(cols, r)) for r in existing_rows]
+            
+            inserted_count = 0
+            for r in runs:
+                crystal_phase = str(r.get("crystal_phase", "Amorphous"))
+                wavelength_shift = float(r.get("wavelength_shift", 0.0))
+                qs_input = r.get("quality_score")
+                
+                if qs_input:
+                    quality_score = float(qs_input)
+                else:
+                    quality_score = safe_calculate_quality_score(crystal_phase, wavelength_shift, 10.0, 10.0, all_exps)
+
+                cur.execute("""
+                    INSERT INTO experiments (
+                        user_email, target_material, rf_power, working_pressure, target_distance, sputter_time_s,
+                        ar_flow, o2_flow, substrate_temp, film_thickness, xrd_phase, wavelength_shift, 
+                        quality_score, batch_notes, branch_name, rotation_speed, substrate_type, grain_size, h2_response_time, created_at
+                    ) VALUES (
+                        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW()
+                    )
+                """, (
+                    user.get("email"), "Generic", float(r.get("rf_power", 100)), float(r.get("working_pressure", 5.0)), 
+                    float(r.get("target_distance", 50.0)), float(r.get("sputter_time_s", 300)), float(r.get("ar_flow", 20.0)), 
+                    float(r.get("o2_flow", 2.0)), float(r.get("substrate_temp", 25.0)), float(r.get("film_thickness_nm", 100.0)), 
+                    crystal_phase, wavelength_shift, quality_score, str(r.get("notes", "Batch CSV Import")), 
+                    current_branch, 5.0, "Si Wafer", 10.0, 10.0
+                ))
+                inserted_count += 1
+                
+            conn.commit()
+            cur.close()
+            return JSONResponse({"success": True, "inserted_count": inserted_count, "message": f"Successfully ingested {inserted_count} experimental runs."})
+        except Exception as e:
+            conn.rollback()
+            return JSONResponse({"error": f"Database Import failed: {str(e)}"}, status_code=500)
+        finally:
+            release_db_connection(conn)
+            
+    except Exception as e:
+        return JSONResponse({"error": f"Import failed: {str(e)}"}, status_code=500)
+
+# ==============================================================================
 # NEW ADVANCED MODULE ROUTES
 # ==============================================================================
 
