@@ -3,115 +3,168 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}MatrixAI — Materials Optimizer{% endblock %}</title>
+    <title>{% block title %}MATRIX_AI // CORE{% endblock %}</title>
     <link rel="manifest" href="/static/manifest.json">
-    <meta name="theme-color" content="#3B82F6">
+    <meta name="theme-color" content="#000000">
     <link rel="apple-touch-icon" href="/static/icon-192.png">
+    
+    <!-- Google Fonts for Brutalist/Hacker Aesthetic -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <!-- ADDED: AutoTable Plugin for Professional PDF Layouts -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    
     <script>
         tailwind.config = {
             darkMode: 'class',
             theme: {
                 extend: {
+                    fontFamily: {
+                        sans: ['"JetBrains Mono"', 'monospace'],
+                        display: ['"Space Grotesk"', 'sans-serif'],
+                    },
                     colors: {
-                        slate: { 850: '#0f172a', 900: '#0b0f19', 950: '#030712' },
-                        brand: { blue: '#3B82F6', purple: '#7C3AED' }
+                        black: '#000000',
+                        gray: { 900: '#0a0a0a', 800: '#171717', 700: '#262626' },
+                        matrix: { green: '#00FF41', dark: '#003B00' }
+                    },
+                    boxShadow: {
+                        'hard': '4px 4px 0px 0px rgba(0, 255, 65, 0.2)',
+                        'hard-hover': '2px 2px 0px 0px rgba(0, 255, 65, 0.4)',
                     }
                 }
             }
         }
     </script>
     <style>
-        @keyframes pulse-glow {
-            0%, 100% { box-shadow: 0 0 12px rgba(59, 130, 246, 0.4), 0 0 24px rgba(124, 58, 237, 0.2); }
-            50% { box-shadow: 0 0 24px rgba(59, 130, 246, 0.8), 0 0 40px rgba(124, 58, 237, 0.5); }
+        body { background-color: #000; color: #e5e5e5; }
+        ::selection { background: #00FF41; color: #000; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #000; border-left: 1px solid #171717; }
+        ::-webkit-scrollbar-thumb { background: #262626; }
+        ::-webkit-scrollbar-thumb:hover { background: #00FF41; }
+        
+        /* Scanline effect for headers */
+        .scanline { position: relative; overflow: hidden; }
+        .scanline::after {
+            content: " ";
+            display: block; position: absolute; top: 0; left: 0; bottom: 0; right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            z-index: 20; background-size: 100% 2px, 3px 100%; pointer-events: none;
         }
-        .btn-glow { background: linear-gradient(135deg, #3B82F6, #7C3AED); animation: pulse-glow 3s infinite ease-in-out; }
+        
+        /* Remove soft focus outlines, use hard strict borders */
+        input:focus, select:focus, textarea:focus { outline: none !important; box-shadow: none !important; border-color: #00FF41 !important; }
     </style>
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen font-sans antialiased flex">
+<body class="bg-black text-gray-300 min-h-screen font-sans antialiased flex selection:bg-matrix-green selection:text-black">
 
-    <!-- ADVANCED STARTUP SPLASH SCREEN -->
-    <div id="splashScreen" class="fixed inset-0 bg-slate-950 z-[100] flex flex-col items-center justify-center overflow-hidden transition-opacity duration-1000 ease-out">
-        <canvas id="latticeCanvas" class="absolute inset-0 w-full h-full opacity-40 pointer-events-none"></canvas>
-        <div class="absolute w-96 h-96 bg-blue-600/20 rounded-full blur-3xl pointer-events-none animate-pulse"></div>
-        <div class="absolute w-96 h-96 bg-purple-600/20 rounded-full blur-3xl pointer-events-none animate-pulse" style="animation-delay: 1s;"></div>
-        <div class="relative z-10 bg-slate-900/80 border border-slate-800 backdrop-blur-xl p-8 rounded-3xl shadow-2xl max-w-md w-full mx-4 flex flex-col items-center text-center space-y-6">
-            <div class="relative flex items-center justify-center">
-                <div class="absolute w-20 h-20 rounded-full bg-gradient-to-tr from-blue-500 to-purple-600 opacity-75 animate-ping"></div>
-                <div class="relative w-16 h-16 rounded-2xl bg-gradient-to-tr from-blue-600 to-purple-600 flex items-center justify-center font-extrabold text-white text-3xl shadow-2xl btn-glow">M</div>
+    <!-- BRUTALIST TERMINAL BOOT SEQUENCE -->
+    <div id="splashScreen" class="fixed inset-0 bg-black z-[100] flex flex-col items-center justify-center overflow-hidden transition-opacity duration-700 ease-out">
+        <canvas id="latticeCanvas" class="absolute inset-0 w-full h-full opacity-20 pointer-events-none"></canvas>
+        
+        <div class="relative z-10 w-full max-w-xl mx-4 p-8 border border-gray-800 bg-gray-900/90 shadow-hard flex flex-col space-y-6">
+            <div class="flex justify-between items-center border-b border-gray-800 pb-2">
+                <span class="text-matrix-green font-bold tracking-widest text-sm">SYS_INIT // MATRIX_CORE</span>
+                <span class="text-gray-500 text-xs">v2.0.4-stable</span>
             </div>
-            <div>
-                <h1 class="text-2xl font-extrabold tracking-wider bg-clip-text text-transparent bg-gradient-to-r from-white via-slate-200 to-slate-400">MatrixAI Engine</h1>
-                <p id="loadingText" class="text-xs text-blue-400 font-mono mt-2 tracking-wide">Initializing workspace...</p>
+            
+            <div class="font-display text-4xl font-extrabold text-white tracking-tighter uppercase">
+                >_MATRIX<span class="text-matrix-green text-opacity-80">AI</span>
             </div>
-            <div class="w-full bg-slate-950 rounded-full h-1.5 overflow-hidden border border-slate-800">
-                <div id="loadingBar" class="bg-gradient-to-r from-blue-500 to-purple-600 h-full w-0 transition-all duration-300 ease-out"></div>
+            
+            <div class="bg-black border border-gray-800 p-4 h-32 flex flex-col justify-end overflow-hidden">
+                <p id="loadingText" class="text-xs text-matrix-green font-mono tracking-tight leading-relaxed animate-pulse">root@matrix:~# execution context started...</p>
+            </div>
+
+            <div class="w-full bg-black h-1 border border-gray-800">
+                <div id="loadingBar" class="bg-matrix-green h-full w-0 transition-all duration-[50ms] ease-linear"></div>
             </div>
         </div>
     </div>
 
-    <!-- SIDEBAR NAVIGATION (ONLY RENDERED WHEN LOGGED IN) -->
+    <!-- HACKER SIDEBAR (NO EMOJIS, SHARP BORDERS) -->
     {% if user %}
-    <aside class="w-64 bg-slate-900 border-r border-slate-800 flex flex-col fixed h-screen z-50">
-        <div class="h-16 flex items-center px-6 border-b border-slate-800 space-x-3">
-            <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-blue-500 to-purple-600 flex items-center justify-center font-extrabold text-white shadow-lg">M</div>
-            <span class="font-bold text-lg bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-400">MatrixAI</span>
+    <aside class="w-64 bg-black border-r border-gray-800 flex flex-col fixed h-screen z-50">
+        <div class="h-16 flex items-center px-6 border-b border-gray-800 space-x-4 bg-gray-900 scanline">
+            <div class="w-8 h-8 bg-matrix-green text-black flex items-center justify-center font-extrabold text-xl shadow-[2px_2px_0px_#171717]">M</div>
+            <span class="font-display font-bold text-lg tracking-widest text-gray-200">MATRIX</span>
         </div>
 
-        <div class="flex-1 py-6 px-4 space-y-2 overflow-y-auto">
-            <div class="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-3 mb-2">Workspace</div>
-            <a href="/" class="flex items-center space-x-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-300 hover:bg-slate-800 hover:text-white transition"><span>🏠 Command Center</span></a>
-            <a href="/experiments-view" class="flex items-center space-x-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-300 hover:bg-slate-800 hover:text-white transition"><span>🗄️ Experiment Ledger</span></a>
-            <a href="/optimizer-view" class="flex items-center space-x-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-300 hover:bg-slate-800 hover:text-white transition"><span>🧠 AI Process Engine</span></a>
+        <div class="flex-1 py-6 space-y-1 overflow-y-auto px-3">
+            <div class="text-[10px] font-bold text-gray-600 uppercase tracking-widest px-3 mb-3 border-b border-gray-800 pb-1">Primary Modules</div>
             
-            <div class="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-3 mt-6 mb-2">Advanced Tools</div>
-            <button onclick="toggleSandbox()" class="w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-300 hover:bg-slate-800 hover:text-white transition shadow-sm border border-transparent hover:border-slate-700">
-                <span>🧪 Digital Twin Sandbox</span>
+            <a href="/" class="flex items-center px-3 py-2 text-xs font-medium text-gray-400 hover:text-matrix-green hover:bg-gray-900 border-l-2 border-transparent hover:border-matrix-green transition-colors">
+                <span class="w-8 inline-block text-gray-600">[~]</span> <span>Command Center</span>
+            </a>
+            <a href="/experiments-view" class="flex items-center px-3 py-2 text-xs font-medium text-gray-400 hover:text-matrix-green hover:bg-gray-900 border-l-2 border-transparent hover:border-matrix-green transition-colors">
+                <span class="w-8 inline-block text-gray-600">[+]</span> <span>Experiment Ledger</span>
+            </a>
+            <a href="/optimizer-view" class="flex items-center px-3 py-2 text-xs font-medium text-gray-400 hover:text-matrix-green hover:bg-gray-900 border-l-2 border-transparent hover:border-matrix-green transition-colors">
+                <span class="w-8 inline-block text-gray-600">[*]</span> <span>Process Engine</span>
+            </a>
+            
+            <div class="text-[10px] font-bold text-gray-600 uppercase tracking-widest px-3 mt-8 mb-3 border-b border-gray-800 pb-1">Simulation & Logic</div>
+            
+            <button onclick="toggleSandbox()" class="w-full flex items-center px-3 py-2 text-xs font-medium text-gray-400 hover:text-matrix-green hover:bg-gray-900 border-l-2 border-transparent hover:border-matrix-green transition-colors text-left">
+                <span class="w-8 inline-block text-gray-600">[>]</span> <span>Digital Twin Env</span>
             </button>
-            <a href="/scheduler" class="flex items-center space-x-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-300 hover:bg-slate-800 hover:text-white transition"><span>📅 Lab Scheduler</span></a>
-            <a href="/thesis" class="flex items-center space-x-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-300 hover:bg-slate-800 hover:text-white transition"><span>📝 Thesis Writer</span></a>
-            <a href="/publication" class="flex items-center space-x-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-300 hover:bg-slate-800 hover:text-white transition"><span>🏆 Publication Readiness</span></a>
-            <a href="/agent" class="flex items-center space-x-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-300 hover:bg-slate-800 hover:text-white transition"><span>🤖 Autonomous Agent</span></a>
-            <a href="/api/docs" class="flex items-center space-x-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-300 hover:bg-slate-800 hover:text-white transition"><span>🔌 Public API</span></a>
+            <a href="/scheduler" class="flex items-center px-3 py-2 text-xs font-medium text-gray-400 hover:text-matrix-green hover:bg-gray-900 border-l-2 border-transparent hover:border-matrix-green transition-colors">
+                <span class="w-8 inline-block text-gray-600">[t]</span> <span>Lab Scheduler</span>
+            </a>
+            <a href="/thesis" class="flex items-center px-3 py-2 text-xs font-medium text-gray-400 hover:text-matrix-green hover:bg-gray-900 border-l-2 border-transparent hover:border-matrix-green transition-colors">
+                <span class="w-8 inline-block text-gray-600">[w]</span> <span>Thesis Compiler</span>
+            </a>
+            <a href="/publication" class="flex items-center px-3 py-2 text-xs font-medium text-gray-400 hover:text-matrix-green hover:bg-gray-900 border-l-2 border-transparent hover:border-matrix-green transition-colors">
+                <span class="w-8 inline-block text-gray-600">[p]</span> <span>Pub Readiness</span>
+            </a>
+            <a href="/agent" class="flex items-center px-3 py-2 text-xs font-medium text-gray-400 hover:text-matrix-green hover:bg-gray-900 border-l-2 border-transparent hover:border-matrix-green transition-colors">
+                <span class="w-8 inline-block text-gray-600">[a]</span> <span>Auto-Agent</span>
+            </a>
+            <a href="/api/docs" class="flex items-center px-3 py-2 text-xs font-medium text-gray-400 hover:text-matrix-green hover:bg-gray-900 border-l-2 border-transparent hover:border-matrix-green transition-colors">
+                <span class="w-8 inline-block text-gray-600">[/]</span> <span>API Endpoints</span>
+            </a>
 
-            <div class="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-3 mt-6 mb-2">Data & Analytics</div>
-            <a href="/bulk-import" class="flex items-center space-x-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-300 hover:bg-slate-800 hover:text-white transition"><span>📥 Bulk CSV Import</span></a>
-            
-            <!-- UPDATED COST TRACKER LINK -->
-            <a href="/cost-tracker" class="flex items-center space-x-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-300 hover:bg-slate-800 hover:text-white transition"><span>💰 Cost & Resource Tracker</span></a>
+            <div class="text-[10px] font-bold text-gray-600 uppercase tracking-widest px-3 mt-8 mb-3 border-b border-gray-800 pb-1">Data & Ops</div>
+            <a href="/bulk-import" class="flex items-center px-3 py-2 text-xs font-medium text-gray-400 hover:text-matrix-green hover:bg-gray-900 border-l-2 border-transparent hover:border-matrix-green transition-colors">
+                <span class="w-8 inline-block text-gray-600">[v]</span> <span>Bulk Ingestion</span>
+            </a>
+            <a href="/cost-tracker" class="flex items-center px-3 py-2 text-xs font-medium text-gray-400 hover:text-matrix-green hover:bg-gray-900 border-l-2 border-transparent hover:border-matrix-green transition-colors">
+                <span class="w-8 inline-block text-gray-600">[$]</span> <span>Resource Burn</span>
+            </a>
 
             {% if user and user.email.lower() == 'pavannaidu9031@gmail.com' %}
-            <div class="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-3 mt-6 mb-2">Administration</div>
-            <a href="/admin/users" class="flex items-center space-x-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-purple-400 bg-purple-500/10 border border-purple-500/20 hover:bg-purple-500/20 transition"><span>🛡️ Admin Panel</span></a>
+            <div class="text-[10px] font-bold text-gray-600 uppercase tracking-widest px-3 mt-8 mb-3 border-b border-gray-800 pb-1">Root Access</div>
+            <a href="/admin/users" class="flex items-center px-3 py-2 text-xs font-bold text-red-500 hover:bg-gray-900 border-l-2 border-transparent hover:border-red-500 transition-colors">
+                <span class="w-8 inline-block text-red-800">[#]</span> <span>Admin Override</span>
+            </a>
             {% endif %}
         </div>
 
-        <div class="p-4 border-t border-slate-800 bg-slate-900/50 flex flex-col space-y-3">
+        <div class="p-4 border-t border-gray-800 bg-gray-900 scanline flex flex-col space-y-3">
             <div class="flex items-center justify-between">
-                <div class="flex items-center space-x-2 overflow-hidden">
-                    {% if user.picture %}<img src="{{ user.picture }}" class="w-6 h-6 rounded-full flex-shrink-0">{% endif %}
-                    <span class="text-xs font-medium text-slate-300 truncate">{{ user.name }}</span>
+                <div class="flex items-center space-x-3 overflow-hidden">
+                    <div class="w-2 h-2 bg-matrix-green rounded-full animate-pulse"></div>
+                    <span class="text-[10px] font-bold text-gray-400 tracking-wider truncate uppercase">USR: {{ user.name }}</span>
                 </div>
-                <a href="/logout" class="text-xs text-red-400 hover:text-red-300 transition">Logout</a>
+                <a href="/logout" class="text-[10px] text-gray-600 hover:text-red-500 font-bold tracking-widest uppercase transition">KILL</a>
             </div>
         </div>
     </aside>
     {% endif %}
 
     <!-- MAIN CONTENT AREA -->
-    <div class="flex-1 {% if user %}ml-64{% endif %} min-h-screen flex flex-col bg-slate-950">
+    <div class="flex-1 {% if user %}ml-64{% endif %} min-h-screen flex flex-col bg-black">
         {% if user %}
-        <header class="h-16 border-b border-slate-800 bg-slate-900/60 backdrop-blur-md sticky top-0 z-40 px-8 flex items-center justify-between">
-            <div class="text-sm font-bold text-slate-200">{% block header_title %}Dashboard{% endblock %}</div>
-            <div class="flex items-center space-x-3">
-                <span class="text-xs px-2.5 py-1 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 font-semibold">Branch: {{ current_branch|default('main') }}</span>
+        <header class="h-16 border-b border-gray-800 bg-black/90 backdrop-blur-md sticky top-0 z-40 px-8 flex items-center justify-between">
+            <div class="text-sm font-display font-bold tracking-widest uppercase text-gray-300">{% block header_title %}SYSTEM DASHBOARD{% endblock %}</div>
+            <div class="flex items-center space-x-4">
+                <span class="text-[10px] px-2 py-1 bg-gray-900 text-matrix-green border border-gray-700 font-mono tracking-widest uppercase">BR: {{ current_branch|default('MAIN') }}</span>
             </div>
         </header>
         {% endif %}
@@ -121,198 +174,114 @@
         </main>
     </div>
 
-    <!-- DIGITAL TWIN SANDBOX MODAL (GLOBAL) -->
-    <div id="sandboxModal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-slate-950/80 backdrop-blur-md opacity-0 transition-opacity duration-300">
-        <div class="bg-slate-900 border border-slate-700 rounded-3xl shadow-[0_0_50px_rgba(59,130,246,0.15)] max-w-4xl w-full mx-4 overflow-hidden flex flex-col md:flex-row transform scale-95 transition-transform duration-300" id="sandboxContent">
+    <!-- INDUSTRIAL DIGITAL TWIN SANDBOX (BRUTALIST MODAL) -->
+    <div id="sandboxModal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-black/90 backdrop-blur-sm opacity-0 transition-opacity duration-200">
+        <div class="bg-black border border-gray-700 shadow-hard max-w-4xl w-full mx-4 overflow-hidden flex flex-col md:flex-row transform scale-95 transition-transform duration-200" id="sandboxContent">
             
-            <!-- Left: Controls -->
-            <div class="p-6 md:w-1/2 border-b md:border-b-0 md:border-r border-slate-800 bg-slate-850">
-                <div class="flex justify-between items-center mb-6">
-                    <h2 class="text-xl font-bold text-white flex items-center gap-2">
-                        <span>🧪</span> Digital Twin Sandbox
+            <div class="p-8 md:w-1/2 border-b md:border-b-0 md:border-r border-gray-800 bg-gray-900/50">
+                <div class="flex justify-between items-center mb-8 border-b border-gray-800 pb-4">
+                    <h2 class="text-lg font-display font-bold text-gray-200 tracking-widest uppercase">
+                        [SIM] Digital_Twin
                     </h2>
-                    <button onclick="toggleSandbox()" class="text-slate-400 hover:text-white md:hidden">
-                        <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-                    </button>
+                    <button onclick="toggleSandbox()" class="text-gray-500 hover:text-red-500 font-bold md:hidden">X</button>
                 </div>
                 
-                <div class="space-y-4">
+                <div class="space-y-5">
                     <div>
-                        <div class="flex justify-between text-xs mb-1"><span class="text-slate-400 font-semibold">RF Power (W)</span><span id="val_rf" class="text-blue-400 font-mono">120</span></div>
-                        <input type="range" id="sim_rf" min="50" max="300" value="120" class="w-full accent-blue-500" oninput="updateSim()">
+                        <div class="flex justify-between text-[10px] uppercase tracking-widest font-bold mb-2"><span class="text-gray-500">RF Power_W</span><span id="val_rf" class="text-matrix-green">120</span></div>
+                        <input type="range" id="sim_rf" min="50" max="300" value="120" class="w-full accent-matrix-green bg-gray-800 h-1 appearance-none outline-none" oninput="updateSim()">
                     </div>
                     <div>
-                        <div class="flex justify-between text-xs mb-1"><span class="text-slate-400 font-semibold">Pressure (mTorr)</span><span id="val_pres" class="text-blue-400 font-mono">5.0</span></div>
-                        <input type="range" id="sim_pres" min="1.0" max="20.0" step="0.5" value="5.0" class="w-full accent-blue-500" oninput="updateSim()">
+                        <div class="flex justify-between text-[10px] uppercase tracking-widest font-bold mb-2"><span class="text-gray-500">Pressure_mT</span><span id="val_pres" class="text-matrix-green">5.0</span></div>
+                        <input type="range" id="sim_pres" min="1.0" max="20.0" step="0.5" value="5.0" class="w-full accent-matrix-green bg-gray-800 h-1 appearance-none outline-none" oninput="updateSim()">
                     </div>
                     <div>
-                        <div class="flex justify-between text-xs mb-1"><span class="text-slate-400 font-semibold">Target Distance (cm)</span><span id="val_dist" class="text-blue-400 font-mono">7.0</span></div>
-                        <input type="range" id="sim_dist" min="3.0" max="15.0" step="0.1" value="7.0" class="w-full accent-blue-500" oninput="updateSim()">
+                        <div class="flex justify-between text-[10px] uppercase tracking-widest font-bold mb-2"><span class="text-gray-500">Dist_cm</span><span id="val_dist" class="text-matrix-green">7.0</span></div>
+                        <input type="range" id="sim_dist" min="3.0" max="15.0" step="0.1" value="7.0" class="w-full accent-matrix-green bg-gray-800 h-1 appearance-none outline-none" oninput="updateSim()">
                     </div>
                     <div>
-                        <div class="flex justify-between text-xs mb-1"><span class="text-slate-400 font-semibold">Sputter Time (s)</span><span id="val_time" class="text-blue-400 font-mono">600</span></div>
-                        <input type="range" id="sim_time" min="10" max="3600" step="10" value="600" class="w-full accent-blue-500" oninput="updateSim()">
+                        <div class="flex justify-between text-[10px] uppercase tracking-widest font-bold mb-2"><span class="text-gray-500">Time_sec</span><span id="val_time" class="text-matrix-green">600</span></div>
+                        <input type="range" id="sim_time" min="10" max="3600" step="10" value="600" class="w-full accent-matrix-green bg-gray-800 h-1 appearance-none outline-none" oninput="updateSim()">
                     </div>
                     <div>
-                        <div class="flex justify-between text-xs mb-1"><span class="text-slate-400 font-semibold">Ar Flow (sccm)</span><span id="val_ar" class="text-blue-400 font-mono">20</span></div>
-                        <input type="range" id="sim_ar" min="5" max="100" value="20" class="w-full accent-blue-500" oninput="updateSim()">
+                        <div class="flex justify-between text-[10px] uppercase tracking-widest font-bold mb-2"><span class="text-gray-500">Ar_sccm</span><span id="val_ar" class="text-matrix-green">20</span></div>
+                        <input type="range" id="sim_ar" min="5" max="100" value="20" class="w-full accent-matrix-green bg-gray-800 h-1 appearance-none outline-none" oninput="updateSim()">
                     </div>
                     <div>
-                        <div class="flex justify-between text-xs mb-1"><span class="text-slate-400 font-semibold">Substrate Temp (°C)</span><span id="val_temp" class="text-blue-400 font-mono">300</span></div>
-                        <input type="range" id="sim_temp" min="25" max="800" step="25" value="300" class="w-full accent-blue-500" oninput="updateSim()">
+                        <div class="flex justify-between text-[10px] uppercase tracking-widest font-bold mb-2"><span class="text-gray-500">Temp_C</span><span id="val_temp" class="text-matrix-green">300</span></div>
+                        <input type="range" id="sim_temp" min="25" max="800" step="25" value="300" class="w-full accent-matrix-green bg-gray-800 h-1 appearance-none outline-none" oninput="updateSim()">
                     </div>
                 </div>
             </div>
 
-            <!-- Right: Live Predictions -->
-            <div class="p-6 md:w-1/2 flex flex-col justify-center relative">
-                <button onclick="toggleSandbox()" class="absolute top-6 right-6 text-slate-400 hover:text-white hidden md:block transition">
-                    <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            <div class="p-8 md:w-1/2 flex flex-col justify-center relative bg-black scanline">
+                <button onclick="toggleSandbox()" class="absolute top-6 right-6 text-gray-600 hover:text-red-500 font-mono text-sm hidden md:block">
+                    [CLOSE]
                 </button>
                 
-                <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-6">Real-Time Surrogate Predictions</h3>
+                <h3 class="text-[10px] font-bold text-gray-600 uppercase tracking-widest mb-8 border-b border-gray-800 pb-2">Output Telemetry</h3>
                 
-                <div class="space-y-4">
-                    <div class="bg-slate-950 border border-slate-800 rounded-xl p-4 flex justify-between items-center shadow-inner">
-                        <span class="text-sm font-medium text-slate-300">Predicted Thickness</span>
-                        <div class="text-right">
-                            <div class="text-xl font-extrabold text-blue-400 font-mono" id="pred_thick">-- nm</div>
-                        </div>
+                <div class="space-y-6">
+                    <div class="border-l-2 border-gray-700 pl-4 py-1">
+                        <span class="text-[10px] font-bold text-gray-500 uppercase tracking-widest block mb-1">Thickness</span>
+                        <div class="text-2xl font-bold text-gray-200" id="pred_thick">-- nm</div>
                     </div>
-                    <div class="bg-slate-950 border border-slate-800 rounded-xl p-4 flex justify-between items-center shadow-inner">
-                        <span class="text-sm font-medium text-slate-300">Wavelength Shift</span>
-                        <div class="text-right">
-                            <div class="text-xl font-extrabold text-purple-400 font-mono" id="pred_shift">-- pm</div>
-                        </div>
+                    <div class="border-l-2 border-gray-700 pl-4 py-1">
+                        <span class="text-[10px] font-bold text-gray-500 uppercase tracking-widest block mb-1">Lambda Shift</span>
+                        <div class="text-2xl font-bold text-gray-200" id="pred_shift">-- pm</div>
                     </div>
-                    <div class="bg-slate-950 border border-slate-800 rounded-xl p-4 flex justify-between items-center shadow-inner relative overflow-hidden">
-                        <div class="absolute left-0 top-0 bottom-0 w-1 bg-emerald-500"></div>
-                        <span class="text-sm font-medium text-slate-300 pl-2">Est. Quality Score</span>
-                        <div class="text-right">
-                            <div class="text-xl font-extrabold text-emerald-400 font-mono" id="pred_score">-- / 100</div>
-                        </div>
+                    <div class="border-l-2 border-matrix-green pl-4 py-1 bg-matrix-green/5">
+                        <span class="text-[10px] font-bold text-matrix-green uppercase tracking-widest block mb-1">Est. Score</span>
+                        <div class="text-3xl font-extrabold text-matrix-green" id="pred_score">-- / 100</div>
                     </div>
                 </div>
                 
-                <p class="text-[10px] text-slate-500 mt-6 text-center">Powered by MatrixAI Proprietary Engine</p>
+                <p class="text-[9px] text-gray-700 mt-10 tracking-widest uppercase">Sys: Proprietary Engine Active</p>
             </div>
         </div>
     </div>
 
-    <!-- AI SCIENTIFIC CO-PILOT DRAWER (GLOBAL) -->
-    <button id="btnChatToggle" class="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-tr from-blue-600 to-purple-600 rounded-full shadow-lg shadow-purple-500/30 flex items-center justify-center text-white hover:scale-105 transition-transform z-50">
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
+    <!-- TERMINAL CHAT DRAWER -->
+    <button id="btnChatToggle" class="fixed bottom-6 right-6 w-12 h-12 bg-matrix-green text-black border border-matrix-green shadow-hard font-bold flex items-center justify-center hover:bg-green-400 hover:-translate-y-1 transition-all z-50">
+        >_
     </button>
 
-    <div id="chatDrawer" class="fixed top-0 right-0 w-full sm:w-[400px] h-full bg-slate-900 border-l border-slate-800 shadow-2xl transform translate-x-full transition-transform duration-300 ease-in-out z-[60] flex flex-col">
-        <div class="h-16 border-b border-slate-800 flex items-center justify-between px-4 bg-slate-850">
-            <div class="flex items-center space-x-2">
-                <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold">AI</div>
-                <span class="font-bold text-white">Scientific Co-Pilot</span>
+    <div id="chatDrawer" class="fixed top-0 right-0 w-full sm:w-[450px] h-full bg-black border-l border-gray-800 shadow-2xl transform translate-x-full transition-transform duration-200 ease-out z-[60] flex flex-col">
+        <div class="h-16 border-b border-gray-800 flex items-center justify-between px-6 bg-gray-900 scanline">
+            <div class="flex items-center space-x-3">
+                <span class="font-display font-bold text-gray-300 tracking-widest uppercase">Terminal_Uplink</span>
             </div>
-            <button id="btnCloseChat" class="text-slate-400 hover:text-white transition">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            <button id="btnCloseChat" class="text-gray-500 hover:text-red-500 font-bold tracking-widest text-xs">
+                [X]
             </button>
         </div>
-        <div id="chatHistory" class="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-950/50">
-            <div class="flex items-start space-x-3">
-                <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-500 to-purple-600 flex-shrink-0 flex items-center justify-center text-xs text-white">AI</div>
-                <div class="bg-slate-800 border border-slate-700 rounded-2xl rounded-tl-none px-4 py-2.5 text-sm text-slate-200">
-                    Hello! I'm your MatrixAI Co-Pilot. I have access to your recent experiments. How can I help you optimize your process today?
+        
+        <div id="chatHistory" class="flex-1 overflow-y-auto p-6 space-y-6 bg-black">
+            <div class="flex flex-col space-y-1">
+                <div class="text-[10px] text-gray-600 font-bold uppercase tracking-widest">System_Message</div>
+                <div class="border border-gray-800 bg-gray-900/50 p-3 text-sm text-matrix-green font-mono leading-relaxed">
+                    Root access verified. Material logic loaded. Input query parameters below.
                 </div>
             </div>
         </div>
-        <div class="p-4 bg-slate-850 border-t border-slate-800">
-            <div class="flex items-center space-x-2 mb-2">
-                <label class="text-xs text-slate-400 font-semibold">Model:</label>
-                <select id="aiProvider" class="bg-slate-900 border border-slate-700 text-xs text-white rounded px-2 py-1 focus:outline-none focus:border-blue-500">
-                    <option value="gemini">Google Gemini 2.5 (Deep Reasoning)</option>
-                    <option value="groq">Groq LLaMA 3 (Fast Responses)</option>
+        
+        <div class="p-4 bg-gray-900 border-t border-gray-800">
+            <div class="flex items-center space-x-2 mb-3">
+                <label class="text-[10px] text-gray-500 uppercase tracking-widest font-bold">Node:</label>
+                <select id="aiProvider" class="bg-black border border-gray-700 text-xs text-matrix-green p-1 uppercase focus:border-matrix-green outline-none">
+                    <option value="gemini">Gemini-Core</option>
+                    <option value="groq">Llama-Fast</option>
                 </select>
             </div>
-            <div class="relative">
-                <textarea id="chatInput" rows="2" placeholder="Ask about physics, parameters, or outcomes..." class="w-full bg-slate-900 border border-slate-700 rounded-xl py-2 px-3 pr-12 text-sm text-white focus:outline-none focus:border-blue-500 resize-none transition"></textarea>
-                <button id="btnSendChat" class="absolute right-2 bottom-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg p-1.5 transition">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
+            <div class="relative flex space-x-2">
+                <textarea id="chatInput" rows="1" placeholder="enter sequence..." class="w-full bg-black border border-gray-700 p-3 text-sm text-gray-200 focus:border-matrix-green transition-colors resize-none placeholder-gray-700 outline-none"></textarea>
+                <button id="btnSendChat" class="bg-gray-800 hover:bg-matrix-green hover:text-black border border-gray-700 text-gray-400 font-bold p-3 transition-colors uppercase text-xs tracking-widest">
+                    Run
                 </button>
             </div>
         </div>
     </div>
 
-    <!-- DIGITAL TWIN SANDBOX JAVASCRIPT -->
-    <script>
-        const sandboxModal = document.getElementById('sandboxModal');
-        const sandboxContent = document.getElementById('sandboxContent');
-        let simTimeout;
-
-        function toggleSandbox() {
-            if (sandboxModal.classList.contains('hidden')) {
-                sandboxModal.classList.remove('hidden');
-                setTimeout(() => {
-                    sandboxModal.classList.remove('opacity-0');
-                    sandboxContent.classList.remove('scale-95');
-                    runSimulation(); 
-                }, 10);
-            } else {
-                sandboxModal.classList.add('opacity-0');
-                sandboxContent.classList.add('scale-95');
-                setTimeout(() => sandboxModal.classList.add('hidden'), 300);
-            }
-        }
-
-        function updateSim() {
-            document.getElementById('val_rf').innerText = document.getElementById('sim_rf').value;
-            document.getElementById('val_pres').innerText = document.getElementById('sim_pres').value;
-            document.getElementById('val_dist').innerText = document.getElementById('sim_dist').value;
-            document.getElementById('val_time').innerText = document.getElementById('sim_time').value;
-            document.getElementById('val_ar').innerText = document.getElementById('sim_ar').value;
-            document.getElementById('val_temp').innerText = document.getElementById('sim_temp').value;
-            
-            clearTimeout(simTimeout);
-            simTimeout = setTimeout(runSimulation, 300); // 300ms Debounce
-        }
-
-        async function runSimulation() {
-            const params = [
-                document.getElementById('sim_rf').value,
-                document.getElementById('sim_pres').value,
-                document.getElementById('sim_dist').value,
-                document.getElementById('sim_time').value,
-                document.getElementById('sim_ar').value,
-                document.getElementById('sim_temp').value
-            ];
-
-            document.getElementById('pred_thick').innerText = '...';
-            document.getElementById('pred_shift').innerText = '...';
-            document.getElementById('pred_score').innerText = '...';
-
-            try {
-                const res = await fetch('/api/sandbox/simulate', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ params: params, target_material: 'Generic', branch: 'main' })
-                });
-                const data = await res.json();
-                
-                if (data.success && data.simulation) {
-                    const thick = data.simulation.thickness || data.simulation.film_thickness || (Math.random() * 80 + 50);
-                    const shift = data.simulation.shift || data.simulation.wavelength_shift || (Math.random() * 8 + 2);
-                    const score = data.simulation.score || data.simulation.quality_score || (Math.random() * 40 + 50);
-                    
-                    document.getElementById('pred_thick').innerText = parseFloat(thick).toFixed(1) + ' nm';
-                    document.getElementById('pred_shift').innerText = parseFloat(shift).toFixed(2) + ' pm';
-                    document.getElementById('pred_score').innerText = parseFloat(score).toFixed(1) + ' / 100';
-                }
-            } catch (e) {
-                console.error('Simulation error:', e);
-                document.getElementById('pred_thick').innerText = 'Err';
-                document.getElementById('pred_shift').innerText = 'Err';
-                document.getElementById('pred_score').innerText = 'Err';
-            }
-        }
-    </script>
-
-    <!-- GLOBAL CHAT SCRIPT -->
     <script>
         const chatDrawer = document.getElementById('chatDrawer');
         const btnChatToggle = document.getElementById('btnChatToggle');
@@ -334,24 +303,24 @@
 
         function appendMessage(role, text) {
             const wrapper = document.createElement('div');
-            wrapper.className = 'flex items-start space-x-3 ' + (role === 'user' ? 'flex-row-reverse space-x-reverse' : '');
+            wrapper.className = 'flex flex-col space-y-1 mb-4';
             
-            const avatar = document.createElement('div');
-            avatar.className = role === 'user' 
-                ? 'w-8 h-8 rounded-full bg-slate-700 border border-slate-600 flex-shrink-0 flex items-center justify-center text-xs text-white' 
-                : 'w-8 h-8 rounded-full bg-gradient-to-tr from-blue-500 to-purple-600 flex-shrink-0 flex items-center justify-center text-xs text-white';
-            avatar.innerText = role === 'user' ? 'U' : 'AI';
+            const header = document.createElement('div');
+            header.className = role === 'user' 
+                ? 'text-[10px] text-gray-500 font-bold uppercase tracking-widest text-right' 
+                : 'text-[10px] text-matrix-green font-bold uppercase tracking-widest';
+            header.innerText = role === 'user' ? 'Local_User' : 'Matrix_Response';
 
             const bubble = document.createElement('div');
             bubble.className = role === 'user'
-                ? 'bg-blue-600 text-white rounded-2xl rounded-tr-none px-4 py-2.5 text-sm'
-                : 'bg-slate-800 border border-slate-700 rounded-2xl rounded-tl-none px-4 py-2.5 text-sm text-slate-200';
+                ? 'border border-gray-700 bg-gray-900 p-3 text-sm text-gray-300 ml-8'
+                : 'border border-gray-800 bg-gray-900/50 p-3 text-sm text-gray-300 mr-8';
             
-            let formattedText = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            let formattedText = text.replace(/\*\*(.*?)\*\*/g, '<strong class="text-white">$1</strong>');
             formattedText = formattedText.replace(/\n/g, '<br>');
             bubble.innerHTML = formattedText;
 
-            wrapper.appendChild(avatar);
+            wrapper.appendChild(header);
             wrapper.appendChild(bubble);
             chatHistory.appendChild(wrapper);
             chatHistory.scrollTop = chatHistory.scrollHeight;
@@ -369,14 +338,9 @@
             const loadingId = 'loading-' + Date.now();
             const loadingWrapper = document.createElement('div');
             loadingWrapper.id = loadingId;
-            loadingWrapper.className = 'flex items-start space-x-3';
+            loadingWrapper.className = 'flex flex-col space-y-1 mb-4';
             loadingWrapper.innerHTML = `
-                <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-500 to-purple-600 flex-shrink-0 flex items-center justify-center text-xs text-white animate-pulse">AI</div>
-                <div class="bg-slate-800 border border-slate-700 rounded-2xl rounded-tl-none px-4 py-2.5 text-sm text-slate-400 flex space-x-1 items-center h-10">
-                    <div class="w-1.5 h-1.5 bg-slate-500 rounded-full animate-bounce"></div>
-                    <div class="w-1.5 h-1.5 bg-slate-500 rounded-full animate-bounce" style="animation-delay: 0.1s"></div>
-                    <div class="w-1.5 h-1.5 bg-slate-500 rounded-full animate-bounce" style="animation-delay: 0.2s"></div>
-                </div>
+                <div class="text-[10px] text-matrix-green font-bold uppercase tracking-widest animate-pulse">Matrix_Computing...</div>
             `;
             chatHistory.appendChild(loadingWrapper);
             chatHistory.scrollTop = chatHistory.scrollHeight;
@@ -394,11 +358,11 @@
                 if (res.ok && data.reply) {
                     appendMessage('ai', data.reply);
                 } else {
-                    appendMessage('ai', `**Error:** ${data.error || 'Failed to connect to AI.'}`);
+                    appendMessage('ai', `[ERROR]: ${data.error || 'Connection refused.'}`);
                 }
             } catch (err) {
                 document.getElementById(loadingId).remove();
-                appendMessage('ai', '**Error:** Could not reach the server.');
+                appendMessage('ai', '[ERROR]: Packet loss. Server unreachable.');
             }
         }
 
@@ -410,30 +374,15 @@
             }
         });
     </script>
-    
-    <!-- Feature 10: PWA Service Worker Registration -->
-    <script>
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/static/sw.js')
-                .then(registration => {
-                    console.log('ServiceWorker registration successful with scope: ', registration.scope);
-                })
-                .catch(err => {
-                    console.log('ServiceWorker registration failed: ', err);
-                });
-            });
-        }
-    </script>
 
-    <!-- ROBUST ANIMATION & ATOMIC LATTICE SCRIPT -->
+    <!-- BRUTALIST ANIMATION SCRIPT -->
     <script>
         const loadingTexts = [
-            "Establishing secure database connection...",
-            "Loading Supabase experimental history...",
-            "Calibrating MatrixAI proprietary engine...",
-            "Synthesizing digital twin environment...",
-            "MatrixAI Core Ready."
+            "root@matrix:~# mounting secure partitions...",
+            "root@matrix:~# establishing connection to DB cluster...",
+            "root@matrix:~# calibrating logic parameters...",
+            "root@matrix:~# bypassing safety interlocks...",
+            "root@matrix:~# SYSTEM ONLINE."
         ];
         
         let textIndex = 0;
@@ -443,7 +392,9 @@
         const textInterval = setInterval(() => {
             textIndex++;
             if (textIndex < loadingTexts.length) {
-                if (textElement) textElement.innerText = loadingTexts[textIndex];
+                if (textElement) {
+                    textElement.innerText += "\n" + loadingTexts[textIndex];
+                }
                 if (barElement) barElement.style.width = ((textIndex + 1) * 20) + '%';
             } else {
                 clearInterval(textInterval);
@@ -453,11 +404,11 @@
                         splash.style.opacity = '0';
                         setTimeout(() => {
                             splash.style.display = 'none';
-                        }, 1000);
+                        }, 700);
                     }
-                }, 400);
+                }, 500);
             }
-        }, 300);
+        }, 400);
 
         const canvas = document.getElementById('latticeCanvas');
         if (canvas) {
@@ -471,15 +422,15 @@
             resizeCanvas();
 
             const particles = [];
-            const particleCount = 35;
+            const particleCount = 40;
 
             for (let i = 0; i < particleCount; i++) {
                 particles.push({
                     x: Math.random() * canvas.width,
                     y: Math.random() * canvas.height,
-                    vx: (Math.random() - 0.5) * 1.2,
-                    vy: (Math.random() - 0.5) * 1.2,
-                    radius: Math.random() * 2 + 1.5
+                    vx: (Math.random() - 0.5) * 1.5,
+                    vy: (Math.random() - 0.5) * 1.5,
+                    size: Math.random() * 2 + 1
                 });
             }
 
@@ -492,12 +443,12 @@
                         const dy = particles[i].y - particles[j].y;
                         const dist = Math.sqrt(dx * dx + dy * dy);
                         
-                        if (dist < 130) {
+                        if (dist < 150) {
                             ctx.beginPath();
                             ctx.moveTo(particles[i].x, particles[i].y);
                             ctx.lineTo(particles[j].x, particles[j].y);
-                            ctx.strokeStyle = `rgba(59, 130, 246, ${1 - dist / 130})`;
-                            ctx.lineWidth = 0.6;
+                            ctx.strokeStyle = `rgba(0, 255, 65, ${0.5 - dist / 300})`;
+                            ctx.lineWidth = 1;
                             ctx.stroke();
                         }
                     }
@@ -510,79 +461,48 @@
                     if (p.x < 0 || p.x > canvas.width) p.vx *= -1;
                     if (p.y < 0 || p.y > canvas.height) p.vy *= -1;
 
-                    ctx.beginPath();
-                    ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
-                    ctx.fillStyle = '#7C3AED';
-                    ctx.fill();
+                    // Draw square hacker nodes instead of circles
+                    ctx.fillStyle = '#00FF41';
+                    ctx.fillRect(p.x - p.size, p.y - p.size, p.size * 2, p.size * 2);
                 });
 
                 requestAnimationFrame(animateLattice);
             }
             animateLattice();
         }
-    </script>
 
-    <!-- ADDED: PROFESSIONAL PDF DOSSIER GENERATOR SCRIPT -->
-    <script>
+        // PDF GENERATOR WITH BRUTALIST AESTHETIC
         function downloadLabDossier(expData) {
-            // Ensure jsPDF is loaded
             const { jsPDF } = window.jspdf;
-            const doc = new jsPDF('p', 'mm', 'a4'); // Portrait, millimeters, A4 size
-
-            // MatrixAI Brand Colors
-            const brandBlue = [59, 130, 246];
-            const darkSlate = [15, 23, 42];
-            const lightSlate = [100, 116, 139];
-
-            // 1. Header Section
+            const doc = new jsPDF('p', 'mm', 'a4');
+            
+            // Brutalist PDF Colors
+            const black = [0, 0, 0];
+            const gray = [50, 50, 50];
+            
             doc.setFont("helvetica", "bold");
             doc.setFontSize(24);
-            doc.setTextColor(brandBlue[0], brandBlue[1], brandBlue[2]);
-            doc.text("MatrixAI", 14, 22);
+            doc.text("MATRIX_AI // LAB DOSSIER", 14, 22);
             
-            doc.setFontSize(14);
-            doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
-            doc.text("Executive Lab Audit Dossier", 14, 30);
-
-            doc.setFont("helvetica", "normal");
-            doc.setFontSize(10);
-            doc.setTextColor(lightSlate[0], lightSlate[1], lightSlate[2]);
-            doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 36);
-            doc.text(`Run ID: #${expData.id || 'N/A'} | Branch: ${expData.branch_name || 'main'}`, 14, 41);
-
-            // Divider Line
-            doc.setDrawColor(200, 200, 200);
-            doc.setLineWidth(0.5);
-            doc.line(14, 45, 196, 45);
-
-            // 2. Primary Outcomes Table
-            doc.setFont("helvetica", "bold");
             doc.setFontSize(12);
-            doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
-            doc.text("1. Primary Experimental Outcomes", 14, 55);
+            doc.setTextColor(gray[0], gray[1], gray[2]);
+            doc.text(`Run ID: [${expData.id || 'N/A'}] | Timestamp: ${new Date().toLocaleString()}`, 14, 30);
+
+            doc.setDrawColor(0, 0, 0);
+            doc.setLineWidth(1);
+            doc.line(14, 35, 196, 35);
 
             doc.autoTable({
-                startY: 59,
-                head: [['Target Material', 'Crystal Phase', 'Wave Shift (pm)', 'Quality Score']],
-                body: [[
-                    expData.target_material || 'Generic', 
-                    expData.xrd_phase || 'Amorphous', 
-                    expData.wavelength_shift || '0.0', 
-                    `${expData.quality_score || '0.0'} / 100`
-                ]],
-                headStyles: { fillColor: brandBlue, textColor: 255, fontStyle: 'bold' },
+                startY: 45,
+                head: [['Target Material', 'Phase', 'Shift (pm)', 'Score']],
+                body: [[ expData.target_material || 'Generic', expData.xrd_phase || 'Amorphous', expData.wavelength_shift || '0.0', expData.quality_score || '0.0' ]],
+                headStyles: { fillColor: black, textColor: 255, fontStyle: 'bold', halign: 'center' },
                 theme: 'grid',
-                styles: { fontSize: 10, halign: 'center', cellPadding: 4 }
+                styles: { fontSize: 10, halign: 'center' }
             });
 
-            // 3. Recipe Parameters Table
-            doc.setFont("helvetica", "bold");
-            doc.setFontSize(12);
-            doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
-            doc.text("2. Deposition Recipe Parameters", 14, doc.lastAutoTable.finalY + 12);
-
             doc.autoTable({
-                startY: doc.lastAutoTable.finalY + 16,
+                startY: doc.lastAutoTable.finalY + 15,
                 head: [['Parameter', 'Value', 'Unit']],
                 body: [
                     ['RF Power', expData.rf_power || 'N/A', 'W'],
@@ -594,37 +514,29 @@
                     ['Substrate Temp', expData.substrate_temp || 'N/A', '°C'],
                     ['Rotation Speed', expData.rotation_speed || 'N/A', 'RPM']
                 ],
-                headStyles: { fillColor: [51, 65, 85], textColor: 255 }, // Dark slate header
-                alternateRowStyles: { fillColor: [241, 245, 249] }, // Light gray stripes
+                headStyles: { fillColor: gray, textColor: 255 },
                 theme: 'striped',
-                styles: { fontSize: 10, cellPadding: 3 }
+                styles: { fontSize: 10 }
             });
 
-            // 4. Lab Notes & Diagnostics
             let finalY = doc.lastAutoTable.finalY + 14;
             doc.setFont("helvetica", "bold");
-            doc.setFontSize(12);
-            doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
-            doc.text("3. Lab Notes & Diagnostics", 14, finalY);
+            doc.text("SYS_LOGS & DIAGNOSTICS", 14, finalY);
             
             doc.setFont("helvetica", "normal");
             doc.setFontSize(10);
-            doc.setTextColor(lightSlate[0], lightSlate[1], lightSlate[2]);
             const notes = expData.batch_notes || "No operational notes provided for this physical run.";
-            const splitNotes = doc.splitTextToSize(notes, 175); // Wrap text at margins
+            const splitNotes = doc.splitTextToSize(notes, 175); 
             doc.text(splitNotes, 14, finalY + 6);
 
-            // 5. Footer (MatrixAI Proprietary Tag)
             const pageCount = doc.internal.getNumberOfPages();
             for(let i = 1; i <= pageCount; i++) {
                 doc.setPage(i);
                 doc.setFontSize(8);
-                doc.setTextColor(150, 150, 150);
-                doc.text(`Powered by MatrixAI Proprietary Engine - Page ${i} of ${pageCount}`, 105, 285, null, null, "center");
+                doc.text(`[SYS_AUTH: PROPRIETARY ENGINE] - PG ${i}/${pageCount}`, 105, 285, null, null, "center");
             }
 
-            // Trigger the download
-            doc.save(`MatrixAI_Dossier_Run_${expData.id || 'Export'}.pdf`);
+            doc.save(`MATRIX_RUN_${expData.id || 'EXPORT'}.pdf`);
         }
     </script>
 </body>
