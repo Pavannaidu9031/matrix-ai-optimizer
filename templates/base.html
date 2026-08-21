@@ -11,6 +11,8 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <!-- ADDED: AutoTable Plugin for Professional PDF Layouts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
     <script>
         tailwind.config = {
@@ -190,7 +192,7 @@
                     </div>
                 </div>
                 
-                <p class="text-[10px] text-slate-500 mt-6 text-center">Powered by MatrixAI Predictive Engine</p>
+                <p class="text-[10px] text-slate-500 mt-6 text-center">Powered by MatrixAI Proprietary Engine</p>
             </div>
         </div>
     </div>
@@ -515,6 +517,112 @@
                 requestAnimationFrame(animateLattice);
             }
             animateLattice();
+        }
+    </script>
+
+    <!-- ADDED: PROFESSIONAL PDF DOSSIER GENERATOR SCRIPT -->
+    <script>
+        function downloadLabDossier(expData) {
+            // Ensure jsPDF is loaded
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF('p', 'mm', 'a4'); // Portrait, millimeters, A4 size
+
+            // MatrixAI Brand Colors
+            const brandBlue = [59, 130, 246];
+            const darkSlate = [15, 23, 42];
+            const lightSlate = [100, 116, 139];
+
+            // 1. Header Section
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(24);
+            doc.setTextColor(brandBlue[0], brandBlue[1], brandBlue[2]);
+            doc.text("MatrixAI", 14, 22);
+            
+            doc.setFontSize(14);
+            doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
+            doc.text("Executive Lab Audit Dossier", 14, 30);
+
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(10);
+            doc.setTextColor(lightSlate[0], lightSlate[1], lightSlate[2]);
+            doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 36);
+            doc.text(`Run ID: #${expData.id || 'N/A'} | Branch: ${expData.branch_name || 'main'}`, 14, 41);
+
+            // Divider Line
+            doc.setDrawColor(200, 200, 200);
+            doc.setLineWidth(0.5);
+            doc.line(14, 45, 196, 45);
+
+            // 2. Primary Outcomes Table
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(12);
+            doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
+            doc.text("1. Primary Experimental Outcomes", 14, 55);
+
+            doc.autoTable({
+                startY: 59,
+                head: [['Target Material', 'Crystal Phase', 'Wave Shift (pm)', 'Quality Score']],
+                body: [[
+                    expData.target_material || 'Generic', 
+                    expData.xrd_phase || 'Amorphous', 
+                    expData.wavelength_shift || '0.0', 
+                    `${expData.quality_score || '0.0'} / 100`
+                ]],
+                headStyles: { fillColor: brandBlue, textColor: 255, fontStyle: 'bold' },
+                theme: 'grid',
+                styles: { fontSize: 10, halign: 'center', cellPadding: 4 }
+            });
+
+            // 3. Recipe Parameters Table
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(12);
+            doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
+            doc.text("2. Deposition Recipe Parameters", 14, doc.lastAutoTable.finalY + 12);
+
+            doc.autoTable({
+                startY: doc.lastAutoTable.finalY + 16,
+                head: [['Parameter', 'Value', 'Unit']],
+                body: [
+                    ['RF Power', expData.rf_power || 'N/A', 'W'],
+                    ['Working Pressure', expData.working_pressure || 'N/A', 'mTorr'],
+                    ['Target Distance', expData.target_distance || 'N/A', 'cm'],
+                    ['Sputter Time', expData.sputter_time_s || 'N/A', 's'],
+                    ['Argon Flow', expData.ar_flow || 'N/A', 'sccm'],
+                    ['Oxygen Flow', expData.o2_flow || 'N/A', 'sccm'],
+                    ['Substrate Temp', expData.substrate_temp || 'N/A', '°C'],
+                    ['Rotation Speed', expData.rotation_speed || 'N/A', 'RPM']
+                ],
+                headStyles: { fillColor: [51, 65, 85], textColor: 255 }, // Dark slate header
+                alternateRowStyles: { fillColor: [241, 245, 249] }, // Light gray stripes
+                theme: 'striped',
+                styles: { fontSize: 10, cellPadding: 3 }
+            });
+
+            // 4. Lab Notes & Diagnostics
+            let finalY = doc.lastAutoTable.finalY + 14;
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(12);
+            doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
+            doc.text("3. Lab Notes & Diagnostics", 14, finalY);
+            
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(10);
+            doc.setTextColor(lightSlate[0], lightSlate[1], lightSlate[2]);
+            const notes = expData.batch_notes || "No operational notes provided for this physical run.";
+            const splitNotes = doc.splitTextToSize(notes, 175); // Wrap text at margins
+            doc.text(splitNotes, 14, finalY + 6);
+
+            // 5. Footer (MatrixAI Proprietary Tag)
+            const pageCount = doc.internal.getNumberOfPages();
+            for(let i = 1; i <= pageCount; i++) {
+                doc.setPage(i);
+                doc.setFontSize(8);
+                doc.setTextColor(150, 150, 150);
+                doc.text(`Powered by MatrixAI Proprietary Engine - Page ${i} of ${pageCount}`, 105, 285, null, null, "center");
+            }
+
+            // Trigger the download
+            doc.save(`MatrixAI_Dossier_Run_${expData.id || 'Export'}.pdf`);
         }
     </script>
 </body>
