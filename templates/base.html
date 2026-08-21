@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}MatrixAI — Materials Optimizer{% endblock %}</title>
     <link rel="manifest" href="/static/manifest.json">
-    <meta name="theme-color" content="#ffffff">
+    <meta name="theme-color" content="#020617">
     <link rel="apple-touch-icon" href="/static/icon-192.png">
     
-    <!-- Clean Slate Typography: Inter -->
+    <!-- VisionOS Typography: Inter -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -31,7 +31,6 @@
                         brand: {
                             50: '#eef2ff',
                             100: '#e0e7ff',
-                            200: '#c7d2fe',
                             400: '#818cf8',
                             500: '#6366f1',
                             600: '#4f46e5',
@@ -40,163 +39,174 @@
                         slate: { 850: '#151e2e', 900: '#0f172a', 950: '#020617' }
                     },
                     boxShadow: {
-                        'soft': '0 4px 20px -2px rgba(0, 0, 0, 0.05)',
-                        'glow': '0 0 20px rgba(99, 102, 241, 0.4)',
+                        'glass': '0 8px 32px 0 rgba(0, 0, 0, 0.37)',
+                        'glow': '0 0 30px rgba(99, 102, 241, 0.25)',
                     }
                 }
             }
         }
     </script>
     <style>
-        body { transition: background-color 0.3s ease, color 0.3s ease; }
+        /* VisionOS Aurora Background Gradients */
+        body { 
+            background-color: #020617; 
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(79, 70, 229, 0.15) 0px, transparent 50%),
+                radial-gradient(at 100% 0%, rgba(147, 51, 234, 0.12) 0px, transparent 50%),
+                radial-gradient(at 50% 100%, rgba(59, 130, 246, 0.1) 0px, transparent 50%);
+            background-attachment: fixed;
+            transition: background-color 0.4s ease, color 0.4s ease; 
+        }
+        
+        /* Frosted Glass Effect */
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.55);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }
+
+        body.force-light-mode .glass-panel {
+            background: rgba(255, 255, 255, 0.7);
+            border: 1px solid rgba(0, 0, 0, 0.06);
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
+        }
+
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
-        .dark ::-webkit-scrollbar-thumb { background: #334155; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 10px; }
         
-        /* Smooth focus rings for accessibility */
         input:focus, select:focus, textarea:focus { 
             outline: none !important; 
-            box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.3) !important; 
+            box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.4) !important; 
             border-color: #6366f1 !important; 
         }
     </style>
 </head>
-<body class="bg-slate-50 text-slate-800 dark:bg-slate-950 dark:text-slate-200 min-h-screen font-sans antialiased flex transition-colors duration-300">
+<body class="text-slate-100 min-h-screen font-sans antialiased flex">
 
     <!-- INTERACTIVE LIGHTBULB THEME SWITCHER -->
     <div class="fixed top-0 right-16 z-[200] flex flex-col items-center">
-        <!-- Ceiling Mount -->
-        <div class="w-10 h-2 bg-slate-300 dark:bg-slate-800 rounded-b-md shadow-sm relative z-30"></div>
-        <!-- Main Wire -->
-        <div class="w-0.5 h-8 bg-slate-300 dark:bg-slate-700 relative z-30"></div>
-        
-        <!-- Bulb Assembly -->
+        <div class="w-10 h-2 bg-slate-800 rounded-b-md shadow-sm relative z-30"></div>
+        <div class="w-0.5 h-8 bg-slate-700 relative z-30"></div>
         <div class="relative flex flex-col items-center">
-            <!-- Socket -->
-            <div class="w-5 h-4 bg-slate-400 dark:bg-slate-600 rounded-t-sm z-30 flex flex-col justify-evenly py-0.5">
-                <div class="w-full h-px bg-slate-500 dark:bg-slate-800"></div>
-                <div class="w-full h-px bg-slate-500 dark:bg-slate-800"></div>
+            <div class="w-5 h-4 bg-slate-600 rounded-t-sm z-30 flex flex-col justify-evenly py-0.5">
+                <div class="w-full h-px bg-slate-800"></div>
+                <div class="w-full h-px bg-slate-800"></div>
             </div>
-            
-            <!-- Glass Bulb -->
-            <div id="theme-bulb" class="w-12 h-12 rounded-full -mt-1.5 transition-all duration-500 z-40 relative overflow-hidden flex items-center justify-center cursor-pointer">
-                <!-- Filament -->
-                <div id="filament" class="w-2 h-3 border-b-2 border-l-2 border-r-2 rounded-b-md transition-all duration-300"></div>
+            <div id="theme-bulb" class="w-12 h-12 rounded-full -mt-1.5 transition-all duration-500 z-40 relative overflow-hidden flex items-center justify-center cursor-pointer bg-slate-800 border-2 border-slate-600 shadow-inner">
+                <div id="filament" class="w-2 h-3 border-b-2 border-l-2 border-r-2 rounded-b-md transition-all duration-300 border-slate-500 opacity-50"></div>
             </div>
-
-            <!-- ON Rope (Left) -->
             <div class="absolute top-0 -left-10 flex flex-col items-center cursor-pointer group z-50" onclick="pullThemeCord('on')">
-                <div class="text-[9px] font-bold text-slate-400 dark:text-slate-500 mb-1 group-hover:text-yellow-500 transition-colors select-none">ON</div>
-                <div id="cord-on" class="w-[1.5px] h-16 bg-slate-300 dark:bg-slate-600 flex flex-col justify-end items-center origin-top transition-transform duration-200">
+                <div class="text-[9px] font-bold text-slate-500 mb-1 group-hover:text-yellow-400 transition-colors select-none">ON</div>
+                <div id="cord-on" class="w-[1.5px] h-16 bg-slate-600 flex flex-col justify-end items-center origin-top transition-transform duration-200">
                     <div class="w-2.5 h-3 bg-yellow-400 rounded-full translate-y-1.5 shadow-sm"></div>
                 </div>
             </div>
-
-            <!-- OFF Rope (Right) -->
             <div class="absolute top-0 -right-10 flex flex-col items-center cursor-pointer group z-50" onclick="pullThemeCord('off')">
-                <div class="text-[9px] font-bold text-slate-400 dark:text-slate-500 mb-1 group-hover:text-slate-700 dark:group-hover:text-slate-300 transition-colors select-none">OFF</div>
-                <div id="cord-off" class="w-[1.5px] h-16 bg-slate-300 dark:bg-slate-600 flex flex-col justify-end items-center origin-top transition-transform duration-200">
-                    <div class="w-2.5 h-3 bg-slate-400 dark:bg-slate-800 rounded-full translate-y-1.5 shadow-sm"></div>
+                <div class="text-[9px] font-bold text-slate-500 mb-1 group-hover:text-slate-300 transition-colors select-none">OFF</div>
+                <div id="cord-off" class="w-[1.5px] h-16 bg-slate-600 flex flex-col justify-end items-center origin-top transition-transform duration-200">
+                    <div class="w-2.5 h-3 bg-slate-800 border border-slate-500 rounded-full translate-y-1.5 shadow-sm"></div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- CLEAN STARTUP SPLASH SCREEN -->
-    <div id="splashScreen" class="fixed inset-0 bg-white dark:bg-slate-950 z-[100] flex flex-col items-center justify-center overflow-hidden transition-opacity duration-700 ease-out">
+    <!-- STARTUP SPLASH SCREEN -->
+    <div id="splashScreen" class="fixed inset-0 bg-slate-950 z-[100] flex flex-col items-center justify-center overflow-hidden transition-opacity duration-700 ease-out">
         <div class="relative z-10 flex flex-col items-center text-center space-y-6">
             <div class="relative flex items-center justify-center">
-                <div class="absolute w-20 h-20 rounded-2xl bg-brand-500 opacity-20 animate-ping"></div>
-                <div class="relative w-16 h-16 rounded-2xl bg-gradient-to-tr from-brand-600 to-indigo-400 flex items-center justify-center font-extrabold text-white text-3xl shadow-glow">M</div>
+                <div class="absolute w-20 h-20 rounded-3xl bg-brand-500 opacity-30 animate-ping"></div>
+                <div class="relative w-16 h-16 rounded-3xl bg-gradient-to-tr from-brand-600 to-indigo-400 flex items-center justify-center font-extrabold text-white text-3xl shadow-glow">M</div>
             </div>
             <div>
-                <h1 class="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white">MatrixAI Engine</h1>
-                <p id="loadingText" class="text-sm text-slate-500 dark:text-slate-400 mt-2 font-medium">Initializing secure workspace...</p>
+                <h1 class="text-2xl font-extrabold tracking-tight text-white">MatrixAI Engine</h1>
+                <p id="loadingText" class="text-sm text-slate-400 mt-2 font-medium">Initializing VisionOS Workspace...</p>
             </div>
-            <div class="w-64 bg-slate-100 dark:bg-slate-800 rounded-full h-1.5 overflow-hidden">
-                <div id="loadingBar" class="bg-brand-500 h-full w-0 transition-all duration-300 ease-out rounded-full"></div>
+            <div class="w-64 bg-slate-900 rounded-full h-1.5 overflow-hidden border border-white/5">
+                <div id="loadingBar" class="bg-gradient-to-r from-brand-500 to-indigo-400 h-full w-0 transition-all duration-300 ease-out rounded-full"></div>
             </div>
         </div>
     </div>
 
-    <!-- ELEGANT SIDEBAR -->
+    <!-- VISIONOS SIDEBAR -->
     {% if user %}
-    <aside class="w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col fixed h-screen z-50 transition-colors duration-300">
-        <div class="h-16 flex items-center px-6 border-b border-slate-200 dark:border-slate-800 space-x-3">
-            <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-brand-600 to-indigo-500 flex items-center justify-center font-extrabold text-white shadow-sm">M</div>
-            <span class="font-bold text-lg text-slate-900 dark:text-white tracking-tight">MatrixAI</span>
+    <aside class="w-64 glass-panel border-r border-white/10 flex flex-col fixed h-screen z-50">
+        <div class="h-16 flex items-center px-6 border-b border-white/10 space-x-3">
+            <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-brand-600 to-indigo-500 flex items-center justify-center font-extrabold text-white shadow-glow">M</div>
+            <span class="font-bold text-lg text-white tracking-tight">MatrixAI</span>
         </div>
 
         <div class="flex-1 py-6 px-4 space-y-1.5 overflow-y-auto">
-            <div class="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider px-3 mb-2">Workspace</div>
+            <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-3 mb-2">Workspace</div>
             
-            <a href="/" class="flex items-center space-x-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-brand-600 dark:hover:text-brand-400 transition-colors">
-                <svg class="w-4 h-4 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
+            <a href="/" class="flex items-center space-x-3 px-3 py-2.5 rounded-2xl text-sm font-medium text-slate-300 hover:bg-white/10 hover:text-white transition-all">
+                <svg class="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
                 <span>Command Center</span>
             </a>
-            <a href="/experiments-view" class="flex items-center space-x-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-brand-600 dark:hover:text-brand-400 transition-colors">
-                <svg class="w-4 h-4 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+            <a href="/experiments-view" class="flex items-center space-x-3 px-3 py-2.5 rounded-2xl text-sm font-medium text-slate-300 hover:bg-white/10 hover:text-white transition-all">
+                <svg class="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
                 <span>Experiment Ledger</span>
             </a>
-            <a href="/optimizer-view" class="flex items-center space-x-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-brand-600 dark:hover:text-brand-400 transition-colors">
-                <svg class="w-4 h-4 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+            <a href="/optimizer-view" class="flex items-center space-x-3 px-3 py-2.5 rounded-2xl text-sm font-medium text-slate-300 hover:bg-white/10 hover:text-white transition-all">
+                <svg class="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
                 <span>Process Engine</span>
             </a>
             
-            <div class="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider px-3 mt-6 mb-2">Advanced Tools</div>
+            <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-3 mt-6 mb-2">Advanced Tools</div>
             
-            <button onclick="toggleSandbox()" class="w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-brand-600 dark:hover:text-brand-400 transition-colors text-left">
-                <svg class="w-4 h-4 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
+            <button onclick="toggleSandbox()" class="w-full flex items-center space-x-3 px-3 py-2.5 rounded-2xl text-sm font-medium text-slate-300 hover:bg-white/10 hover:text-white transition-all text-left">
+                <svg class="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
                 <span>Digital Twin Env</span>
             </button>
-            <a href="/scheduler" class="flex items-center space-x-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-brand-600 dark:hover:text-brand-400 transition-colors">
-                <svg class="w-4 h-4 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+            <a href="/scheduler" class="flex items-center space-x-3 px-3 py-2.5 rounded-2xl text-sm font-medium text-slate-300 hover:bg-white/10 hover:text-white transition-all">
+                <svg class="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
                 <span>Lab Scheduler</span>
             </a>
-            <a href="/thesis" class="flex items-center space-x-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-brand-600 dark:hover:text-brand-400 transition-colors">
-                <svg class="w-4 h-4 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+            <a href="/thesis" class="flex items-center space-x-3 px-3 py-2.5 rounded-2xl text-sm font-medium text-slate-300 hover:bg-white/10 hover:text-white transition-all">
+                <svg class="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                 <span>Thesis Compiler</span>
             </a>
-            <a href="/publication" class="flex items-center space-x-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-brand-600 dark:hover:text-brand-400 transition-colors">
-                <svg class="w-4 h-4 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z"></path></svg>
+            <a href="/publication" class="flex items-center space-x-3 px-3 py-2.5 rounded-2xl text-sm font-medium text-slate-300 hover:bg-white/10 hover:text-white transition-all">
+                <svg class="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z"></path></svg>
                 <span>Pub Readiness</span>
             </a>
-            <a href="/agent" class="flex items-center space-x-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-brand-600 dark:hover:text-brand-400 transition-colors">
-                <svg class="w-4 h-4 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+            <a href="/agent" class="flex items-center space-x-3 px-3 py-2.5 rounded-2xl text-sm font-medium text-slate-300 hover:bg-white/10 hover:text-white transition-all">
+                <svg class="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
                 <span>Auto-Agent</span>
             </a>
-            <a href="/api/docs" class="flex items-center space-x-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-brand-600 dark:hover:text-brand-400 transition-colors">
-                <svg class="w-4 h-4 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path></svg>
+            <a href="/api/docs" class="flex items-center space-x-3 px-3 py-2.5 rounded-2xl text-sm font-medium text-slate-300 hover:bg-white/10 hover:text-white transition-all">
+                <svg class="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path></svg>
                 <span>API Endpoints</span>
             </a>
 
-            <div class="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider px-3 mt-6 mb-2">Data & Ops</div>
-            <a href="/bulk-import" class="flex items-center space-x-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-brand-600 dark:hover:text-brand-400 transition-colors">
-                <svg class="w-4 h-4 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+            <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-3 mt-6 mb-2">Data & Ops</div>
+            <a href="/bulk-import" class="flex items-center space-x-3 px-3 py-2.5 rounded-2xl text-sm font-medium text-slate-300 hover:bg-white/10 hover:text-white transition-all">
+                <svg class="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
                 <span>Bulk Ingestion</span>
             </a>
-            <a href="/cost-tracker" class="flex items-center space-x-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-brand-600 dark:hover:text-brand-400 transition-colors">
-                <svg class="w-4 h-4 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            <a href="/cost-tracker" class="flex items-center space-x-3 px-3 py-2.5 rounded-2xl text-sm font-medium text-slate-300 hover:bg-white/10 hover:text-white transition-all">
+                <svg class="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                 <span>Resource Burn</span>
             </a>
             
             {% if user and user.email.lower() == 'pavannaidu9031@gmail.com' %}
-            <div class="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider px-3 mt-6 mb-2">Administration</div>
-            <a href="/admin/users" class="flex items-center space-x-3 px-3 py-2.5 rounded-xl text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors">
+            <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-3 mt-6 mb-2">Administration</div>
+            <a href="/admin/users" class="flex items-center space-x-3 px-3 py-2.5 rounded-2xl text-sm font-medium text-red-400 hover:bg-red-500/10 transition-all">
                 <svg class="w-4 h-4 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8V7z"></path></svg>
                 <span>Admin Panel</span>
             </a>
             {% endif %}
         </div>
 
-        <div class="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 flex flex-col space-y-3 transition-colors">
+        <div class="p-4 border-t border-white/10 bg-slate-900/40 flex flex-col space-y-3">
             <div class="flex items-center justify-between">
                 <div class="flex items-center space-x-2 overflow-hidden">
                     {% if user.picture %}<img src="{{ user.picture }}" class="w-7 h-7 rounded-full flex-shrink-0 shadow-sm">{% endif %}
-                    <span class="text-sm font-semibold text-slate-700 dark:text-slate-300 truncate">{{ user.name }}</span>
+                    <span class="text-sm font-semibold text-slate-200 truncate">{{ user.name }}</span>
                 </div>
-                <a href="/logout" class="text-xs text-slate-400 hover:text-red-500 font-medium transition-colors" title="Logout">
+                <a href="/logout" class="text-xs text-slate-400 hover:text-red-400 font-medium transition-colors" title="Logout">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
                 </a>
             </div>
@@ -205,12 +215,12 @@
     {% endif %}
 
     <!-- MAIN CONTENT AREA -->
-    <div class="flex-1 {% if user %}ml-64{% endif %} min-h-screen flex flex-col transition-colors duration-300">
+    <div class="flex-1 {% if user %}ml-64{% endif %} min-h-screen flex flex-col">
         {% if user %}
-        <header class="h-16 border-b border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md sticky top-0 z-40 px-8 flex items-center justify-between transition-colors">
-            <div class="text-base font-bold text-slate-800 dark:text-white">{% block header_title %}Dashboard{% endblock %}</div>
-            <div class="flex items-center space-x-4 pr-24"> <!-- Padding right to avoid lightbulb overlap -->
-                <span class="text-xs px-3 py-1 rounded-full bg-brand-50 dark:bg-brand-500/10 text-brand-600 dark:text-brand-400 border border-brand-200 dark:border-brand-500/20 font-semibold tracking-wide shadow-sm">Branch: {{ current_branch|default('main') }}</span>
+        <header class="h-16 border-b border-white/10 glass-panel sticky top-0 z-40 px-8 flex items-center justify-between">
+            <div class="text-base font-bold text-white tracking-wide">{% block header_title %}Dashboard{% endblock %}</div>
+            <div class="flex items-center space-x-4 pr-24">
+                <span class="text-xs px-3 py-1 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 font-semibold tracking-wide shadow-sm">Branch: {{ current_branch|default('main') }}</span>
             </div>
         </header>
         {% endif %}
@@ -220,78 +230,66 @@
         </main>
     </div>
 
-    <!-- DIGITAL TWIN SANDBOX MODAL (CLEAN SLATE) -->
-    <div id="sandboxModal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-slate-900/50 backdrop-blur-sm opacity-0 transition-opacity duration-300">
-        <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl max-w-4xl w-full mx-4 overflow-hidden flex flex-col md:flex-row transform scale-95 transition-all duration-300" id="sandboxContent">
-            
-            <!-- Left: Controls -->
-            <div class="p-8 md:w-1/2 border-b md:border-b-0 md:border-r border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-850">
+    <!-- DIGITAL TWIN SANDBOX MODAL -->
+    <div id="sandboxModal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-slate-950/80 backdrop-blur-md opacity-0 transition-opacity duration-300">
+        <div class="glass-panel rounded-3xl shadow-2xl max-w-4xl w-full mx-4 overflow-hidden flex flex-col md:flex-row transform scale-95 transition-all duration-300 border border-white/10" id="sandboxContent">
+            <div class="p-8 md:w-1/2 border-b md:border-b-0 md:border-r border-white/10 bg-slate-900/40">
                 <div class="flex justify-between items-center mb-6">
-                    <h2 class="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
-                        <svg class="w-5 h-5 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
+                    <h2 class="text-xl font-bold text-white flex items-center gap-2">
+                        <svg class="w-5 h-5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
                         Digital Twin Sandbox
                     </h2>
-                    <button onclick="toggleSandbox()" class="text-slate-400 hover:text-slate-600 dark:hover:text-white md:hidden">
+                    <button onclick="toggleSandbox()" class="text-slate-400 hover:text-white md:hidden">
                         <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                     </button>
                 </div>
                 
                 <div class="space-y-5">
-                    <!-- Standard Sliders -->
                     <div>
-                        <div class="flex justify-between text-xs mb-1.5"><span class="text-slate-500 dark:text-slate-400 font-semibold">RF Power (W)</span><span id="val_rf" class="text-brand-600 dark:text-brand-400 font-medium">120</span></div>
-                        <input type="range" id="sim_rf" min="50" max="300" value="120" class="w-full accent-brand-500" oninput="updateSim()">
+                        <div class="flex justify-between text-xs mb-1.5"><span class="text-slate-400 font-semibold">RF Power (W)</span><span id="val_rf" class="text-indigo-400 font-medium">120</span></div>
+                        <input type="range" id="sim_rf" min="50" max="300" value="120" class="w-full accent-indigo-500 cursor-pointer" oninput="updateSim()">
                     </div>
                     <div>
-                        <div class="flex justify-between text-xs mb-1.5"><span class="text-slate-500 dark:text-slate-400 font-semibold">Pressure (mTorr)</span><span id="val_pres" class="text-brand-600 dark:text-brand-400 font-medium">5.0</span></div>
-                        <input type="range" id="sim_pres" min="1.0" max="20.0" step="0.5" value="5.0" class="w-full accent-brand-500" oninput="updateSim()">
+                        <div class="flex justify-between text-xs mb-1.5"><span class="text-slate-400 font-semibold">Pressure (mTorr)</span><span id="val_pres" class="text-indigo-400 font-medium">5.0</span></div>
+                        <input type="range" id="sim_pres" min="1.0" max="20.0" step="0.5" value="5.0" class="w-full accent-indigo-500 cursor-pointer" oninput="updateSim()">
                     </div>
                     <div>
-                        <div class="flex justify-between text-xs mb-1.5"><span class="text-slate-500 dark:text-slate-400 font-semibold">Target Distance (cm)</span><span id="val_dist" class="text-brand-600 dark:text-brand-400 font-medium">7.0</span></div>
-                        <input type="range" id="sim_dist" min="3.0" max="15.0" step="0.1" value="7.0" class="w-full accent-brand-500" oninput="updateSim()">
+                        <div class="flex justify-between text-xs mb-1.5"><span class="text-slate-400 font-semibold">Target Distance (cm)</span><span id="val_dist" class="text-indigo-400 font-medium">7.0</span></div>
+                        <input type="range" id="sim_dist" min="3.0" max="15.0" step="0.1" value="7.0" class="w-full accent-indigo-500 cursor-pointer" oninput="updateSim()">
                     </div>
                     <div>
-                        <div class="flex justify-between text-xs mb-1.5"><span class="text-slate-500 dark:text-slate-400 font-semibold">Sputter Time (s)</span><span id="val_time" class="text-brand-600 dark:text-brand-400 font-medium">600</span></div>
-                        <input type="range" id="sim_time" min="10" max="3600" step="10" value="600" class="w-full accent-brand-500" oninput="updateSim()">
+                        <div class="flex justify-between text-xs mb-1.5"><span class="text-slate-400 font-semibold">Sputter Time (s)</span><span id="val_time" class="text-indigo-400 font-medium">600</span></div>
+                        <input type="range" id="sim_time" min="10" max="3600" step="10" value="600" class="w-full accent-indigo-500 cursor-pointer" oninput="updateSim()">
                     </div>
                     <div>
-                        <div class="flex justify-between text-xs mb-1.5"><span class="text-slate-500 dark:text-slate-400 font-semibold">Ar Flow (sccm)</span><span id="val_ar" class="text-brand-600 dark:text-brand-400 font-medium">20</span></div>
-                        <input type="range" id="sim_ar" min="5" max="100" value="20" class="w-full accent-brand-500" oninput="updateSim()">
+                        <div class="flex justify-between text-xs mb-1.5"><span class="text-slate-400 font-semibold">Ar Flow (sccm)</span><span id="val_ar" class="text-indigo-400 font-medium">20</span></div>
+                        <input type="range" id="sim_ar" min="5" max="100" value="20" class="w-full accent-indigo-500 cursor-pointer" oninput="updateSim()">
                     </div>
                     <div>
-                        <div class="flex justify-between text-xs mb-1.5"><span class="text-slate-500 dark:text-slate-400 font-semibold">Substrate Temp (°C)</span><span id="val_temp" class="text-brand-600 dark:text-brand-400 font-medium">300</span></div>
-                        <input type="range" id="sim_temp" min="25" max="800" step="25" value="300" class="w-full accent-brand-500" oninput="updateSim()">
+                        <div class="flex justify-between text-xs mb-1.5"><span class="text-slate-400 font-semibold">Substrate Temp (°C)</span><span id="val_temp" class="text-indigo-400 font-medium">300</span></div>
+                        <input type="range" id="sim_temp" min="25" max="800" step="25" value="300" class="w-full accent-indigo-500 cursor-pointer" oninput="updateSim()">
                     </div>
                 </div>
             </div>
 
-            <!-- Right: Live Predictions -->
-            <div class="p-8 md:w-1/2 flex flex-col justify-center relative bg-white dark:bg-slate-900">
-                <button onclick="toggleSandbox()" class="absolute top-6 right-6 text-slate-400 hover:text-slate-600 dark:hover:text-white hidden md:block transition-colors">
+            <div class="p-8 md:w-1/2 flex flex-col justify-center relative bg-slate-900/60">
+                <button onclick="toggleSandbox()" class="absolute top-6 right-6 text-slate-400 hover:text-white hidden md:block transition-colors">
                     <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                 </button>
-                
-                <h3 class="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-6">Real-Time Surrogate Predictions</h3>
-                
+                <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-6">Real-Time Surrogate Predictions</h3>
                 <div class="space-y-4">
-                    <div class="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 flex justify-between items-center shadow-sm">
-                        <span class="text-sm font-semibold text-slate-600 dark:text-slate-300">Predicted Thickness</span>
-                        <div class="text-right">
-                            <div class="text-2xl font-extrabold text-brand-600 dark:text-brand-400" id="pred_thick">-- nm</div>
-                        </div>
+                    <div class="bg-slate-950/60 border border-white/5 rounded-2xl p-5 flex justify-between items-center shadow-sm">
+                        <span class="text-sm font-semibold text-slate-300">Predicted Thickness</span>
+                        <div class="text-right"><div class="text-2xl font-extrabold text-indigo-400" id="pred_thick">-- nm</div></div>
                     </div>
-                    <div class="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 flex justify-between items-center shadow-sm">
-                        <span class="text-sm font-semibold text-slate-600 dark:text-slate-300">Wavelength Shift</span>
-                        <div class="text-right">
-                            <div class="text-2xl font-extrabold text-purple-600 dark:text-purple-400" id="pred_shift">-- pm</div>
-                        </div>
+                    <div class="bg-slate-950/60 border border-white/5 rounded-2xl p-5 flex justify-between items-center shadow-sm">
+                        <span class="text-sm font-semibold text-slate-300">Wavelength Shift</span>
+                        <div class="text-right"><div class="text-2xl font-extrabold text-purple-400" id="pred_shift">-- pm</div></div>
                     </div>
-                    <div class="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 flex justify-between items-center shadow-sm relative overflow-hidden">
-                        <div class="absolute left-0 top-0 bottom-0 w-1.5 bg-green-500"></div>
-                        <span class="text-sm font-semibold text-slate-600 dark:text-slate-300 pl-3">Est. Quality Score</span>
-                        <div class="text-right">
-                            <div class="text-2xl font-extrabold text-green-600 dark:text-green-400" id="pred_score">-- / 100</div>
-                        </div>
+                    <div class="bg-slate-950/60 border border-white/5 rounded-2xl p-5 flex justify-between items-center shadow-sm relative overflow-hidden">
+                        <div class="absolute left-0 top-0 bottom-0 w-1.5 bg-emerald-500"></div>
+                        <span class="text-sm font-semibold text-slate-300 pl-3">Est. Quality Score</span>
+                        <div class="text-right"><div class="text-2xl font-extrabold text-emerald-400" id="pred_score">-- / 100</div></div>
                     </div>
                 </div>
             </div>
@@ -299,40 +297,38 @@
     </div>
 
     <!-- AI SCIENTIFIC CO-PILOT DRAWER -->
-    <button id="btnChatToggle" class="fixed bottom-6 right-6 w-14 h-14 bg-brand-600 rounded-full shadow-lg shadow-brand-500/30 flex items-center justify-center text-white hover:bg-brand-500 hover:scale-105 transition-all z-50">
+    <button id="btnChatToggle" class="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-tr from-brand-600 to-indigo-500 rounded-full shadow-glow flex items-center justify-center text-white hover:scale-105 transition-all z-50">
         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
     </button>
 
-    <div id="chatDrawer" class="fixed top-0 right-0 w-full sm:w-[400px] h-full bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 shadow-2xl transform translate-x-full transition-transform duration-300 ease-in-out z-[60] flex flex-col">
-        <div class="h-16 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-6 bg-slate-50 dark:bg-slate-950/50">
+    <div id="chatDrawer" class="fixed top-0 right-0 w-full sm:w-[400px] h-full glass-panel border-l border-white/10 shadow-2xl transform translate-x-full transition-transform duration-300 ease-in-out z-[60] flex flex-col">
+        <div class="h-16 border-b border-white/10 flex items-center justify-between px-6 bg-slate-900/60">
             <div class="flex items-center space-x-3">
-                <div class="w-8 h-8 rounded-lg bg-brand-100 dark:bg-brand-900/30 text-brand-600 dark:text-brand-400 flex items-center justify-center font-bold">AI</div>
-                <span class="font-bold text-slate-800 dark:text-white">Scientific Co-Pilot</span>
+                <div class="w-8 h-8 rounded-xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold border border-indigo-500/30">AI</div>
+                <span class="font-bold text-white">Scientific Co-Pilot</span>
             </div>
-            <button id="btnCloseChat" class="text-slate-400 hover:text-slate-600 dark:hover:text-white transition">
+            <button id="btnCloseChat" class="text-slate-400 hover:text-white transition">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
             </button>
         </div>
-        
-        <div id="chatHistory" class="flex-1 overflow-y-auto p-6 space-y-5 bg-white dark:bg-slate-900">
+        <div id="chatHistory" class="flex-1 overflow-y-auto p-6 space-y-5 bg-slate-950/40">
             <div class="flex items-start space-x-3">
-                <div class="w-8 h-8 rounded-full bg-brand-100 dark:bg-brand-900/30 flex-shrink-0 flex items-center justify-center text-xs font-bold text-brand-600 dark:text-brand-400">AI</div>
-                <div class="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl rounded-tl-none px-4 py-3 text-sm text-slate-700 dark:text-slate-300 shadow-sm">
+                <div class="w-8 h-8 rounded-full bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 flex-shrink-0 flex items-center justify-center text-xs font-bold">AI</div>
+                <div class="bg-slate-900/80 border border-white/10 rounded-2xl rounded-tl-none px-4 py-3 text-sm text-slate-200 shadow-sm">
                     Hello! I'm your MatrixAI Co-Pilot. I have access to your recent experiments. How can I help you optimize your process today?
                 </div>
             </div>
         </div>
-        
-        <div class="p-5 bg-slate-50 dark:bg-slate-950/50 border-t border-slate-200 dark:border-slate-800">
+        <div class="p-5 bg-slate-900/60 border-t border-white/10">
             <div class="flex items-center space-x-2 mb-3">
-                <label class="text-xs text-slate-500 dark:text-slate-400 font-semibold">Model:</label>
-                <select id="aiProvider" class="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs text-slate-700 dark:text-white rounded-lg px-2 py-1.5 focus:border-brand-500">
+                <label class="text-xs text-slate-400 font-semibold">Model:</label>
+                <select id="aiProvider" class="bg-slate-950 border border-white/10 text-xs text-white rounded-xl px-3 py-1.5 focus:border-indigo-500">
                     <option value="gemini">Google Gemini 2.5</option>
                     <option value="groq">Groq LLaMA 3</option>
                 </select>
             </div>
             <div class="relative">
-                <textarea id="chatInput" rows="2" placeholder="Ask about physics or parameters..." class="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl py-3 px-4 pr-12 text-sm text-slate-800 dark:text-white focus:border-brand-500 resize-none transition shadow-sm"></textarea>
+                <textarea id="chatInput" rows="2" placeholder="Ask about physics or parameters..." class="w-full bg-slate-950 border border-white/10 rounded-xl py-3 px-4 pr-12 text-sm text-white focus:border-indigo-500 resize-none transition shadow-sm"></textarea>
                 <button id="btnSendChat" class="absolute right-2 bottom-2 bg-brand-600 hover:bg-brand-500 text-white rounded-lg p-2 transition shadow-sm">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
                 </button>
@@ -340,23 +336,17 @@
         </div>
     </div>
 
-    <!-- LIGHTBULB & DARK MODE SCRIPT -->
+    <!-- SCRIPTS -->
     <script>
-        // Check local storage on load to set correct bulb state
         document.addEventListener('DOMContentLoaded', () => {
             const html = document.documentElement;
             const isDark = localStorage.getItem('matrix_theme') !== 'light';
             const bulb = document.getElementById('theme-bulb');
             const filament = document.getElementById('filament');
-            
             if (!isDark) {
                 html.classList.remove('dark');
                 bulb.className = "w-12 h-12 rounded-full -mt-1.5 transition-all duration-300 z-40 relative overflow-hidden flex items-center justify-center cursor-pointer bg-yellow-100 border-2 border-yellow-300 shadow-[0_0_30px_10px_rgba(250,204,21,0.4)]";
                 filament.className = "w-2 h-3 border-b-2 border-l-2 border-r-2 rounded-b-md transition-all duration-300 border-yellow-500 opacity-100";
-            } else {
-                html.classList.add('dark');
-                bulb.className = "w-12 h-12 rounded-full -mt-1.5 transition-all duration-300 z-40 relative overflow-hidden flex items-center justify-center cursor-pointer bg-slate-800 border-2 border-slate-600 shadow-inner";
-                filament.className = "w-2 h-3 border-b-2 border-l-2 border-r-2 rounded-b-md transition-all duration-300 border-slate-500 opacity-50";
             }
         });
 
@@ -365,22 +355,15 @@
             const html = document.documentElement;
             const bulb = document.getElementById('theme-bulb');
             const filament = document.getElementById('filament');
-            
-            // 1. Pull down animation (stretch the cord)
             cord.style.transform = 'scaleY(1.5)';
-            
-            // 2. Spring back and trigger theme change
             setTimeout(() => {
                 cord.style.transform = 'scaleY(1)';
-                
                 if (action === 'on') {
-                    // Light Mode (Clean Slate)
                     html.classList.remove('dark');
                     localStorage.setItem('matrix_theme', 'light');
                     bulb.className = "w-12 h-12 rounded-full -mt-1.5 transition-all duration-300 z-40 relative overflow-hidden flex items-center justify-center cursor-pointer bg-yellow-100 border-2 border-yellow-300 shadow-[0_0_30px_10px_rgba(250,204,21,0.4)]";
                     filament.className = "w-2 h-3 border-b-2 border-l-2 border-r-2 rounded-b-md transition-all duration-300 border-yellow-500 opacity-100";
                 } else {
-                    // Dark Mode (Deep Slate)
                     html.classList.add('dark');
                     localStorage.setItem('matrix_theme', 'dark');
                     bulb.className = "w-12 h-12 rounded-full -mt-1.5 transition-all duration-300 z-40 relative overflow-hidden flex items-center justify-center cursor-pointer bg-slate-800 border-2 border-slate-600 shadow-inner";
@@ -389,28 +372,19 @@
             }, 200);
         }
     </script>
-
-    <!-- DIGITAL TWIN JS -->
     <script>
         const sandboxModal = document.getElementById('sandboxModal');
         const sandboxContent = document.getElementById('sandboxContent');
         let simTimeout;
-
         function toggleSandbox() {
             if (sandboxModal.classList.contains('hidden')) {
                 sandboxModal.classList.remove('hidden');
-                setTimeout(() => {
-                    sandboxModal.classList.remove('opacity-0');
-                    sandboxContent.classList.remove('scale-95');
-                    runSimulation(); 
-                }, 10);
+                setTimeout(() => { sandboxModal.classList.remove('opacity-0'); sandboxContent.classList.remove('scale-95'); runSimulation(); }, 10);
             } else {
-                sandboxModal.classList.add('opacity-0');
-                sandboxContent.classList.add('scale-95');
+                sandboxModal.classList.add('opacity-0'); sandboxContent.classList.add('scale-95');
                 setTimeout(() => sandboxModal.classList.add('hidden'), 300);
             }
         }
-
         function updateSim() {
             document.getElementById('val_rf').innerText = document.getElementById('sim_rf').value;
             document.getElementById('val_pres').innerText = document.getElementById('sim_pres').value;
@@ -418,52 +392,21 @@
             document.getElementById('val_time').innerText = document.getElementById('sim_time').value;
             document.getElementById('val_ar').innerText = document.getElementById('sim_ar').value;
             document.getElementById('val_temp').innerText = document.getElementById('sim_temp').value;
-            
-            clearTimeout(simTimeout);
-            simTimeout = setTimeout(runSimulation, 300);
+            clearTimeout(simTimeout); simTimeout = setTimeout(runSimulation, 300);
         }
-
         async function runSimulation() {
-            const params = [
-                document.getElementById('sim_rf').value,
-                document.getElementById('sim_pres').value,
-                document.getElementById('sim_dist').value,
-                document.getElementById('sim_time').value,
-                document.getElementById('sim_ar').value,
-                document.getElementById('sim_temp').value
-            ];
-
-            document.getElementById('pred_thick').innerText = '...';
-            document.getElementById('pred_shift').innerText = '...';
-            document.getElementById('pred_score').innerText = '...';
-
+            const params = [document.getElementById('sim_rf').value, document.getElementById('sim_pres').value, document.getElementById('sim_dist').value, document.getElementById('sim_time').value, document.getElementById('sim_ar').value, document.getElementById('sim_temp').value];
             try {
-                const res = await fetch('/api/sandbox/simulate', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ params: params, target_material: 'Generic', branch: 'main' })
-                });
+                const res = await fetch('/api/sandbox/simulate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ params: params, target_material: 'Generic', branch: 'main' }) });
                 const data = await res.json();
-                
                 if (data.success && data.simulation) {
-                    const thick = data.simulation.thickness || data.simulation.film_thickness || (Math.random() * 80 + 50);
-                    const shift = data.simulation.shift || data.simulation.wavelength_shift || (Math.random() * 8 + 2);
-                    const score = data.simulation.score || data.simulation.quality_score || (Math.random() * 40 + 50);
-                    
-                    document.getElementById('pred_thick').innerText = parseFloat(thick).toFixed(1) + ' nm';
-                    document.getElementById('pred_shift').innerText = parseFloat(shift).toFixed(2) + ' pm';
-                    document.getElementById('pred_score').innerText = parseFloat(score).toFixed(1) + ' / 100';
+                    document.getElementById('pred_thick').innerText = parseFloat(data.simulation.thickness || 50).toFixed(1) + ' nm';
+                    document.getElementById('pred_shift').innerText = parseFloat(data.simulation.shift || 2).toFixed(2) + ' pm';
+                    document.getElementById('pred_score').innerText = parseFloat(data.simulation.score || 50).toFixed(1) + ' / 100';
                 }
-            } catch (e) {
-                console.error('Simulation error:', e);
-                document.getElementById('pred_thick').innerText = 'Err';
-                document.getElementById('pred_shift').innerText = 'Err';
-                document.getElementById('pred_score').innerText = 'Err';
-            }
+            } catch (e) { console.error('Sim error:', e); }
         }
     </script>
-
-    <!-- CO-PILOT CHAT SCRIPT -->
     <script>
         const chatDrawer = document.getElementById('chatDrawer');
         const btnChatToggle = document.getElementById('btnChatToggle');
@@ -472,125 +415,44 @@
         const chatInput = document.getElementById('chatInput');
         const btnSendChat = document.getElementById('btnSendChat');
         const aiProvider = document.getElementById('aiProvider');
-
         const toggleDrawer = () => chatDrawer.classList.toggle('translate-x-full');
         btnChatToggle.addEventListener('click', toggleDrawer);
         btnCloseChat.addEventListener('click', toggleDrawer);
 
-        chatInput.addEventListener('input', function() {
-            this.style.height = 'auto';
-            this.style.height = (this.scrollHeight) + 'px';
-            if (this.value === '') this.style.height = 'auto';
-        });
-
         function appendMessage(role, text) {
             const wrapper = document.createElement('div');
             wrapper.className = 'flex items-start space-x-3 ' + (role === 'user' ? 'flex-row-reverse space-x-reverse' : '');
-            
             const avatar = document.createElement('div');
-            avatar.className = role === 'user' 
-                ? 'w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 flex-shrink-0 flex items-center justify-center text-xs font-bold text-slate-600 dark:text-white' 
-                : 'w-8 h-8 rounded-full bg-brand-100 dark:bg-brand-900/30 flex-shrink-0 flex items-center justify-center text-xs font-bold text-brand-600 dark:text-brand-400';
+            avatar.className = role === 'user' ? 'w-8 h-8 rounded-full bg-slate-700 flex-shrink-0 flex items-center justify-center text-xs font-bold text-white' : 'w-8 h-8 rounded-full bg-indigo-500/20 border border-indigo-500/30 flex-shrink-0 flex items-center justify-center text-xs font-bold text-indigo-400';
             avatar.innerText = role === 'user' ? 'U' : 'AI';
-
             const bubble = document.createElement('div');
-            bubble.className = role === 'user'
-                ? 'bg-brand-600 text-white rounded-2xl rounded-tr-none px-4 py-3 text-sm shadow-sm'
-                : 'bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl rounded-tl-none px-4 py-3 text-sm text-slate-700 dark:text-slate-300 shadow-sm';
-            
-            let formattedText = text.replace(/\*\*(.*?)\*\*/g, '<strong class="font-bold">$1</strong>');
-            formattedText = formattedText.replace(/\n/g, '<br>');
-            bubble.innerHTML = formattedText;
-
-            wrapper.appendChild(avatar);
-            wrapper.appendChild(bubble);
-            chatHistory.appendChild(wrapper);
+            bubble.className = role === 'user' ? 'bg-indigo-600 text-white rounded-2xl rounded-tr-none px-4 py-3 text-sm shadow-sm' : 'glass-panel border border-white/10 rounded-2xl rounded-tl-none px-4 py-3 text-sm text-slate-200 shadow-sm';
+            bubble.innerHTML = text.replace(/\*\*(.*?)\*\*/g, '<strong class="font-bold">$1</strong>').replace(/\n/g, '<br>');
+            wrapper.appendChild(avatar); wrapper.appendChild(bubble); chatHistory.appendChild(wrapper);
             chatHistory.scrollTop = chatHistory.scrollHeight;
         }
 
         async function sendChatMessage() {
-            const message = chatInput.value.trim();
-            if (!message) return;
-
-            const provider = aiProvider.value;
-            appendMessage('user', message);
-            chatInput.value = '';
-            chatInput.style.height = 'auto';
-
+            const message = chatInput.value.trim(); if (!message) return;
+            const provider = aiProvider.value; appendMessage('user', message); chatInput.value = '';
             const loadingId = 'loading-' + Date.now();
-            const loadingWrapper = document.createElement('div');
-            loadingWrapper.id = loadingId;
-            loadingWrapper.className = 'flex items-start space-x-3';
-            loadingWrapper.innerHTML = `
-                <div class="w-8 h-8 rounded-full bg-brand-100 dark:bg-brand-900/30 flex-shrink-0 flex items-center justify-center text-xs font-bold text-brand-600 dark:text-brand-400 animate-pulse">AI</div>
-                <div class="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl rounded-tl-none px-4 py-3 text-sm flex space-x-1 items-center h-10 shadow-sm">
-                    <div class="w-1.5 h-1.5 bg-slate-400 dark:bg-slate-500 rounded-full animate-bounce"></div>
-                    <div class="w-1.5 h-1.5 bg-slate-400 dark:bg-slate-500 rounded-full animate-bounce" style="animation-delay: 0.1s"></div>
-                    <div class="w-1.5 h-1.5 bg-slate-400 dark:bg-slate-500 rounded-full animate-bounce" style="animation-delay: 0.2s"></div>
-                </div>
-            `;
-            chatHistory.appendChild(loadingWrapper);
-            chatHistory.scrollTop = chatHistory.scrollHeight;
-
+            const loadingWrapper = document.createElement('div'); loadingWrapper.id = loadingId; loadingWrapper.className = 'flex items-start space-x-3';
+            loadingWrapper.innerHTML = `<div class="w-8 h-8 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center text-xs font-bold animate-pulse">AI</div><div class="glass-panel px-4 py-3 rounded-2xl text-sm flex space-x-1 items-center h-10"><div class="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce"></div><div class="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style="animation-delay: 0.1s"></div></div>`;
+            chatHistory.appendChild(loadingWrapper); chatHistory.scrollTop = chatHistory.scrollHeight;
             try {
-                const res = await fetch('/api/chat', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message: message, provider: provider })
-                });
-                
-                const data = await res.json();
-                document.getElementById(loadingId).remove();
-
-                if (res.ok && data.reply) {
-                    appendMessage('ai', data.reply);
-                } else {
-                    appendMessage('ai', `**Error:** ${data.error || 'Failed to connect to AI.'}`);
-                }
-            } catch (err) {
-                document.getElementById(loadingId).remove();
-                appendMessage('ai', '**Error:** Could not reach the server.');
-            }
+                const res = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: message, provider: provider }) });
+                const data = await res.json(); document.getElementById(loadingId).remove();
+                if (res.ok && data.reply) appendMessage('ai', data.reply); else appendMessage('ai', 'Error connecting to AI.');
+            } catch (err) { document.getElementById(loadingId).remove(); appendMessage('ai', 'Server unreachable.'); }
         }
-
         btnSendChat.addEventListener('click', sendChatMessage);
-        chatInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                sendChatMessage();
-            }
-        });
+        chatInput.addEventListener('keypress', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChatMessage(); } });
     </script>
-
-    <!-- CLEAN STARTUP ANIMATION -->
     <script>
-        const loadingTexts = [
-            "Establishing secure connection...",
-            "Loading experimental history...",
-            "Calibrating MatrixAI engine...",
-            "Ready."
-        ];
-        
-        let textIndex = 0;
-        const textElement = document.getElementById('loadingText');
-        const barElement = document.getElementById('loadingBar');
-        
-        const textInterval = setInterval(() => {
-            textIndex++;
-            if (textIndex < loadingTexts.length) {
-                if (textElement) textElement.innerText = loadingTexts[textIndex];
-                if (barElement) barElement.style.width = ((textIndex + 1) * 30) + '%';
-            } else {
-                clearInterval(textInterval);
-                setTimeout(() => {
-                    const splash = document.getElementById('splashScreen');
-                    if (splash) {
-                        splash.style.opacity = '0';
-                        setTimeout(() => { splash.style.display = 'none'; }, 700);
-                    }
-                }, 300);
-            }
-        }, 300);
+        setTimeout(() => {
+            const splash = document.getElementById('splashScreen');
+            if (splash) { splash.style.opacity = '0'; setTimeout(() => { splash.style.display = 'none'; }, 700); }
+        }, 500);
     </script>
 </body>
 </html>
