@@ -42,18 +42,16 @@
         }
     </script>
     <style>
-        body { background-color: #000; color: #e5e5e5; transition: background-color 0.4s ease; }
+        body { background-color: #000; color: #e5e5e5; transition: background-color 0.4s ease; overflow-x: hidden; }
         ::selection { background: #00FF41; color: #000; }
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: #000; border-left: 1px solid #171717; }
         ::-webkit-scrollbar-thumb { background: #262626; }
         ::-webkit-scrollbar-thumb:hover { background: #00FF41; }
         
-        /* Scanline effect for headers */
         .scanline { position: relative; overflow: hidden; }
         .scanline::after {
-            content: " ";
-            display: block; position: absolute; top: 0; left: 0; bottom: 0; right: 0;
+            content: " "; display: block; position: absolute; top: 0; left: 0; bottom: 0; right: 0;
             background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
             z-index: 20; background-size: 100% 2px, 3px 100%; pointer-events: none;
         }
@@ -61,8 +59,33 @@
         input:focus, select:focus, textarea:focus { outline: none !important; box-shadow: none !important; border-color: #00FF41 !important; }
 
         /* ==================================================== */
-        /* MAGICAL LIGHT MODE OVERRIDE (Triggered by Lightbulb) */
+        /* RESPONSIVE DESIGN REQUIREMENTS */
         /* ==================================================== */
+
+        /* Global Form Grid Configuration */
+        @media (min-width: 1024px) {
+            .form-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+            #appSidebar { width: 280px; transform: translateX(0); }
+            .main-content { margin-left: 280px; }
+        }
+        @media (min-width: 640px) and (max-width: 1023px) {
+            .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+            #appSidebar { width: 60px; transform: translateX(0); z-index: 150; }
+            .main-content { margin-left: 60px; }
+            .nav-item:hover .tooltip-text { display: block; position: absolute; left: 100%; top: 50%; transform: translateY(-50%); background: black; border: 1px solid #00FF41; color: #00FF41; padding: 4px 8px; z-index: 200; white-space: nowrap; font-size: 10px; margin-left: 10px; }
+        }
+        @media (max-width: 639px) {
+            .form-grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
+            #appSidebar { width: 100%; transform: translateX(-100%); z-index: 160; transition: transform 0.3s ease; }
+            #appSidebar.open { transform: translateX(0); }
+            .main-content { margin-left: 0; }
+            /* Enforce 44px touch targets on mobile */
+            input, select, button, .touch-target { min-height: 44px; font-size: max(12px, 0.875rem) !important; }
+        }
+
+        .tooltip-text { display: none; }
+
+        /* Magical Light Mode Override */
         body.force-light-mode { background-color: #f4f4f5 !important; color: #171717 !important; }
         body.force-light-mode [class*="bg-black"] { background-color: #ffffff !important; }
         body.force-light-mode [class*="bg-gray-9"], body.force-light-mode [class*="bg-[#0a0a0a]"], body.force-light-mode [class*="bg-[#050505]"], body.force-light-mode [class*="bg-[#111]"] { background-color: #fafafa !important; }
@@ -78,325 +101,334 @@
 </head>
 <body class="bg-black text-gray-300 min-h-screen font-sans antialiased flex selection:bg-matrix-green selection:text-black">
 
-    <!-- INTERACTIVE LIGHTBULB THEME SWITCHER (PINNED TO CORNER) -->
-    <div class="fixed top-0 right-16 z-[200] flex flex-col items-center">
-        <!-- Ceiling Mount -->
-        <div class="w-12 h-2 bg-gray-800 border-b border-gray-600 shadow-lg relative z-30"></div>
-        <!-- Main Wire -->
-        <div class="w-1 h-10 bg-gray-700 relative z-30"></div>
-        
-        <!-- Bulb Assembly -->
+    <!-- THEME SWITCHER -->
+    <div class="fixed top-0 right-4 md:right-16 z-[200] flex flex-col items-center pointer-events-auto">
+        <div class="w-8 md:w-12 h-2 bg-gray-800 border-b border-gray-600 shadow-lg relative z-30"></div>
+        <div class="w-1 h-6 md:h-10 bg-gray-700 relative z-30"></div>
         <div class="relative flex flex-col items-center">
-            <!-- Socket -->
-            <div class="w-6 h-5 bg-gray-600 rounded-t-sm z-30 flex flex-col justify-evenly py-0.5">
-                <div class="w-full h-0.5 bg-gray-800"></div>
-                <div class="w-full h-0.5 bg-gray-800"></div>
-                <div class="w-full h-0.5 bg-gray-800"></div>
+            <div class="w-5 md:w-6 h-4 md:h-5 bg-gray-600 rounded-t-sm z-30 flex flex-col justify-evenly py-0.5">
+                <div class="w-full h-px md:h-0.5 bg-gray-800"></div>
+                <div class="w-full h-px md:h-0.5 bg-gray-800"></div>
             </div>
-            
-            <!-- Glass Bulb -->
-            <div id="theme-bulb" class="w-14 h-14 bg-black border-2 border-gray-700 rounded-full -mt-2 shadow-[inset_0_-4px_10px_rgba(0,0,0,0.8)] transition-all duration-500 z-40 relative overflow-hidden flex items-center justify-center">
-                <!-- Filament -->
-                <div class="w-2 h-4 border-b-2 border-l-2 border-r-2 border-gray-700 rounded-b-md opacity-50" id="filament"></div>
+            <div id="theme-bulb" class="w-10 h-10 md:w-14 md:h-14 bg-black border-2 border-gray-700 rounded-full -mt-1 md:-mt-2 shadow-[inset_0_-4px_10px_rgba(0,0,0,0.8)] transition-all duration-500 z-40 relative overflow-hidden flex items-center justify-center">
+                <div class="w-1.5 h-3 md:w-2 md:h-4 border-b-2 border-l-2 border-r-2 border-gray-700 rounded-b-md opacity-50" id="filament"></div>
             </div>
-
-            <!-- ON Rope (Left) -->
-            <div class="absolute top-0 -left-12 flex flex-col items-center cursor-pointer group z-50" onclick="pullThemeCord('on')">
-                <div class="text-[9px] font-bold text-gray-500 mb-1 tracking-widest group-hover:text-yellow-400 transition-colors pointer-events-none select-none">ON</div>
-                <div id="cord-on" class="w-[2px] h-20 bg-gray-600 flex flex-col justify-end items-center origin-top transition-transform duration-200 ease-in-out">
-                    <div class="w-3 h-4 bg-yellow-500/80 border border-yellow-400 rounded-full translate-y-2"></div>
+            <div class="absolute top-0 -left-10 md:-left-12 flex flex-col items-center cursor-pointer group z-50 touch-target" onclick="pullThemeCord('on')">
+                <div class="text-[8px] md:text-[9px] font-bold text-gray-500 mb-1 tracking-widest group-hover:text-yellow-400 select-none">ON</div>
+                <div id="cord-on" class="w-[2px] h-12 md:h-20 bg-gray-600 flex flex-col justify-end items-center origin-top transition-transform duration-200">
+                    <div class="w-2.5 h-3 md:w-3 md:h-4 bg-yellow-500/80 border border-yellow-400 rounded-full translate-y-1 md:translate-y-2"></div>
                 </div>
             </div>
-
-            <!-- OFF Rope (Right) -->
-            <div class="absolute top-0 -right-12 flex flex-col items-center cursor-pointer group z-50" onclick="pullThemeCord('off')">
-                <div class="text-[9px] font-bold text-gray-500 mb-1 tracking-widest group-hover:text-gray-300 transition-colors pointer-events-none select-none">OFF</div>
-                <div id="cord-off" class="w-[2px] h-20 bg-gray-600 flex flex-col justify-end items-center origin-top transition-transform duration-200 ease-in-out">
-                    <div class="w-3 h-4 bg-gray-800 border border-gray-500 rounded-full translate-y-2"></div>
+            <div class="absolute top-0 -right-10 md:-right-12 flex flex-col items-center cursor-pointer group z-50 touch-target" onclick="pullThemeCord('off')">
+                <div class="text-[8px] md:text-[9px] font-bold text-gray-500 mb-1 tracking-widest group-hover:text-gray-300 select-none">OFF</div>
+                <div id="cord-off" class="w-[2px] h-12 md:h-20 bg-gray-600 flex flex-col justify-end items-center origin-top transition-transform duration-200">
+                    <div class="w-2.5 h-3 md:w-3 md:h-4 bg-gray-800 border border-gray-500 rounded-full translate-y-1 md:translate-y-2"></div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- BRUTALIST TERMINAL BOOT SEQUENCE -->
+    <!-- BOOT SPLASH -->
     <div id="splashScreen" class="fixed inset-0 bg-black z-[100] flex flex-col items-center justify-center overflow-hidden transition-opacity duration-700 ease-out">
         <canvas id="latticeCanvas" class="absolute inset-0 w-full h-full opacity-20 pointer-events-none"></canvas>
-        
         <div class="relative z-10 w-full max-w-xl mx-4 p-8 border border-gray-800 bg-gray-900/90 shadow-hard flex flex-col space-y-6">
             <div class="flex justify-between items-center border-b border-gray-800 pb-2">
                 <span class="text-matrix-green font-bold tracking-widest text-sm">SYS_INIT // MATRIX_CORE</span>
                 <span class="text-gray-500 text-xs">v2.0.4-stable</span>
             </div>
-            
-            <div class="font-display text-4xl font-extrabold text-white tracking-tighter uppercase">
-                >_MATRIX<span class="text-matrix-green text-opacity-80">AI</span>
-            </div>
-            
+            <div class="font-display text-3xl md:text-4xl font-extrabold text-white tracking-tighter uppercase">>_MATRIX<span class="text-matrix-green text-opacity-80">AI</span></div>
             <div class="bg-black border border-gray-800 p-4 h-32 flex flex-col justify-end overflow-hidden">
                 <p id="loadingText" class="text-xs text-matrix-green font-mono tracking-tight leading-relaxed animate-pulse">root@matrix:~# execution context started...</p>
             </div>
-
             <div class="w-full bg-black h-1 border border-gray-800">
                 <div id="loadingBar" class="bg-matrix-green h-full w-0 transition-all duration-[50ms] ease-linear"></div>
             </div>
         </div>
     </div>
 
+    <!-- MOBILE SIDEBAR BACKDROP -->
+    <div id="sidebarBackdrop" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-[155] hidden sm:hidden"></div>
+
     <!-- HACKER SIDEBAR -->
     {% if user %}
-    <aside class="w-64 bg-black border-r border-gray-800 flex flex-col fixed h-screen z-50">
-        <div class="h-16 flex items-center px-6 border-b border-gray-800 space-x-4 bg-gray-900 scanline">
-            <div class="w-8 h-8 bg-matrix-green text-black flex items-center justify-center font-extrabold text-xl shadow-[2px_2px_0px_#171717]">M</div>
-            <span class="font-display font-bold text-lg tracking-widest text-gray-200">MATRIX</span>
+    <aside id="appSidebar" class="bg-black border-r border-gray-800 flex flex-col fixed h-screen z-[160] transition-transform duration-300 ease-in-out">
+        <div class="h-16 flex items-center justify-between lg:justify-start px-6 border-b border-gray-800 bg-gray-900 scanline min-h-[64px]">
+            <div class="flex items-center space-x-4">
+                <div class="w-8 h-8 bg-matrix-green text-black flex items-center justify-center font-extrabold text-xl shadow-[2px_2px_0px_#171717]">M</div>
+                <span class="font-display font-bold text-lg tracking-widest text-gray-200 sm:hidden lg:inline-block">MATRIX</span>
+            </div>
+            <button id="closeSidebarBtn" class="sm:hidden text-gray-500 hover:text-red-500 font-bold p-2 touch-target">[X]</button>
         </div>
 
-        <div class="flex-1 py-6 space-y-1 overflow-y-auto px-3">
-            <div class="text-[10px] font-bold text-gray-600 uppercase tracking-widest px-3 mb-3 border-b border-gray-800 pb-1">Primary Modules</div>
+        <div class="flex-1 py-6 space-y-1 overflow-y-auto px-3 overflow-x-hidden">
+            <div class="text-[10px] font-bold text-gray-600 uppercase tracking-widest px-3 mb-3 border-b border-gray-800 pb-1 sm:hidden lg:block">Primary Modules</div>
             
-            <a href="/" class="flex items-center px-3 py-2 text-xs font-medium text-gray-400 hover:text-matrix-green hover:bg-gray-900 border-l-2 border-transparent hover:border-matrix-green transition-colors">
-                <span class="w-8 inline-block text-gray-600">[~]</span> <span>Command Center</span>
+            <a href="/" class="nav-item flex items-center px-3 py-2 text-xs font-medium text-gray-400 hover:text-matrix-green hover:bg-gray-900 border-l-2 border-transparent hover:border-matrix-green transition-colors touch-target">
+                <span class="w-8 inline-block text-gray-600 sidebar-icon text-center lg:text-left">[~]</span> 
+                <span class="sm:hidden lg:inline-block">Command Center</span>
+                <span class="tooltip-text">Command Center</span>
             </a>
-            <a href="/experiments-view" class="flex items-center px-3 py-2 text-xs font-medium text-gray-400 hover:text-matrix-green hover:bg-gray-900 border-l-2 border-transparent hover:border-matrix-green transition-colors">
-                <span class="w-8 inline-block text-gray-600">[+]</span> <span>Experiment Ledger</span>
+            <a href="/experiments-view" class="nav-item flex items-center px-3 py-2 text-xs font-medium text-gray-400 hover:text-matrix-green hover:bg-gray-900 border-l-2 border-transparent hover:border-matrix-green transition-colors touch-target">
+                <span class="w-8 inline-block text-gray-600 sidebar-icon text-center lg:text-left">[+]</span> 
+                <span class="sm:hidden lg:inline-block">Experiment Ledger</span>
+                <span class="tooltip-text">Experiment Ledger</span>
             </a>
-            <a href="/optimizer-view" class="flex items-center px-3 py-2 text-xs font-medium text-gray-400 hover:text-matrix-green hover:bg-gray-900 border-l-2 border-transparent hover:border-matrix-green transition-colors">
-                <span class="w-8 inline-block text-gray-600">[*]</span> <span>Process Engine</span>
+            <a href="/optimizer-view" class="nav-item flex items-center px-3 py-2 text-xs font-medium text-gray-400 hover:text-matrix-green hover:bg-gray-900 border-l-2 border-transparent hover:border-matrix-green transition-colors touch-target">
+                <span class="w-8 inline-block text-gray-600 sidebar-icon text-center lg:text-left">[*]</span> 
+                <span class="sm:hidden lg:inline-block">Process Engine</span>
+                <span class="tooltip-text">Process Engine</span>
             </a>
             
-            <div class="text-[10px] font-bold text-gray-600 uppercase tracking-widest px-3 mt-8 mb-3 border-b border-gray-800 pb-1">Simulation & Logic</div>
+            <div class="text-[10px] font-bold text-gray-600 uppercase tracking-widest px-3 mt-8 mb-3 border-b border-gray-800 pb-1 sm:hidden lg:block">Simulation & Logic</div>
             
-            <button onclick="toggleSandbox()" class="w-full flex items-center px-3 py-2 text-xs font-medium text-gray-400 hover:text-matrix-green hover:bg-gray-900 border-l-2 border-transparent hover:border-matrix-green transition-colors text-left">
-                <span class="w-8 inline-block text-gray-600">[>]</span> <span>Digital Twin Env</span>
+            <button onclick="toggleSandbox()" class="w-full nav-item flex items-center px-3 py-2 text-xs font-medium text-gray-400 hover:text-matrix-green hover:bg-gray-900 border-l-2 border-transparent hover:border-matrix-green transition-colors text-left touch-target">
+                <span class="w-8 inline-block text-gray-600 sidebar-icon text-center lg:text-left">[>]</span> 
+                <span class="sm:hidden lg:inline-block">Digital Twin Env</span>
+                <span class="tooltip-text">Digital Twin Env</span>
             </button>
-            <a href="/scheduler" class="flex items-center px-3 py-2 text-xs font-medium text-gray-400 hover:text-matrix-green hover:bg-gray-900 border-l-2 border-transparent hover:border-matrix-green transition-colors">
-                <span class="w-8 inline-block text-gray-600">[t]</span> <span>Lab Scheduler</span>
+            <a href="/scheduler" class="nav-item flex items-center px-3 py-2 text-xs font-medium text-gray-400 hover:text-matrix-green hover:bg-gray-900 border-l-2 border-transparent hover:border-matrix-green transition-colors touch-target">
+                <span class="w-8 inline-block text-gray-600 sidebar-icon text-center lg:text-left">[t]</span> 
+                <span class="sm:hidden lg:inline-block">Lab Scheduler</span>
+                <span class="tooltip-text">Lab Scheduler</span>
             </a>
-            <a href="/thesis" class="flex items-center px-3 py-2 text-xs font-medium text-gray-400 hover:text-matrix-green hover:bg-gray-900 border-l-2 border-transparent hover:border-matrix-green transition-colors">
-                <span class="w-8 inline-block text-gray-600">[w]</span> <span>Thesis Compiler</span>
+            <a href="/thesis" class="nav-item flex items-center px-3 py-2 text-xs font-medium text-gray-400 hover:text-matrix-green hover:bg-gray-900 border-l-2 border-transparent hover:border-matrix-green transition-colors touch-target">
+                <span class="w-8 inline-block text-gray-600 sidebar-icon text-center lg:text-left">[w]</span> 
+                <span class="sm:hidden lg:inline-block">Thesis Compiler</span>
+                <span class="tooltip-text">Thesis Compiler</span>
             </a>
-            <a href="/publication" class="flex items-center px-3 py-2 text-xs font-medium text-gray-400 hover:text-matrix-green hover:bg-gray-900 border-l-2 border-transparent hover:border-matrix-green transition-colors">
-                <span class="w-8 inline-block text-gray-600">[p]</span> <span>Pub Readiness</span>
+            <a href="/publication" class="nav-item flex items-center px-3 py-2 text-xs font-medium text-gray-400 hover:text-matrix-green hover:bg-gray-900 border-l-2 border-transparent hover:border-matrix-green transition-colors touch-target">
+                <span class="w-8 inline-block text-gray-600 sidebar-icon text-center lg:text-left">[p]</span> 
+                <span class="sm:hidden lg:inline-block">Pub Readiness</span>
+                <span class="tooltip-text">Pub Readiness</span>
             </a>
-            <a href="/agent" class="flex items-center px-3 py-2 text-xs font-medium text-gray-400 hover:text-matrix-green hover:bg-gray-900 border-l-2 border-transparent hover:border-matrix-green transition-colors">
-                <span class="w-8 inline-block text-gray-600">[a]</span> <span>Auto-Agent</span>
+            <a href="/agent" class="nav-item flex items-center px-3 py-2 text-xs font-medium text-gray-400 hover:text-matrix-green hover:bg-gray-900 border-l-2 border-transparent hover:border-matrix-green transition-colors touch-target">
+                <span class="w-8 inline-block text-gray-600 sidebar-icon text-center lg:text-left">[a]</span> 
+                <span class="sm:hidden lg:inline-block">Auto-Agent</span>
+                <span class="tooltip-text">Auto-Agent</span>
             </a>
-            <a href="/api/docs" class="flex items-center px-3 py-2 text-xs font-medium text-gray-400 hover:text-matrix-green hover:bg-gray-900 border-l-2 border-transparent hover:border-matrix-green transition-colors">
-                <span class="w-8 inline-block text-gray-600">[/]</span> <span>API Endpoints</span>
+            <a href="/api/docs" class="nav-item flex items-center px-3 py-2 text-xs font-medium text-gray-400 hover:text-matrix-green hover:bg-gray-900 border-l-2 border-transparent hover:border-matrix-green transition-colors touch-target">
+                <span class="w-8 inline-block text-gray-600 sidebar-icon text-center lg:text-left">[/]</span> 
+                <span class="sm:hidden lg:inline-block">API Endpoints</span>
+                <span class="tooltip-text">API Endpoints</span>
             </a>
 
-            <div class="text-[10px] font-bold text-gray-600 uppercase tracking-widest px-3 mt-8 mb-3 border-b border-gray-800 pb-1">Data & Ops</div>
-            <a href="/bulk-import" class="flex items-center px-3 py-2 text-xs font-medium text-gray-400 hover:text-matrix-green hover:bg-gray-900 border-l-2 border-transparent hover:border-matrix-green transition-colors">
-                <span class="w-8 inline-block text-gray-600">[v]</span> <span>Bulk Ingestion</span>
+            <div class="text-[10px] font-bold text-gray-600 uppercase tracking-widest px-3 mt-8 mb-3 border-b border-gray-800 pb-1 sm:hidden lg:block">Data & Ops</div>
+            <a href="/bulk-import" class="nav-item flex items-center px-3 py-2 text-xs font-medium text-gray-400 hover:text-matrix-green hover:bg-gray-900 border-l-2 border-transparent hover:border-matrix-green transition-colors touch-target">
+                <span class="w-8 inline-block text-gray-600 sidebar-icon text-center lg:text-left">[v]</span> 
+                <span class="sm:hidden lg:inline-block">Bulk Ingestion</span>
+                <span class="tooltip-text">Bulk Ingestion</span>
             </a>
-            <a href="/cost-tracker" class="flex items-center px-3 py-2 text-xs font-medium text-gray-400 hover:text-matrix-green hover:bg-gray-900 border-l-2 border-transparent hover:border-matrix-green transition-colors">
-                <span class="w-8 inline-block text-gray-600">[$]</span> <span>Resource Burn</span>
+            <a href="/cost-tracker" class="nav-item flex items-center px-3 py-2 text-xs font-medium text-gray-400 hover:text-matrix-green hover:bg-gray-900 border-l-2 border-transparent hover:border-matrix-green transition-colors touch-target">
+                <span class="w-8 inline-block text-gray-600 sidebar-icon text-center lg:text-left">[$]</span> 
+                <span class="sm:hidden lg:inline-block">Resource Burn</span>
+                <span class="tooltip-text">Resource Burn</span>
             </a>
 
             {% if user and user.email.lower() == 'pavannaidu9031@gmail.com' %}
-            <div class="text-[10px] font-bold text-gray-600 uppercase tracking-widest px-3 mt-8 mb-3 border-b border-gray-800 pb-1">Root Access</div>
-            <a href="/admin/users" class="flex items-center px-3 py-2 text-xs font-bold text-red-500 hover:bg-gray-900 border-l-2 border-transparent hover:border-red-500 transition-colors">
-                <span class="w-8 inline-block text-red-800">[#]</span> <span>Admin Override</span>
+            <div class="text-[10px] font-bold text-gray-600 uppercase tracking-widest px-3 mt-8 mb-3 border-b border-gray-800 pb-1 sm:hidden lg:block">Root Access</div>
+            <a href="/admin/users" class="nav-item flex items-center px-3 py-2 text-xs font-bold text-red-500 hover:bg-gray-900 border-l-2 border-transparent hover:border-red-500 transition-colors touch-target">
+                <span class="w-8 inline-block text-red-800 sidebar-icon text-center lg:text-left">[#]</span> 
+                <span class="sm:hidden lg:inline-block">Admin Override</span>
+                <span class="tooltip-text">Admin Override</span>
             </a>
             {% endif %}
+
+            <!-- Mobile Only KILL button -->
+            <a href="/logout" class="sm:hidden nav-item flex items-center px-3 py-2 mt-8 text-xs font-bold text-gray-600 hover:text-red-500 hover:bg-gray-900 border-l-2 border-transparent hover:border-red-500 transition-colors touch-target">
+                <span class="w-8 inline-block text-red-800 sidebar-icon">[X]</span> 
+                <span>KILL SESSION</span>
+            </a>
         </div>
 
-        <div class="p-4 border-t border-gray-800 bg-gray-900 scanline flex flex-col space-y-3">
+        <div class="p-4 border-t border-gray-800 bg-gray-900 scanline flex flex-col space-y-3 sm:hidden lg:flex">
             <div class="flex items-center justify-between">
                 <div class="flex items-center space-x-3 overflow-hidden">
                     <div class="w-2 h-2 bg-matrix-green rounded-full animate-pulse"></div>
                     <span class="text-[10px] font-bold text-gray-400 tracking-wider truncate uppercase">USR: {{ user.name }}</span>
                 </div>
-                <a href="/logout" class="text-[10px] text-gray-600 hover:text-red-500 font-bold tracking-widest uppercase transition">KILL</a>
+                <a href="/logout" class="hidden lg:inline-block text-[10px] text-gray-600 hover:text-red-500 font-bold tracking-widest uppercase transition touch-target">KILL</a>
             </div>
         </div>
     </aside>
     {% endif %}
 
     <!-- MAIN CONTENT AREA -->
-    <div class="flex-1 {% if user %}ml-64{% endif %} min-h-screen flex flex-col bg-black">
+    <div class="flex-1 main-content min-h-screen flex flex-col bg-black w-full">
         {% if user %}
-        <header class="h-16 border-b border-gray-800 bg-black/80 backdrop-blur-sm sticky top-0 z-40 px-8 flex items-center justify-between">
-            <div class="text-sm font-display font-bold tracking-widest uppercase text-gray-300">{% block header_title %}SYSTEM DASHBOARD{% endblock %}</div>
-            <div class="flex items-center space-x-4 pr-32"> <!-- Margin applied here to step away from bulb -->
-                <span class="text-[10px] px-2 py-1 bg-gray-900 text-matrix-green border border-gray-700 font-mono tracking-widest uppercase">BR: {{ current_branch|default('MAIN') }}</span>
+        <header class="h-16 border-b border-gray-800 bg-black/80 backdrop-blur-sm sticky top-0 z-40 px-4 md:px-8 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <button id="hamburgerBtn" class="sm:hidden text-matrix-green p-2 focus:outline-none touch-target">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+                </button>
+                <div class="w-6 h-6 bg-matrix-green text-black flex sm:hidden items-center justify-center font-extrabold text-sm">M</div>
+                <div class="text-sm md:text-base font-display font-bold tracking-widest uppercase text-gray-300 truncate">
+                    <span class="hidden sm:inline">{% block header_title %}SYSTEM DASHBOARD{% endblock %}</span>
+                    <span class="sm:hidden">{% block header_title_mobile %}{% block header_title %}{% endblock %}{% endblock %}</span>
+                </div>
+            </div>
+            <div class="flex items-center space-x-4 pr-16 md:pr-32">
+                <span class="hidden lg:inline-flex text-[10px] px-2 py-1 bg-gray-900 text-matrix-green border border-gray-700 font-mono tracking-widest uppercase">BR: {{ current_branch|default('MAIN') }}</span>
+                <a href="/logout" class="hidden sm:inline-flex lg:hidden text-[10px] text-gray-600 hover:text-red-500 font-bold tracking-widest uppercase transition touch-target items-center">KILL</a>
             </div>
         </header>
+        
+        <!-- Tablet slim branch bar -->
+        <div class="hidden sm:flex lg:hidden w-full bg-gray-900 border-b border-gray-800 px-8 py-1">
+            <span class="text-[9px] text-matrix-green font-mono tracking-widest uppercase">BR: {{ current_branch|default('MAIN') }}</span>
+        </div>
         {% endif %}
 
-        <main class="flex-1 p-8 space-y-8 max-w-7xl w-full mx-auto relative">
+        <main class="flex-1 p-4 md:p-8 space-y-8 max-w-7xl w-full mx-auto relative overflow-x-hidden">
             {% block content %}{% endblock %}
         </main>
     </div>
 
-    <!-- INDUSTRIAL DIGITAL TWIN SANDBOX (BRUTALIST MODAL) -->
-    <div id="sandboxModal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-black/90 backdrop-blur-sm opacity-0 transition-opacity duration-200">
-        <div class="bg-black border-2 border-gray-800 shadow-[8px_8px_0px_#171717] max-w-4xl w-full mx-4 overflow-hidden flex flex-col md:flex-row transform scale-95 transition-transform duration-200" id="sandboxContent">
+    <!-- INDUSTRIAL DIGITAL TWIN SANDBOX (RESPONSIVE) -->
+    <div id="sandboxModal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-black/90 backdrop-blur-sm opacity-0 transition-opacity duration-200 p-2 md:p-4 overflow-y-auto">
+        <div class="bg-black border-2 border-gray-800 shadow-[8px_8px_0px_#171717] w-full max-w-4xl mx-auto overflow-hidden flex flex-col md:flex-row transform scale-95 transition-transform duration-200 my-auto" id="sandboxContent">
             
-            <div class="p-8 md:w-1/2 border-b md:border-b-0 md:border-r border-gray-800 bg-gray-900/50">
-                <div class="flex justify-between items-center mb-8 border-b border-gray-800 pb-4">
-                    <h2 class="text-lg font-display font-bold text-gray-200 tracking-widest uppercase">
-                        [SIM] Digital_Twin
-                    </h2>
-                    <button onclick="toggleSandbox()" class="text-gray-500 hover:text-red-500 font-bold md:hidden">X</button>
+            <div class="p-6 md:p-8 md:w-1/2 border-b md:border-b-0 md:border-r border-gray-800 bg-gray-900/50 order-2 md:order-1">
+                <div class="hidden md:flex justify-between items-center mb-8 border-b border-gray-800 pb-4">
+                    <h2 class="text-lg font-display font-bold text-gray-200 tracking-widest uppercase">[SIM] Digital_Twin</h2>
                 </div>
                 
-                <div class="space-y-5">
+                <div class="space-y-6 md:space-y-5">
                     <div>
                         <div class="flex justify-between text-[10px] uppercase tracking-widest font-bold mb-2"><span class="text-gray-500">RF Power_W</span><span id="val_rf" class="text-matrix-green">120</span></div>
-                        <input type="range" id="sim_rf" min="50" max="300" value="120" class="w-full accent-matrix-green bg-gray-800 h-1 appearance-none outline-none" oninput="updateSim()">
+                        <input type="range" id="sim_rf" min="50" max="300" value="120" class="w-full accent-matrix-green bg-gray-800 h-1 appearance-none outline-none touch-target" oninput="updateSim()">
                     </div>
                     <div>
                         <div class="flex justify-between text-[10px] uppercase tracking-widest font-bold mb-2"><span class="text-gray-500">Pressure_mT</span><span id="val_pres" class="text-matrix-green">5.0</span></div>
-                        <input type="range" id="sim_pres" min="1.0" max="20.0" step="0.5" value="5.0" class="w-full accent-matrix-green bg-gray-800 h-1 appearance-none outline-none" oninput="updateSim()">
+                        <input type="range" id="sim_pres" min="1.0" max="20.0" step="0.5" value="5.0" class="w-full accent-matrix-green bg-gray-800 h-1 appearance-none outline-none touch-target" oninput="updateSim()">
                     </div>
                     <div>
                         <div class="flex justify-between text-[10px] uppercase tracking-widest font-bold mb-2"><span class="text-gray-500">Dist_cm</span><span id="val_dist" class="text-matrix-green">7.0</span></div>
-                        <input type="range" id="sim_dist" min="3.0" max="15.0" step="0.1" value="7.0" class="w-full accent-matrix-green bg-gray-800 h-1 appearance-none outline-none" oninput="updateSim()">
+                        <input type="range" id="sim_dist" min="3.0" max="15.0" step="0.1" value="7.0" class="w-full accent-matrix-green bg-gray-800 h-1 appearance-none outline-none touch-target" oninput="updateSim()">
                     </div>
                     <div>
                         <div class="flex justify-between text-[10px] uppercase tracking-widest font-bold mb-2"><span class="text-gray-500">Time_sec</span><span id="val_time" class="text-matrix-green">600</span></div>
-                        <input type="range" id="sim_time" min="10" max="3600" step="10" value="600" class="w-full accent-matrix-green bg-gray-800 h-1 appearance-none outline-none" oninput="updateSim()">
+                        <input type="range" id="sim_time" min="10" max="3600" step="10" value="600" class="w-full accent-matrix-green bg-gray-800 h-1 appearance-none outline-none touch-target" oninput="updateSim()">
                     </div>
                     <div>
                         <div class="flex justify-between text-[10px] uppercase tracking-widest font-bold mb-2"><span class="text-gray-500">Ar_sccm</span><span id="val_ar" class="text-matrix-green">20</span></div>
-                        <input type="range" id="sim_ar" min="5" max="100" value="20" class="w-full accent-matrix-green bg-gray-800 h-1 appearance-none outline-none" oninput="updateSim()">
+                        <input type="range" id="sim_ar" min="5" max="100" value="20" class="w-full accent-matrix-green bg-gray-800 h-1 appearance-none outline-none touch-target" oninput="updateSim()">
                     </div>
                     <div>
                         <div class="flex justify-between text-[10px] uppercase tracking-widest font-bold mb-2"><span class="text-gray-500">Temp_C</span><span id="val_temp" class="text-matrix-green">300</span></div>
-                        <input type="range" id="sim_temp" min="25" max="800" step="25" value="300" class="w-full accent-matrix-green bg-gray-800 h-1 appearance-none outline-none" oninput="updateSim()">
+                        <input type="range" id="sim_temp" min="25" max="800" step="25" value="300" class="w-full accent-matrix-green bg-gray-800 h-1 appearance-none outline-none touch-target" oninput="updateSim()">
                     </div>
                 </div>
             </div>
 
-            <div class="p-8 md:w-1/2 flex flex-col justify-center relative bg-black scanline">
-                <button onclick="toggleSandbox()" class="absolute top-6 right-6 text-gray-600 hover:text-red-500 font-mono text-sm hidden md:block">
-                    [CLOSE]
-                </button>
+            <div class="p-6 md:p-8 md:w-1/2 flex flex-col justify-center relative bg-black scanline order-1 md:order-2 border-b md:border-b-0 border-gray-800">
+                <div class="flex justify-between items-center mb-6 md:mb-8 border-b border-gray-800 pb-2">
+                    <h3 class="text-[10px] font-bold text-gray-600 uppercase tracking-widest md:hidden">Output Telemetry</h3>
+                    <h3 class="text-[10px] font-bold text-gray-600 uppercase tracking-widest hidden md:block border-none">Output Telemetry</h3>
+                    <button onclick="toggleSandbox()" class="text-gray-600 hover:text-red-500 font-mono text-sm touch-target">[CLOSE]</button>
+                </div>
                 
-                <h3 class="text-[10px] font-bold text-gray-600 uppercase tracking-widest mb-8 border-b border-gray-800 pb-2">Output Telemetry</h3>
-                
-                <div class="space-y-6">
+                <div class="space-y-4 md:space-y-6">
                     <div class="border-l-2 border-gray-700 pl-4 py-1">
                         <span class="text-[10px] font-bold text-gray-500 uppercase tracking-widest block mb-1">Thickness</span>
-                        <div class="text-2xl font-bold text-gray-200" id="pred_thick">-- nm</div>
+                        <div class="text-xl md:text-2xl font-bold text-gray-200" id="pred_thick">-- nm</div>
                     </div>
                     <div class="border-l-2 border-gray-700 pl-4 py-1">
                         <span class="text-[10px] font-bold text-gray-500 uppercase tracking-widest block mb-1">Lambda Shift</span>
-                        <div class="text-2xl font-bold text-gray-200" id="pred_shift">-- pm</div>
+                        <div class="text-xl md:text-2xl font-bold text-gray-200" id="pred_shift">-- pm</div>
                     </div>
                     <div class="border-l-2 border-matrix-green pl-4 py-1 bg-matrix-green/5">
                         <span class="text-[10px] font-bold text-matrix-green uppercase tracking-widest block mb-1">Est. Score</span>
-                        <div class="text-3xl font-extrabold text-matrix-green" id="pred_score">-- / 100</div>
+                        <div class="text-2xl md:text-3xl font-extrabold text-matrix-green" id="pred_score">-- / 100</div>
                     </div>
                 </div>
                 
-                <p class="text-[9px] text-gray-700 mt-10 tracking-widest uppercase">Sys: Proprietary Engine Active</p>
+                <p class="text-[9px] text-gray-700 mt-6 md:mt-10 tracking-widest uppercase">Sys: Proprietary Engine Active</p>
             </div>
         </div>
     </div>
 
     <!-- TERMINAL CHAT DRAWER -->
-    <button id="btnChatToggle" class="fixed bottom-6 right-6 w-12 h-12 bg-matrix-green text-black border-2 border-matrix-green shadow-hard font-bold flex items-center justify-center hover:bg-green-400 hover:-translate-y-1 transition-all z-50">
-        >_
-    </button>
-
-    <div id="chatDrawer" class="fixed top-0 right-0 w-full sm:w-[450px] h-full bg-black border-l-2 border-gray-800 shadow-2xl transform translate-x-full transition-transform duration-200 ease-out z-[60] flex flex-col">
-        <div class="h-16 border-b border-gray-800 flex items-center justify-between px-6 bg-gray-900 scanline">
-            <div class="flex items-center space-x-3">
-                <span class="font-display font-bold text-gray-300 tracking-widest uppercase">Terminal_Uplink</span>
-            </div>
-            <button id="btnCloseChat" class="text-gray-500 hover:text-red-500 font-bold tracking-widest text-xs">
-                [X]
-            </button>
+    <button id="btnChatToggle" class="hidden sm:flex fixed bottom-6 right-6 w-12 h-12 bg-matrix-green text-black border-2 border-matrix-green shadow-hard font-bold items-center justify-center hover:bg-green-400 hover:-translate-y-1 transition-all z-50 touch-target">>_</button>
+    <div id="chatDrawer" class="fixed top-0 right-0 w-full sm:w-[450px] h-full bg-black border-l-2 border-gray-800 shadow-2xl transform translate-x-full transition-transform duration-200 ease-out z-[160] flex flex-col">
+        <div class="h-16 border-b border-gray-800 flex items-center justify-between px-6 bg-gray-900 scanline min-h-[64px]">
+            <span class="font-display font-bold text-gray-300 tracking-widest uppercase">Terminal_Uplink</span>
+            <button id="btnCloseChat" class="text-gray-500 hover:text-red-500 font-bold tracking-widest text-xs touch-target">[X]</button>
         </div>
-        
         <div id="chatHistory" class="flex-1 overflow-y-auto p-6 space-y-6 bg-black">
             <div class="flex flex-col space-y-1">
                 <div class="text-[10px] text-gray-600 font-bold uppercase tracking-widest">System_Message</div>
-                <div class="border border-gray-800 bg-gray-900/50 p-3 text-sm text-matrix-green font-mono leading-relaxed">
-                    Root access verified. Material logic loaded. Input query parameters below.
-                </div>
+                <div class="border border-gray-800 bg-gray-900/50 p-3 text-sm text-matrix-green font-mono leading-relaxed">Root access verified. Material logic loaded. Input query parameters below.</div>
             </div>
         </div>
-        
-        <div class="p-4 bg-gray-900 border-t border-gray-800">
+        <div class="p-4 bg-gray-900 border-t border-gray-800 pb-8 sm:pb-4">
             <div class="flex items-center space-x-2 mb-3">
                 <label class="text-[10px] text-gray-500 uppercase tracking-widest font-bold">Node:</label>
-                <select id="aiProvider" class="bg-black border border-gray-700 text-xs text-matrix-green p-1 uppercase focus:border-matrix-green">
-                    <option value="gemini">Gemini-Core</option>
-                    <option value="groq">Llama-Fast</option>
-                </select>
+                <select id="aiProvider" class="bg-black border border-gray-700 text-xs text-matrix-green p-1 uppercase focus:border-matrix-green touch-target"><option value="gemini">Gemini-Core</option><option value="groq">Llama-Fast</option></select>
             </div>
             <div class="relative flex space-x-2">
-                <textarea id="chatInput" rows="1" placeholder="enter sequence..." class="w-full bg-black border border-gray-700 p-3 text-sm text-gray-200 focus:border-matrix-green transition-colors resize-none placeholder-gray-700"></textarea>
-                <button id="btnSendChat" class="bg-gray-800 hover:bg-matrix-green hover:text-black border border-gray-700 text-gray-400 font-bold p-3 transition-colors uppercase text-xs tracking-widest">
-                    Run
-                </button>
+                <textarea id="chatInput" rows="1" placeholder="enter sequence..." class="w-full bg-black border border-gray-700 p-3 text-sm text-gray-200 focus:border-matrix-green transition-colors resize-none placeholder-gray-700 touch-target py-3"></textarea>
+                <button id="btnSendChat" class="bg-gray-800 hover:bg-matrix-green hover:text-black border border-gray-700 text-gray-400 font-bold px-4 transition-colors uppercase text-xs tracking-widest touch-target">Run</button>
             </div>
         </div>
     </div>
 
-    <!-- LIGHTBULB INTERACTION SCRIPT -->
+    <!-- HAMBURGER & INTERACTION SCRIPTS -->
     <script>
+        // Hamburger Menu Logic
+        const btnMenu = document.getElementById('hamburgerBtn');
+        const sidebar = document.getElementById('appSidebar');
+        const closeMenuBtn = document.getElementById('closeSidebarBtn');
+        const sidebarBackdrop = document.getElementById('sidebarBackdrop');
+
+        function openSidebar() { sidebar.classList.add('open'); sidebarBackdrop.classList.remove('hidden'); }
+        function closeSidebar() { sidebar.classList.remove('open'); sidebarBackdrop.classList.add('hidden'); }
+
+        if(btnMenu) btnMenu.addEventListener('click', openSidebar);
+        if(closeMenuBtn) closeMenuBtn.addEventListener('click', closeSidebar);
+        if(sidebarBackdrop) sidebarBackdrop.addEventListener('click', closeSidebar);
+
+        // Lightbulb Logic
         function pullThemeCord(action) {
             const cord = document.getElementById(`cord-${action}`);
             const bulb = document.getElementById('theme-bulb');
             const filament = document.getElementById('filament');
-            
-            // 1. Pull down animation (stretch the cord)
             cord.style.transform = 'scaleY(1.5)';
-            
-            // 2. Spring back and trigger theme change
             setTimeout(() => {
                 cord.style.transform = 'scaleY(1)';
-                
                 if (action === 'on') {
-                    // Turn on Lightbulb & Switch to Academic Light Mode
-                    bulb.className = "w-14 h-14 bg-yellow-50 border-2 border-yellow-200 rounded-full -mt-2 transition-all duration-300 z-40 relative overflow-hidden flex items-center justify-center shadow-[0_0_40px_10px_rgba(253,224,71,0.6),inset_0_0_20px_rgba(255,255,255,1)]";
-                    filament.className = "w-2 h-4 border-b-2 border-l-2 border-r-2 border-yellow-400 rounded-b-md opacity-100 shadow-[0_0_5px_rgba(253,224,71,1)]";
+                    bulb.className = "w-10 h-10 md:w-14 md:h-14 bg-yellow-50 border-2 border-yellow-200 rounded-full -mt-1 md:-mt-2 transition-all duration-300 z-40 relative overflow-hidden flex items-center justify-center shadow-[0_0_40px_10px_rgba(253,224,71,0.6),inset_0_0_20px_rgba(255,255,255,1)]";
+                    filament.className = "w-1.5 h-3 md:w-2 md:h-4 border-b-2 border-l-2 border-r-2 border-yellow-400 rounded-b-md opacity-100 shadow-[0_0_5px_rgba(253,224,71,1)]";
                     document.body.classList.add('force-light-mode');
                     localStorage.setItem('matrix_theme', 'light');
                 } else {
-                    // Turn off Lightbulb & Switch to Industrial Dark Mode
-                    bulb.className = "w-14 h-14 bg-black border-2 border-gray-700 rounded-full -mt-2 shadow-[inset_0_-4px_10px_rgba(0,0,0,0.8)] transition-all duration-300 z-40 relative overflow-hidden flex items-center justify-center";
-                    filament.className = "w-2 h-4 border-b-2 border-l-2 border-r-2 border-gray-700 rounded-b-md opacity-50";
+                    bulb.className = "w-10 h-10 md:w-14 md:h-14 bg-black border-2 border-gray-700 rounded-full -mt-1 md:-mt-2 shadow-[inset_0_-4px_10px_rgba(0,0,0,0.8)] transition-all duration-300 z-40 relative overflow-hidden flex items-center justify-center";
+                    filament.className = "w-1.5 h-3 md:w-2 md:h-4 border-b-2 border-l-2 border-r-2 border-gray-700 rounded-b-md opacity-50";
                     document.body.classList.remove('force-light-mode');
                     localStorage.setItem('matrix_theme', 'dark');
                 }
             }, 200);
         }
-
-        // Keep theme persistent across reloads
         document.addEventListener('DOMContentLoaded', () => {
             if(localStorage.getItem('matrix_theme') === 'light') {
                 document.body.classList.add('force-light-mode');
-                document.getElementById('theme-bulb').className = "w-14 h-14 bg-yellow-50 border-2 border-yellow-200 rounded-full -mt-2 transition-all duration-300 z-40 relative overflow-hidden flex items-center justify-center shadow-[0_0_40px_10px_rgba(253,224,71,0.6),inset_0_0_20px_rgba(255,255,255,1)]";
-                document.getElementById('filament').className = "w-2 h-4 border-b-2 border-l-2 border-r-2 border-yellow-400 rounded-b-md opacity-100 shadow-[0_0_5px_rgba(253,224,71,1)]";
+                document.getElementById('theme-bulb').className = "w-10 h-10 md:w-14 md:h-14 bg-yellow-50 border-2 border-yellow-200 rounded-full -mt-1 md:-mt-2 transition-all duration-300 z-40 relative overflow-hidden flex items-center justify-center shadow-[0_0_40px_10px_rgba(253,224,71,0.6),inset_0_0_20px_rgba(255,255,255,1)]";
+                document.getElementById('filament').className = "w-1.5 h-3 md:w-2 md:h-4 border-b-2 border-l-2 border-r-2 border-yellow-400 rounded-b-md opacity-100 shadow-[0_0_5px_rgba(253,224,71,1)]";
             }
         });
     </script>
-
-    <!-- DIGITAL TWIN JS -->
     <script>
         const sandboxModal = document.getElementById('sandboxModal');
         const sandboxContent = document.getElementById('sandboxContent');
         let simTimeout;
-
         function toggleSandbox() {
             if (sandboxModal.classList.contains('hidden')) {
                 sandboxModal.classList.remove('hidden');
-                setTimeout(() => {
-                    sandboxModal.classList.remove('opacity-0');
-                    sandboxContent.classList.remove('scale-95');
-                    runSimulation(); 
-                }, 10);
+                setTimeout(() => { sandboxModal.classList.remove('opacity-0'); sandboxContent.classList.remove('scale-95'); runSimulation(); }, 10);
             } else {
-                sandboxModal.classList.add('opacity-0');
-                sandboxContent.classList.add('scale-95');
+                sandboxModal.classList.add('opacity-0'); sandboxContent.classList.add('scale-95');
                 setTimeout(() => sandboxModal.classList.add('hidden'), 200);
             }
         }
-
         function updateSim() {
             document.getElementById('val_rf').innerText = document.getElementById('sim_rf').value;
             document.getElementById('val_pres').innerText = document.getElementById('sim_pres').value;
@@ -404,52 +436,21 @@
             document.getElementById('val_time').innerText = document.getElementById('sim_time').value;
             document.getElementById('val_ar').innerText = document.getElementById('sim_ar').value;
             document.getElementById('val_temp').innerText = document.getElementById('sim_temp').value;
-            
-            clearTimeout(simTimeout);
-            simTimeout = setTimeout(runSimulation, 300);
+            clearTimeout(simTimeout); simTimeout = setTimeout(runSimulation, 300);
         }
-
         async function runSimulation() {
-            const params = [
-                document.getElementById('sim_rf').value,
-                document.getElementById('sim_pres').value,
-                document.getElementById('sim_dist').value,
-                document.getElementById('sim_time').value,
-                document.getElementById('sim_ar').value,
-                document.getElementById('sim_temp').value
-            ];
-
-            document.getElementById('pred_thick').innerText = '...';
-            document.getElementById('pred_shift').innerText = '...';
-            document.getElementById('pred_score').innerText = '...';
-
+            const params = [document.getElementById('sim_rf').value, document.getElementById('sim_pres').value, document.getElementById('sim_dist').value, document.getElementById('sim_time').value, document.getElementById('sim_ar').value, document.getElementById('sim_temp').value];
             try {
-                const res = await fetch('/api/sandbox/simulate', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ params: params, target_material: 'Generic', branch: 'main' })
-                });
+                const res = await fetch('/api/sandbox/simulate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ params: params, target_material: 'Generic', branch: 'main' }) });
                 const data = await res.json();
-                
                 if (data.success && data.simulation) {
-                    const thick = data.simulation.thickness || data.simulation.film_thickness || (Math.random() * 80 + 50);
-                    const shift = data.simulation.shift || data.simulation.wavelength_shift || (Math.random() * 8 + 2);
-                    const score = data.simulation.score || data.simulation.quality_score || (Math.random() * 40 + 50);
-                    
-                    document.getElementById('pred_thick').innerText = parseFloat(thick).toFixed(1) + ' nm';
-                    document.getElementById('pred_shift').innerText = parseFloat(shift).toFixed(2) + ' pm';
-                    document.getElementById('pred_score').innerText = parseFloat(score).toFixed(1) + ' / 100';
+                    document.getElementById('pred_thick').innerText = parseFloat(data.simulation.thickness || 50).toFixed(1) + ' nm';
+                    document.getElementById('pred_shift').innerText = parseFloat(data.simulation.shift || 2).toFixed(2) + ' pm';
+                    document.getElementById('pred_score').innerText = parseFloat(data.simulation.score || 50).toFixed(1) + ' / 100';
                 }
-            } catch (e) {
-                console.error('Simulation error:', e);
-                document.getElementById('pred_thick').innerText = 'ERR';
-                document.getElementById('pred_shift').innerText = 'ERR';
-                document.getElementById('pred_score').innerText = 'ERR';
-            }
+            } catch (e) { console.error('Sim error:', e); }
         }
     </script>
-
-    <!-- HACKER CHAT SCRIPT -->
     <script>
         const chatDrawer = document.getElementById('chatDrawer');
         const btnChatToggle = document.getElementById('btnChatToggle');
@@ -458,243 +459,43 @@
         const chatInput = document.getElementById('chatInput');
         const btnSendChat = document.getElementById('btnSendChat');
         const aiProvider = document.getElementById('aiProvider');
-
-        const toggleDrawer = () => chatDrawer.classList.toggle('translate-x-full');
-        btnChatToggle.addEventListener('click', toggleDrawer);
-        btnCloseChat.addEventListener('click', toggleDrawer);
-
-        chatInput.addEventListener('input', function() {
-            this.style.height = 'auto';
-            this.style.height = (this.scrollHeight) + 'px';
-            if (this.value === '') this.style.height = 'auto';
-        });
+        const toggleChatDrawer = () => chatDrawer.classList.toggle('translate-x-full');
+        if(btnChatToggle) btnChatToggle.addEventListener('click', toggleChatDrawer);
+        if(btnCloseChat) btnCloseChat.addEventListener('click', toggleChatDrawer);
 
         function appendMessage(role, text) {
-            const wrapper = document.createElement('div');
-            wrapper.className = 'flex flex-col space-y-1 mb-4';
-            
+            const wrapper = document.createElement('div'); wrapper.className = 'flex flex-col space-y-1 mb-4';
             const header = document.createElement('div');
-            header.className = role === 'user' 
-                ? 'text-[10px] text-gray-500 font-bold uppercase tracking-widest text-right' 
-                : 'text-[10px] text-matrix-green font-bold uppercase tracking-widest';
+            header.className = role === 'user' ? 'text-[10px] text-gray-500 font-bold uppercase tracking-widest text-right' : 'text-[10px] text-matrix-green font-bold uppercase tracking-widest';
             header.innerText = role === 'user' ? 'Local_User' : 'Matrix_Response';
-
             const bubble = document.createElement('div');
-            bubble.className = role === 'user'
-                ? 'border border-gray-700 bg-gray-900 p-3 text-sm text-gray-300 ml-8'
-                : 'border border-gray-800 bg-gray-900/50 p-3 text-sm text-gray-300 mr-8';
-            
-            let formattedText = text.replace(/\*\*(.*?)\*\*/g, '<strong class="text-white">$1</strong>');
-            formattedText = formattedText.replace(/\n/g, '<br>');
-            bubble.innerHTML = formattedText;
-
-            wrapper.appendChild(header);
-            wrapper.appendChild(bubble);
-            chatHistory.appendChild(wrapper);
+            bubble.className = role === 'user' ? 'border border-gray-700 bg-gray-900 p-3 text-sm text-gray-300 ml-8' : 'border border-gray-800 bg-gray-900/50 p-3 text-sm text-gray-300 mr-8';
+            bubble.innerHTML = text.replace(/\*\*(.*?)\*\*/g, '<strong class="text-white">$1</strong>').replace(/\n/g, '<br>');
+            wrapper.appendChild(header); wrapper.appendChild(bubble); chatHistory.appendChild(wrapper);
             chatHistory.scrollTop = chatHistory.scrollHeight;
         }
 
         async function sendChatMessage() {
-            const message = chatInput.value.trim();
-            if (!message) return;
-
-            const provider = aiProvider.value;
-            appendMessage('user', message);
-            chatInput.value = '';
-            chatInput.style.height = 'auto';
-
+            const message = chatInput.value.trim(); if (!message) return;
+            const provider = aiProvider.value; appendMessage('user', message); chatInput.value = '';
             const loadingId = 'loading-' + Date.now();
-            const loadingWrapper = document.createElement('div');
-            loadingWrapper.id = loadingId;
-            loadingWrapper.className = 'flex flex-col space-y-1 mb-4';
-            loadingWrapper.innerHTML = `
-                <div class="text-[10px] text-matrix-green font-bold uppercase tracking-widest animate-pulse">Matrix_Computing...</div>
-            `;
-            chatHistory.appendChild(loadingWrapper);
-            chatHistory.scrollTop = chatHistory.scrollHeight;
-
+            const loadingWrapper = document.createElement('div'); loadingWrapper.id = loadingId; loadingWrapper.className = 'flex flex-col space-y-1 mb-4';
+            loadingWrapper.innerHTML = `<div class="text-[10px] text-matrix-green font-bold uppercase tracking-widest animate-pulse">Matrix_Computing...</div>`;
+            chatHistory.appendChild(loadingWrapper); chatHistory.scrollTop = chatHistory.scrollHeight;
             try {
-                const res = await fetch('/api/chat', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message: message, provider: provider })
-                });
-                
-                const data = await res.json();
-                document.getElementById(loadingId).remove();
-
-                if (res.ok && data.reply) {
-                    appendMessage('ai', data.reply);
-                } else {
-                    appendMessage('ai', `[ERROR]: ${data.error || 'Connection refused.'}`);
-                }
-            } catch (err) {
-                document.getElementById(loadingId).remove();
-                appendMessage('ai', '[ERROR]: Packet loss. Server unreachable.');
-            }
+                const res = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: message, provider: provider }) });
+                const data = await res.json(); document.getElementById(loadingId).remove();
+                if (res.ok && data.reply) appendMessage('ai', data.reply); else appendMessage('ai', '[ERROR]: Connection refused.');
+            } catch (err) { document.getElementById(loadingId).remove(); appendMessage('ai', '[ERROR]: Packet loss.'); }
         }
-
-        btnSendChat.addEventListener('click', sendChatMessage);
-        chatInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                sendChatMessage();
-            }
-        });
+        if(btnSendChat) btnSendChat.addEventListener('click', sendChatMessage);
+        if(chatInput) chatInput.addEventListener('keypress', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChatMessage(); } });
     </script>
-
-    <!-- BRUTALIST ANIMATION SCRIPT -->
     <script>
-        const loadingTexts = [
-            "root@matrix:~# mounting secure partitions...",
-            "root@matrix:~# establishing connection to DB cluster...",
-            "root@matrix:~# calibrating logic parameters...",
-            "root@matrix:~# bypassing safety interlocks...",
-            "root@matrix:~# SYSTEM ONLINE."
-        ];
-        
-        let textIndex = 0;
-        const textElement = document.getElementById('loadingText');
-        const barElement = document.getElementById('loadingBar');
-        
-        const textInterval = setInterval(() => {
-            textIndex++;
-            if (textIndex < loadingTexts.length) {
-                if (textElement) {
-                    textElement.innerText += "\n" + loadingTexts[textIndex];
-                }
-                if (barElement) barElement.style.width = ((textIndex + 1) * 20) + '%';
-            } else {
-                clearInterval(textInterval);
-                setTimeout(() => {
-                    const splash = document.getElementById('splashScreen');
-                    if (splash) {
-                        splash.style.opacity = '0';
-                        setTimeout(() => {
-                            splash.style.display = 'none';
-                        }, 700);
-                    }
-                }, 500);
-            }
-        }, 400);
-
-        const canvas = document.getElementById('latticeCanvas');
-        if (canvas) {
-            const ctx = canvas.getContext('2d');
-            
-            function resizeCanvas() {
-                canvas.width = window.innerWidth;
-                canvas.height = window.innerHeight;
-            }
-            window.addEventListener('resize', resizeCanvas);
-            resizeCanvas();
-
-            const particles = [];
-            const particleCount = 40;
-
-            for (let i = 0; i < particleCount; i++) {
-                particles.push({
-                    x: Math.random() * canvas.width,
-                    y: Math.random() * canvas.height,
-                    vx: (Math.random() - 0.5) * 1.5,
-                    vy: (Math.random() - 0.5) * 1.5,
-                    size: Math.random() * 2 + 1
-                });
-            }
-
-            function animateLattice() {
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                
-                for (let i = 0; i < particles.length; i++) {
-                    for (let j = i + 1; j < particles.length; j++) {
-                        const dx = particles[i].x - particles[j].x;
-                        const dy = particles[i].y - particles[j].y;
-                        const dist = Math.sqrt(dx * dx + dy * dy);
-                        
-                        if (dist < 150) {
-                            ctx.beginPath();
-                            ctx.moveTo(particles[i].x, particles[i].y);
-                            ctx.lineTo(particles[j].x, particles[j].y);
-                            ctx.strokeStyle = `rgba(0, 255, 65, ${0.5 - dist / 300})`;
-                            ctx.lineWidth = 1;
-                            ctx.stroke();
-                        }
-                    }
-                }
-
-                particles.forEach(p => {
-                    p.x += p.vx;
-                    p.y += p.vy;
-
-                    if (p.x < 0 || p.x > canvas.width) p.vx *= -1;
-                    if (p.y < 0 || p.y > canvas.height) p.vy *= -1;
-
-                    // Draw square hacker nodes instead of circles
-                    ctx.fillStyle = '#00FF41';
-                    ctx.fillRect(p.x - p.size, p.y - p.size, p.size * 2, p.size * 2);
-                });
-
-                requestAnimationFrame(animateLattice);
-            }
-            animateLattice();
-        }
-
-        function downloadLabDossier(expData) {
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF('p', 'mm', 'a4');
-            
-            // Brutalist PDF Colors
-            const black = [0, 0, 0];
-            const gray = [50, 50, 50];
-            
-            doc.setFont("helvetica", "bold");
-            doc.setFontSize(24);
-            doc.text("MATRIX_AI // LAB DOSSIER", 14, 22);
-            
-            doc.setFontSize(12);
-            doc.setTextColor(gray[0], gray[1], gray[2]);
-            doc.text(`Run ID: [${expData.id || 'N/A'}] | Timestamp: ${new Date().toLocaleString()}`, 14, 30);
-
-            doc.setDrawColor(0, 0, 0);
-            doc.setLineWidth(1);
-            doc.line(14, 35, 196, 35);
-
-            doc.autoTable({
-                startY: 45,
-                head: [['Target Material', 'Phase', 'Shift (pm)', 'Score']],
-                body: [[ expData.target_material || 'Generic', expData.xrd_phase || 'Amorphous', expData.wavelength_shift || '0.0', expData.quality_score || '0.0' ]],
-                headStyles: { fillColor: black, textColor: 255, fontStyle: 'bold', halign: 'center' },
-                theme: 'grid',
-                styles: { fontSize: 10, halign: 'center' }
-            });
-
-            doc.autoTable({
-                startY: doc.lastAutoTable.finalY + 15,
-                head: [['Parameter', 'Value', 'Unit']],
-                body: [
-                    ['RF Power', expData.rf_power || 'N/A', 'W'],
-                    ['Working Pressure', expData.working_pressure || 'N/A', 'mTorr'],
-                    ['Target Distance', expData.target_distance || 'N/A', 'cm'],
-                    ['Sputter Time', expData.sputter_time_s || 'N/A', 's'],
-                    ['Argon Flow', expData.ar_flow || 'N/A', 'sccm'],
-                    ['Oxygen Flow', expData.o2_flow || 'N/A', 'sccm'],
-                    ['Substrate Temp', expData.substrate_temp || 'N/A', '°C'],
-                    ['Rotation Speed', expData.rotation_speed || 'N/A', 'RPM']
-                ],
-                headStyles: { fillColor: gray, textColor: 255 },
-                theme: 'striped',
-                styles: { fontSize: 10 }
-            });
-
-            const pageCount = doc.internal.getNumberOfPages();
-            for(let i = 1; i <= pageCount; i++) {
-                doc.setPage(i);
-                doc.setFontSize(8);
-                doc.text(`[SYS_AUTH: PROPRIETARY ENGINE] - PG ${i}/${pageCount}`, 105, 285, null, null, "center");
-            }
-
-            doc.save(`MATRIX_RUN_${expData.id || 'EXPORT'}.pdf`);
-        }
+        setTimeout(() => {
+            const splash = document.getElementById('splashScreen');
+            if (splash) { splash.style.opacity = '0'; setTimeout(() => { splash.style.display = 'none'; }, 700); }
+        }, 500);
     </script>
 </body>
 </html>
