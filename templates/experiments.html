@@ -2,136 +2,144 @@
 
 {% block title %}Experiment Ledger | MATRIX_AI{% endblock %}
 {% block header_title %}EXPERIMENT_LEDGER{% endblock %}
+{% block header_title_mobile %}LEDGER{% endblock %}
 
 {% block content %}
 <!-- EXPERIMENT INPUT FORM SECTION -->
 <section id="formSection" class="space-y-6">
-    <div class="flex items-center justify-between border-b border-gray-800 pb-4">
+    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-gray-800 pb-4 gap-4">
         <div>
             <h2 class="text-xl font-display font-bold text-gray-200 tracking-widest uppercase">>_LOG_EXPERIMENTAL_RUN</h2>
             <p class="text-[10px] text-gray-500 font-mono mt-1 tracking-widest uppercase">Awaiting process telemetry inputs...</p>
         </div>
         <!-- LITERATURE INGESTION UPLOAD -->
-        <label class="cursor-pointer bg-gray-900 hover:bg-gray-800 border border-gray-700 text-matrix-green text-[10px] font-bold py-2 px-4 transition-colors flex items-center space-x-2 uppercase tracking-widest">
+        <label class="cursor-pointer bg-gray-900 hover:bg-gray-800 border border-gray-700 text-matrix-green text-[10px] font-bold py-3 sm:py-2 px-4 transition-colors flex items-center justify-center space-x-2 uppercase tracking-widest touch-target w-full sm:w-auto">
             <span id="litUploadLabel">[+] PARSE_LITERATURE_PDF</span>
             <input type="file" id="uploadLiterature" accept="application/pdf" class="hidden">
         </label>
     </div>
 
-    <form action="/add" method="POST" class="grid grid-cols-1 md:grid-cols-3 gap-6 bg-black p-8 border border-gray-800 shadow-hard relative">
+    <form action="/add" method="POST" class="bg-black p-4 sm:p-8 border border-gray-800 shadow-hard relative">
         <input type="hidden" name="branch_name" id="branch_name" value="{{ current_branch|default('main') }}">
 
-        <div class="md:col-span-3 pb-4 border-b border-gray-800 mb-2">
-            <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Target_Domain</label>
-            <select name="target_material" id="target_material" class="w-full md:w-1/3 bg-gray-900 border border-gray-800 rounded-none p-3 text-sm text-matrix-green font-mono focus:border-matrix-green transition-colors outline-none cursor-pointer">
-                <option value="Generic">GENERIC_MIXED</option>
-                <option value="WO3">WO3</option>
-                <option value="TiO2">TIO2</option>
-                <option value="ZnO">ZNO</option>
-            </select>
-        </div>
-
-        <div>
-            <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">RF_Power [W]</label>
-            <input type="number" step="0.1" name="rf_power_w" id="rf_power_w" required placeholder="150" class="w-full bg-gray-900 border border-gray-800 rounded-none p-3 text-sm text-matrix-green font-mono focus:border-matrix-green transition-colors outline-none placeholder-gray-700">
-        </div>
-        <div>
-            <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Pressure [mT]</label>
-            <input type="number" step="0.01" name="working_pressure_mtorr" id="working_pressure_mtorr" required placeholder="5.0" class="w-full bg-gray-900 border border-gray-800 rounded-none p-3 text-sm text-matrix-green font-mono focus:border-matrix-green transition-colors outline-none placeholder-gray-700">
-        </div>
-        <div>
-            <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Ar_Flow [sccm]</label>
-            <input type="number" step="0.1" name="ar_flow_sccm" id="ar_flow_sccm" required placeholder="30" class="w-full bg-gray-900 border border-gray-800 rounded-none p-3 text-sm text-matrix-green font-mono focus:border-matrix-green transition-colors outline-none placeholder-gray-700">
-        </div>
-        <div>
-            <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">O2_Flow [sccm]</label>
-            <input type="number" step="0.1" name="o2_flow_sccm" id="o2_flow_sccm" required placeholder="5" class="w-full bg-gray-900 border border-gray-800 rounded-none p-3 text-sm text-matrix-green font-mono focus:border-matrix-green transition-colors outline-none placeholder-gray-700">
-        </div>
-        <div>
-            <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Sub_Temp [C]</label>
-            <input type="number" step="0.1" name="substrate_temp_c" id="substrate_temp_c" required placeholder="300" class="w-full bg-gray-900 border border-gray-800 rounded-none p-3 text-sm text-matrix-green font-mono focus:border-matrix-green transition-colors outline-none placeholder-gray-700">
-        </div>
-        <div>
-            <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Distance [cm]</label>
-            <input type="number" step="0.1" name="target_substrate_distance_cm" id="target_substrate_distance_cm" required placeholder="7" class="w-full bg-gray-900 border border-gray-800 rounded-none p-3 text-sm text-matrix-green font-mono focus:border-matrix-green transition-colors outline-none placeholder-gray-700">
-        </div>
-        
-        <div>
-            <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Sputter_Time</label>
-            <div class="flex space-x-2">
-                <input type="number" step="0.1" name="sputtering_time_min" placeholder="MIN" class="w-1/2 bg-gray-900 border border-gray-800 rounded-none p-3 text-sm text-matrix-green font-mono focus:border-matrix-green transition-colors outline-none placeholder-gray-700">
-                <input type="number" step="0.1" name="sputtering_time_sec" placeholder="SEC" class="w-1/2 bg-gray-900 border border-gray-800 rounded-none p-3 text-sm text-matrix-green font-mono focus:border-matrix-green transition-colors outline-none placeholder-gray-700">
+        <div class="form-grid">
+            <div class="lg:col-span-3 sm:col-span-2 pb-4 border-b border-gray-800 mb-2">
+                <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Target_Domain</label>
+                <select name="target_material" id="target_material" class="w-full lg:w-1/3 bg-gray-900 border border-gray-800 rounded-none p-3 text-sm text-matrix-green font-mono focus:border-matrix-green transition-colors outline-none cursor-pointer touch-target">
+                    <option value="Generic">GENERIC_MIXED</option>
+                    <option value="WO3">WO3</option>
+                    <option value="TiO2">TIO2</option>
+                    <option value="ZnO">ZNO</option>
+                </select>
             </div>
-        </div>
 
-        <div>
-            <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Thickness [nm]</label>
-            <input type="number" step="0.1" name="film_thickness_nm" id="film_thickness_nm" placeholder="100" class="w-full bg-gray-900 border border-gray-800 rounded-none p-3 text-sm text-matrix-green font-mono focus:border-matrix-green transition-colors outline-none placeholder-gray-700">
-        </div>
-        <div>
-            <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Rotation [rpm]</label>
-            <select name="rotation_speed_rpm" id="rotation_speed_rpm" class="w-full bg-gray-900 border border-gray-800 rounded-none p-3 text-sm text-matrix-green font-mono focus:border-matrix-green transition-colors outline-none cursor-pointer">
-                <option value="1">1 RPM</option>
-                <option value="5" selected>5 RPM</option>
-                <option value="10">10 RPM</option>
-            </select>
-        </div>
-        <div>
-            <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Substrate_Type</label>
-            <select name="substrate_type" id="substrate_type" class="w-full bg-gray-900 border border-gray-800 rounded-none p-3 text-sm text-matrix-green font-mono focus:border-matrix-green transition-colors outline-none cursor-pointer">
-                <option value="Si Wafer">SI_WAFER</option>
-                <option value="Optical Fiber">OPTICAL_FIBER</option>
-            </select>
-        </div>
-
-        <div>
-            <div class="flex justify-between items-center mb-2">
-                <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest">XRD_Phase</label>
-                <label class="text-[9px] text-matrix-green hover:text-white cursor-pointer flex items-center tracking-widest font-bold border-b border-matrix-green transition-colors">
-                    [ AUTO_DETECT ]
-                    <input type="file" id="uploadXRD" accept="image/*" class="hidden">
-                </label>
+            <div>
+                <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">RF_Power [W]</label>
+                <input type="number" step="0.1" name="rf_power_w" id="rf_power_w" required placeholder="150" class="w-full bg-gray-900 border border-gray-800 rounded-none p-3 text-sm text-matrix-green font-mono focus:border-matrix-green transition-colors outline-none placeholder-gray-700 touch-target">
             </div>
-            <input type="text" name="xrd_phase" id="xrd_phase" placeholder="MONOCLINIC" class="w-full bg-gray-900 border border-gray-800 rounded-none p-3 text-sm text-matrix-green font-mono focus:border-matrix-green transition-colors outline-none placeholder-gray-700">
-        </div>
-
-        <div>
-            <div class="flex justify-between items-center mb-2">
-                <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest">Grain_Size [nm]</label>
-                <label class="text-[9px] text-matrix-green hover:text-white cursor-pointer flex items-center tracking-widest font-bold border-b border-matrix-green transition-colors">
-                    [ AUTO_DETECT ]
-                    <input type="file" id="uploadSEM" accept="image/*" class="hidden">
-                </label>
+            <div>
+                <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Pressure [mT]</label>
+                <input type="number" step="0.01" name="working_pressure_mtorr" id="working_pressure_mtorr" required placeholder="5.0" class="w-full bg-gray-900 border border-gray-800 rounded-none p-3 text-sm text-matrix-green font-mono focus:border-matrix-green transition-colors outline-none placeholder-gray-700 touch-target">
             </div>
-            <input type="number" step="0.1" name="grain_size_nm" id="grain_size_nm" placeholder="25.4" class="w-full bg-gray-900 border border-gray-800 rounded-none p-3 text-sm text-matrix-green font-mono focus:border-matrix-green transition-colors outline-none placeholder-gray-700">
-        </div>
+            <div>
+                <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Ar_Flow [sccm]</label>
+                <input type="number" step="0.1" name="ar_flow_sccm" id="ar_flow_sccm" required placeholder="30" class="w-full bg-gray-900 border border-gray-800 rounded-none p-3 text-sm text-matrix-green font-mono focus:border-matrix-green transition-colors outline-none placeholder-gray-700 touch-target">
+            </div>
+            <div>
+                <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">O2_Flow [sccm]</label>
+                <input type="number" step="0.1" name="o2_flow_sccm" id="o2_flow_sccm" required placeholder="5" class="w-full bg-gray-900 border border-gray-800 rounded-none p-3 text-sm text-matrix-green font-mono focus:border-matrix-green transition-colors outline-none placeholder-gray-700 touch-target">
+            </div>
+            <div>
+                <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Sub_Temp [C]</label>
+                <input type="number" step="0.1" name="substrate_temp_c" id="substrate_temp_c" required placeholder="300" class="w-full bg-gray-900 border border-gray-800 rounded-none p-3 text-sm text-matrix-green font-mono focus:border-matrix-green transition-colors outline-none placeholder-gray-700 touch-target">
+            </div>
+            <div>
+                <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Distance [cm]</label>
+                <input type="number" step="0.1" name="target_substrate_distance_cm" id="target_substrate_distance_cm" required placeholder="7" class="w-full bg-gray-900 border border-gray-800 rounded-none p-3 text-sm text-matrix-green font-mono focus:border-matrix-green transition-colors outline-none placeholder-gray-700 touch-target">
+            </div>
+            
+            <!-- FIXED SPUTTER TIME -->
+            <div>
+                <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Sputter_Time [S]</label>
+                <input type="number" step="0.1" name="sputtering_time_s" id="sputtering_time_s" placeholder="e.g. 1800" class="w-full bg-gray-900 border border-gray-800 rounded-none p-3 text-sm text-matrix-green font-mono focus:border-matrix-green transition-colors outline-none placeholder-gray-700 touch-target">
+                <p class="text-[9px] text-gray-600 mt-1 uppercase tracking-widest">1800s = 30 min</p>
+            </div>
 
-        <div>
-            <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">H2_Response [s]</label>
-            <input type="number" step="0.1" name="h2_response_time_s" required placeholder="12" class="w-full bg-gray-900 border border-gray-800 rounded-none p-3 text-sm text-matrix-green font-mono focus:border-matrix-green transition-colors outline-none placeholder-gray-700">
-        </div>
-        <div>
-            <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Lambda_Shift [pm]</label>
-            <input type="number" step="0.1" name="wavelength_shift_pm" placeholder="150" class="w-full bg-gray-900 border border-gray-800 rounded-none p-3 text-sm text-matrix-green font-mono focus:border-matrix-green transition-colors outline-none placeholder-gray-700">
-        </div>
-        <div>
-            <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Sys_Notes</label>
-            <input type="text" name="notes" placeholder="BATCH-A" class="w-full bg-gray-900 border border-gray-800 rounded-none p-3 text-sm text-matrix-green font-mono focus:border-matrix-green transition-colors outline-none placeholder-gray-700">
-        </div>
+            <div>
+                <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Thickness [nm]</label>
+                <input type="number" step="0.1" name="film_thickness_nm" id="film_thickness_nm" placeholder="100" class="w-full bg-gray-900 border border-gray-800 rounded-none p-3 text-sm text-matrix-green font-mono focus:border-matrix-green transition-colors outline-none placeholder-gray-700 touch-target">
+            </div>
+            <div>
+                <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Rotation [rpm]</label>
+                <select name="rotation_speed_rpm" id="rotation_speed_rpm" class="w-full bg-gray-900 border border-gray-800 rounded-none p-3 text-sm text-matrix-green font-mono focus:border-matrix-green transition-colors outline-none cursor-pointer touch-target">
+                    <option value="1">1 RPM</option>
+                    <option value="5" selected>5 RPM</option>
+                    <option value="10">10 RPM</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Substrate_Type</label>
+                <select name="substrate_type" id="substrate_type" class="w-full bg-gray-900 border border-gray-800 rounded-none p-3 text-sm text-matrix-green font-mono focus:border-matrix-green transition-colors outline-none cursor-pointer touch-target">
+                    <option value="Si Wafer">SI_WAFER</option>
+                    <option value="Optical Fiber">OPTICAL_FIBER</option>
+                </select>
+            </div>
 
-        <div class="md:col-span-3 flex flex-wrap gap-4 mt-4 pt-4 border-t border-gray-800">
-            <button type="submit" class="bg-matrix-green hover:bg-green-400 text-black font-bold py-3 px-8 transition-colors text-xs uppercase tracking-widest shadow-hard-hover">
-                COMMIT_DATA
-            </button>
-            <a href="/export/csv" class="bg-gray-900 hover:bg-gray-800 text-gray-300 border border-gray-700 font-bold py-3 px-6 transition-colors text-xs flex items-center space-x-2 uppercase tracking-widest">
-                <span>[V] EXPORT_CSV</span>
-            </a>
+            <div>
+                <div class="flex justify-between items-center mb-2">
+                    <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest">XRD_Phase</label>
+                    <label class="text-[9px] text-matrix-green hover:text-white cursor-pointer flex items-center tracking-widest font-bold border-b border-matrix-green transition-colors touch-target">
+                        [ AUTO_DETECT ]
+                        <input type="file" id="uploadXRD" accept="image/*" class="hidden">
+                    </label>
+                </div>
+                <input type="text" name="xrd_phase" id="xrd_phase" placeholder="MONOCLINIC" class="w-full bg-gray-900 border border-gray-800 rounded-none p-3 text-sm text-matrix-green font-mono focus:border-matrix-green transition-colors outline-none placeholder-gray-700 touch-target">
+            </div>
+
+            <div>
+                <div class="flex justify-between items-center mb-2">
+                    <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest">Grain_Size [nm]</label>
+                    <label class="text-[9px] text-matrix-green hover:text-white cursor-pointer flex items-center tracking-widest font-bold border-b border-matrix-green transition-colors touch-target">
+                        [ AUTO_DETECT ]
+                        <input type="file" id="uploadSEM" accept="image/*" class="hidden">
+                    </label>
+                </div>
+                <input type="number" step="0.1" name="grain_size_nm" id="grain_size_nm" placeholder="25.4" class="w-full bg-gray-900 border border-gray-800 rounded-none p-3 text-sm text-matrix-green font-mono focus:border-matrix-green transition-colors outline-none placeholder-gray-700 touch-target">
+            </div>
+
+            <div>
+                <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">H2_Response [s]</label>
+                <input type="number" step="0.1" name="h2_response_time_s" required placeholder="12" class="w-full bg-gray-900 border border-gray-800 rounded-none p-3 text-sm text-matrix-green font-mono focus:border-matrix-green transition-colors outline-none placeholder-gray-700 touch-target">
+            </div>
+            <div>
+                <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Lambda_Shift [pm]</label>
+                <input type="number" step="0.1" name="wavelength_shift_pm" placeholder="150" class="w-full bg-gray-900 border border-gray-800 rounded-none p-3 text-sm text-matrix-green font-mono focus:border-matrix-green transition-colors outline-none placeholder-gray-700 touch-target">
+            </div>
+            <div>
+                <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Sys_Notes</label>
+                <input type="text" name="notes" placeholder="BATCH-A" class="w-full bg-gray-900 border border-gray-800 rounded-none p-3 text-sm text-matrix-green font-mono focus:border-matrix-green transition-colors outline-none placeholder-gray-700 touch-target">
+            </div>
+
+            <div class="lg:col-span-3 sm:col-span-2 flex flex-col sm:flex-row gap-4 mt-4 pt-4 border-t border-gray-800">
+                <button type="submit" class="w-full sm:w-auto bg-matrix-green hover:bg-green-400 text-black font-bold py-3 px-8 transition-colors text-xs uppercase tracking-widest shadow-hard-hover touch-target">
+                    COMMIT_DATA
+                </button>
+                <a href="/export/csv" class="w-full sm:w-auto bg-gray-900 hover:bg-gray-800 text-gray-300 border border-gray-700 font-bold py-3 px-6 transition-colors text-xs flex items-center justify-center space-x-2 uppercase tracking-widest touch-target">
+                    <span>[V] EXPORT_CSV</span>
+                </a>
+            </div>
         </div>
     </form>
 </section>
 
-<!-- LOGGED EXPERIMENTS TABLE -->
-<section class="space-y-4 pt-8">
+<!-- LOADING SKELETON (Shows while DOM is rendering mobile layout) -->
+<div id="loadingSkeletons" class="space-y-4 pt-8 animate-pulse hidden">
+    <div class="h-8 bg-gray-900 w-1/3 mb-4"></div>
+    <div class="h-32 bg-gray-900 w-full mb-4"></div>
+</div>
+
+<!-- LOGGED EXPERIMENTS TABLE / CARDS -->
+<section id="ledgerSection" class="space-y-4 pt-8 transition-opacity duration-300">
     <div class="flex items-center justify-between border-b border-gray-800 pb-2">
         <div>
             <h2 class="text-xl font-display font-bold text-gray-200 uppercase tracking-widest">>_DATABASE_LEDGER</h2>
@@ -139,7 +147,8 @@
         </div>
     </div>
 
-    <div class="bg-black border border-gray-800 overflow-x-auto relative pb-16 shadow-hard">
+    <!-- DESKTOP TABLE VIEW -->
+    <div class="hidden lg:block bg-black border border-gray-800 overflow-x-auto relative pb-16 shadow-hard">
         <table class="w-full text-left border-collapse">
             <thead>
                 <tr class="text-gray-500 border-b border-gray-800 text-[10px] uppercase tracking-widest bg-gray-900">
@@ -160,22 +169,17 @@
             </thead>
             <tbody class="divide-y divide-gray-800 text-xs font-mono">
                 {% for exp in experiments %}
-                <tr id="exp-row-{{ exp.id }}" class="hover:bg-gray-900 transition-colors">
+                <tr id="exp-row-desktop-{{ exp.id }}" class="hover:bg-gray-900 transition-colors">
                     <td class="p-4 text-center">
                         <input type="checkbox" class="compare-cbk w-4 h-4 bg-black border border-gray-700 appearance-none checked:bg-matrix-green checked:border-matrix-green cursor-pointer" value="{{ loop.index0 }}">
                     </td>
                     <td class="p-4 font-bold text-gray-300">{{ exp.target_material or 'GENERIC' }}</td>
                     <td class="p-4">
                         {% set q = exp.quality_score or 50.0 %}
-                        {% if q >= 80 %}
-                            <span class="text-matrix-green font-bold text-[10px] tracking-widest uppercase">[ OPTIMAL : {{ q }} ]</span>
-                        {% elif q >= 60 %}
-                            <span class="text-gray-300 font-bold text-[10px] tracking-widest uppercase">[ NOMINAL : {{ q }} ]</span>
-                        {% elif q >= 40 %}
-                            <span class="text-yellow-500 font-bold text-[10px] tracking-widest uppercase">[ MARGINAL : {{ q }} ]</span>
-                        {% else %}
-                            <span class="text-red-500 font-bold text-[10px] tracking-widest uppercase">[ CRITICAL : {{ q }} ]</span>
-                        {% endif %}
+                        {% if q >= 80 %}<span class="text-matrix-green font-bold text-[10px] tracking-widest uppercase">[ OPTIMAL : {{ q }} ]</span>
+                        {% elif q >= 60 %}<span class="text-gray-300 font-bold text-[10px] tracking-widest uppercase">[ NOMINAL : {{ q }} ]</span>
+                        {% elif q >= 40 %}<span class="text-yellow-500 font-bold text-[10px] tracking-widest uppercase">[ MARGINAL : {{ q }} ]</span>
+                        {% else %}<span class="text-red-500 font-bold text-[10px] tracking-widest uppercase">[ CRITICAL : {{ q }} ]</span>{% endif %}
                     </td>
                     <td class="p-4 text-gray-500 uppercase">{{ exp.batch_notes or '-' }}</td>
                     <td class="p-4 text-gray-300">{{ exp.rf_power }}</td>
@@ -184,13 +188,9 @@
                     <td class="p-4 text-matrix-green">{{ exp.sputter_time_s }}</td>
                     <td class="p-4 text-gray-300">{{ exp.rotation_speed }}</td>
                     <td class="p-4">
-                        {% if exp.xrd_phase == 'Monoclinic' %}
-                            <span class="text-matrix-green font-bold text-[10px] uppercase">MONO</span>
-                        {% elif exp.xrd_phase == 'Partial' %}
-                            <span class="text-yellow-500 font-bold text-[10px] uppercase">PART</span>
-                        {% else %}
-                            <span class="text-red-500 font-bold text-[10px] uppercase">AMORPH</span>
-                        {% endif %}
+                        {% if exp.xrd_phase == 'Monoclinic' %}<span class="text-matrix-green font-bold text-[10px] uppercase">MONO</span>
+                        {% elif exp.xrd_phase == 'Partial' %}<span class="text-yellow-500 font-bold text-[10px] uppercase">PART</span>
+                        {% else %}<span class="text-red-500 font-bold text-[10px] uppercase">AMORPH</span>{% endif %}
                     </td>
                     <td class="p-4 text-gray-300">{{ exp.h2_response_time }}</td>
                     <td class="p-4 font-bold text-gray-200">{{ exp.wavelength_shift if exp.wavelength_shift is not none else '-' }}</td>
@@ -203,40 +203,132 @@
                     </td>
                 </tr>
                 {% else %}
-                <tr>
-                    <td colspan="13" class="p-8 text-center text-gray-600 uppercase tracking-widest font-bold">
-                        SYSTEM_EMPTY. LOG_DATA_TO_PROCEED.
-                    </td>
-                </tr>
+                <tr><td colspan="13" class="p-8 text-center text-gray-600 uppercase tracking-widest font-bold">SYSTEM_EMPTY. LOG_DATA_TO_PROCEED.</td></tr>
                 {% endfor %}
             </tbody>
         </table>
         
         <div id="compareBar" class="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-gray-900 border border-matrix-green px-6 py-4 shadow-hard hidden z-40 flex items-center space-x-6">
             <span class="text-xs font-bold text-matrix-green tracking-widest uppercase">NODES_SELECTED: 2</span>
-            <button id="btnCompare" class="bg-matrix-green hover:bg-green-400 text-black font-bold py-2 px-4 text-xs uppercase tracking-widest transition-colors">EXECUTE_RADAR</button>
-            <button id="btnClearCompare" class="text-gray-500 hover:text-white transition-colors text-xs font-bold uppercase tracking-widest">ABORT</button>
+            <button id="btnCompare" class="bg-matrix-green hover:bg-green-400 text-black font-bold py-2 px-4 text-xs uppercase tracking-widest transition-colors touch-target">EXECUTE_RADAR</button>
+            <button id="btnClearCompare" class="text-gray-500 hover:text-white transition-colors text-xs font-bold uppercase tracking-widest touch-target">ABORT</button>
         </div>
+    </div>
+
+    <!-- MOBILE/TABLET CARD VIEW -->
+    <div class="block lg:hidden space-y-4">
+        {% for exp in experiments %}
+        <div id="exp-row-mobile-{{ exp.id }}" class="bg-gray-900 border border-gray-800 p-4 relative shadow-md">
+            <div class="flex justify-between items-center border-b border-gray-800 pb-2 mb-3">
+                <span class="font-bold text-matrix-green uppercase tracking-widest text-[11px]">RUN #{{ exp.id }} [{{ exp.xrd_phase|default('N/A')|upper }}]</span>
+                <span class="w-3 h-3 rounded-full {% if exp.quality_score >= 80 %}bg-matrix-green shadow-[0_0_8px_#00FF41]{% elif exp.quality_score >= 40 %}bg-yellow-500{% else %}bg-red-500{% endif %}"></span>
+            </div>
+            <div class="grid grid-cols-2 gap-y-3 gap-x-2 text-[10px] font-mono text-gray-400 mb-4">
+                <div>RF: <span class="text-white font-bold">{{ exp.rf_power }}W</span></div>
+                <div>DIST: <span class="text-white font-bold">{{ exp.target_distance }}cm</span></div>
+                <div>THICK: <span class="text-white font-bold">{{ exp.film_thickness }}nm</span></div>
+                <div>ROT: <span class="text-white font-bold">{{ exp.rotation_speed }}rpm</span></div>
+                <div>SHIFT: <span class="text-white font-bold">{{ exp.wavelength_shift }}pm</span></div>
+                <div>QUALITY: <span class="text-white font-bold">{{ exp.quality_score }}</span></div>
+            </div>
+            <div class="flex gap-2 text-[10px] font-bold tracking-widest uppercase">
+                <button onclick="openWhatIf({{ loop.index0 }})" class="flex-1 bg-black text-matrix-green border border-gray-700 hover:border-matrix-green transition-colors touch-target">[?]</button>
+                <button onclick="deleteExperiment({{ exp.id }})" class="flex-1 bg-black text-red-500 border border-gray-700 hover:border-red-500 transition-colors touch-target">[X]</button>
+                <button onclick="toggleCardMore({{ exp.id }})" class="flex-[2] bg-black text-gray-300 border border-gray-700 hover:border-gray-500 transition-colors touch-target" id="btn-more-{{ exp.id }}">[▼MORE]</button>
+            </div>
+            <div id="card-more-{{ exp.id }}" class="hidden mt-4 pt-4 border-t border-gray-800 grid grid-cols-2 gap-y-3 gap-x-2 text-[10px] font-mono text-gray-400">
+                <div>PRES: <span class="text-white font-bold">{{ exp.working_pressure }}mT</span></div>
+                <div>AR FLOW: <span class="text-white font-bold">{{ exp.ar_flow }}</span></div>
+                <div>O2 FLOW: <span class="text-white font-bold">{{ exp.o2_flow }}</span></div>
+                <div>TEMP: <span class="text-white font-bold">{{ exp.substrate_temp }}C</span></div>
+                <div>TIME: <span class="text-white font-bold">{{ exp.sputter_time_s }}s</span></div>
+                <div>SUB: <span class="text-white font-bold">{{ exp.substrate_type|upper }}</span></div>
+                <div>GRAIN: <span class="text-white font-bold">{{ exp.grain_size_nm }}nm</span></div>
+                <div>H2: <span class="text-white font-bold">{{ exp.h2_response_time }}s</span></div>
+                <div class="col-span-2 text-gray-500">NOTES: <span class="text-white font-bold uppercase">{{ exp.batch_notes or '-' }}</span></div>
+            </div>
+        </div>
+        {% else %}
+        <div class="p-8 text-center text-gray-600 uppercase tracking-widest font-bold bg-black border border-gray-800">
+            SYSTEM_EMPTY. LOG_DATA_TO_PROCEED.
+        </div>
+        {% endfor %}
     </div>
 </section>
 
+<!-- QUICK LOG FAB (Mobile Only) -->
+<button id="quickLogFab" class="lg:hidden fixed bottom-20 right-6 w-14 h-14 bg-matrix-green text-black rounded-full flex items-center justify-center font-bold text-2xl shadow-hard z-50 hover:bg-green-400 transition-transform active:scale-95" onclick="toggleQuickLog()">
+    +
+</button>
+
+<!-- QUICK LOG MODAL -->
+<div id="quickLogModal" class="fixed inset-0 bg-black/90 backdrop-blur-sm hidden z-[200] flex items-center justify-center p-4">
+    <div class="bg-black border-2 border-matrix-green p-6 shadow-hard w-full max-w-sm relative">
+        <button onclick="toggleQuickLog()" class="absolute top-4 right-4 text-gray-500 hover:text-red-500 font-bold transition-colors uppercase text-[10px] tracking-widest touch-target">[X]</button>
+        <h3 class="text-lg font-display font-bold text-matrix-green uppercase tracking-widest mb-6">>_QUICK_LOG</h3>
+        
+        <form action="/add" method="POST" class="space-y-4">
+            <input type="hidden" name="branch_name" value="{{ current_branch|default('main') }}">
+            <input type="hidden" name="target_material" value="Generic">
+            <input type="hidden" name="working_pressure_mtorr" value="0">
+            <input type="hidden" name="ar_flow_sccm" value="0">
+            <input type="hidden" name="o2_flow_sccm" value="0">
+            <input type="hidden" name="substrate_temp_c" value="0">
+            <input type="hidden" name="sputtering_time_s" value="0">
+            <input type="hidden" name="rotation_speed_rpm" value="5">
+            <input type="hidden" name="substrate_type" value="Si Wafer">
+            <input type="hidden" name="h2_response_time_s" value="0">
+            <input type="hidden" name="notes" value="QUICK_LOG_ENTRY">
+
+            <div>
+                <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">RF_Power [W]</label>
+                <input type="number" step="0.1" name="rf_power_w" required class="w-full bg-gray-900 border border-gray-800 rounded-none p-3 text-sm text-matrix-green font-mono focus:border-matrix-green transition-colors outline-none touch-target">
+            </div>
+            <div>
+                <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Distance [cm]</label>
+                <input type="number" step="0.1" name="target_substrate_distance_cm" required class="w-full bg-gray-900 border border-gray-800 rounded-none p-3 text-sm text-matrix-green font-mono focus:border-matrix-green transition-colors outline-none touch-target">
+            </div>
+            <div>
+                <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Thickness [nm]</label>
+                <input type="number" step="0.1" name="film_thickness_nm" class="w-full bg-gray-900 border border-gray-800 rounded-none p-3 text-sm text-matrix-green font-mono focus:border-matrix-green transition-colors outline-none touch-target">
+            </div>
+            <div>
+                <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">XRD_Phase</label>
+                <select name="xrd_phase" class="w-full bg-gray-900 border border-gray-800 rounded-none p-3 text-sm text-matrix-green font-mono focus:border-matrix-green transition-colors outline-none touch-target">
+                    <option value="Monoclinic">MONOCLINIC</option>
+                    <option value="Partial">PARTIAL</option>
+                    <option value="Amorphous">AMORPHOUS</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Wave_Shift [pm]</label>
+                <input type="number" step="0.1" name="wavelength_shift_pm" class="w-full bg-gray-900 border border-gray-800 rounded-none p-3 text-sm text-matrix-green font-mono focus:border-matrix-green transition-colors outline-none touch-target">
+            </div>
+
+            <button type="submit" class="w-full bg-matrix-green hover:bg-green-400 text-black font-bold py-3 mt-4 transition-colors text-xs uppercase tracking-widest touch-target">
+                COMMIT_LOG
+            </button>
+        </form>
+    </div>
+</div>
+
 <!-- HACKER WHAT-IF MODAL -->
-<div id="whatIfModal" class="fixed inset-0 bg-black/90 backdrop-blur-sm hidden z-[60] flex items-center justify-center p-4">
-    <div class="bg-black border-2 border-gray-800 p-8 shadow-hard w-full max-w-lg relative">
-        <button onclick="document.getElementById('whatIfModal').classList.add('hidden')" class="absolute top-4 right-4 text-gray-600 hover:text-red-500 font-bold transition-colors uppercase text-[10px] tracking-widest">
-            [CLOSE]
+<div id="whatIfModal" class="fixed inset-0 bg-black/90 backdrop-blur-sm hidden z-[200] flex items-center justify-center p-4">
+    <div class="bg-black border-2 border-gray-800 p-6 sm:p-8 shadow-hard w-full max-w-lg relative">
+        <button onclick="document.getElementById('whatIfModal').classList.add('hidden')" class="absolute top-4 right-4 text-gray-600 hover:text-red-500 font-bold transition-colors uppercase text-[10px] tracking-widest touch-target">
+            [X]
         </button>
-        <h3 class="text-xl font-display font-bold text-gray-200 uppercase tracking-widest mb-2">>_COUNTERFACTUAL_ANALYSIS</h3>
-        <p class="text-[10px] text-gray-500 mb-8 uppercase tracking-widest border-b border-gray-800 pb-4">Adjust local parameters to bypass matrix limits.</p>
+        <h3 class="text-lg sm:text-xl font-display font-bold text-gray-200 uppercase tracking-widest mb-2">>_COUNTERFACTUAL_ANALYSIS</h3>
+        <p class="text-[10px] text-gray-500 mb-6 uppercase tracking-widest border-b border-gray-800 pb-4">Adjust local parameters to bypass matrix limits.</p>
         
         <div class="space-y-6 mb-8">
             <div>
                 <div class="flex justify-between text-[10px] font-bold uppercase tracking-widest mb-2"><span class="text-gray-400">RF_Power</span><span class="text-matrix-green" id="wiRfVal"></span></div>
-                <input type="range" id="wiRf" min="15" max="200" step="1" class="w-full accent-matrix-green bg-gray-800 h-1 appearance-none outline-none" oninput="runWhatIf()">
+                <input type="range" id="wiRf" min="15" max="200" step="1" class="w-full accent-matrix-green bg-gray-800 h-1.5 appearance-none outline-none touch-target" oninput="runWhatIf()">
             </div>
             <div>
                 <div class="flex justify-between text-[10px] font-bold uppercase tracking-widest mb-2"><span class="text-gray-400">Pressure</span><span class="text-matrix-green" id="wiPressVal"></span></div>
-                <input type="range" id="wiPress" min="3" max="10" step="0.1" class="w-full accent-matrix-green bg-gray-800 h-1 appearance-none outline-none" oninput="runWhatIf()">
+                <input type="range" id="wiPress" min="3" max="10" step="0.1" class="w-full accent-matrix-green bg-gray-800 h-1.5 appearance-none outline-none touch-target" oninput="runWhatIf()">
             </div>
         </div>
 
@@ -255,14 +347,14 @@
 </div>
 
 <!-- Radar Chart Modal -->
-<div id="radarModal" class="fixed inset-0 bg-black/90 backdrop-blur-sm hidden z-[60] flex items-center justify-center p-4">
-    <div class="bg-black border-2 border-gray-800 p-8 shadow-hard w-full max-w-2xl relative">
-        <button id="btnCloseRadar" class="absolute top-4 right-4 text-gray-600 hover:text-red-500 font-bold transition-colors uppercase text-[10px] tracking-widest">
-            [CLOSE]
+<div id="radarModal" class="fixed inset-0 bg-black/90 backdrop-blur-sm hidden z-[200] flex items-center justify-center p-4">
+    <div class="bg-black border-2 border-gray-800 p-6 sm:p-8 shadow-hard w-full max-w-2xl relative">
+        <button id="btnCloseRadar" class="absolute top-4 right-4 text-gray-600 hover:text-red-500 font-bold transition-colors uppercase text-[10px] tracking-widest touch-target">
+            [X]
         </button>
-        <h3 class="text-xl font-display font-bold text-gray-200 uppercase tracking-widest mb-2">>_RADAR_OVERLAP</h3>
-        <p class="text-[10px] text-gray-500 mb-8 uppercase tracking-widest border-b border-gray-800 pb-4">Multi-variate topological comparison.</p>
-        <div class="h-80 w-full relative">
+        <h3 class="text-lg sm:text-xl font-display font-bold text-gray-200 uppercase tracking-widest mb-2">>_RADAR_OVERLAP</h3>
+        <p class="text-[10px] text-gray-500 mb-6 uppercase tracking-widest border-b border-gray-800 pb-4">Multi-variate topological comparison.</p>
+        <div class="h-64 sm:h-80 w-full relative">
             <canvas id="radarCanvas"></canvas>
         </div>
     </div>
@@ -272,24 +364,37 @@
 <script>
     const expData = {{ experiments | tojson | default('[]') }};
 
+    function toggleCardMore(id) {
+        const panel = document.getElementById('card-more-' + id);
+        const btn = document.getElementById('btn-more-' + id);
+        if (panel.classList.contains('hidden')) {
+            panel.classList.remove('hidden');
+            btn.innerText = "[▲LESS]";
+        } else {
+            panel.classList.add('hidden');
+            btn.innerText = "[▼MORE]";
+        }
+    }
+
+    function toggleQuickLog() {
+        const modal = document.getElementById('quickLogModal');
+        modal.classList.toggle('hidden');
+    }
+
     // SECURE DELETE LOGIC
     async function deleteExperiment(id) {
         if(!confirm(`[WARNING] Purge RECORD_${id}? Optimization weights will recalculate.`)) return;
-        
         try {
             const res = await fetch(`/experiments/${id}`, { method: 'DELETE' });
             const data = await res.json();
-            
             if(res.ok && data.success) {
-                const row = document.getElementById(`exp-row-${id}`);
-                if(row) row.remove();
+                const rowD = document.getElementById(`exp-row-desktop-${id}`);
+                const rowM = document.getElementById(`exp-row-mobile-${id}`);
+                if(rowD) rowD.remove();
+                if(rowM) rowM.remove();
                 alert(`SYS_MSG: RECORD_${id} purged.`);
-            } else {
-                alert(`SYS_ERR: ${data.message || data.error}`);
-            }
-        } catch(err) {
-            alert("SYS_ERR: Target server unreachable.");
-        }
+            } else alert(`SYS_ERR: ${data.message || data.error}`);
+        } catch(err) { alert("SYS_ERR: Target server unreachable."); }
     }
 
     // WHAT-IF LOGIC
@@ -301,12 +406,10 @@
         document.getElementById('whatIfModal').classList.remove('hidden');
         runWhatIf();
     }
-    
     async function runWhatIf() {
         if(!activeWhatIfExp) return;
         const rf = document.getElementById('wiRf').value;
         const press = document.getElementById('wiPress').value;
-        
         document.getElementById('wiRfVal').innerText = rf + " W";
         document.getElementById('wiPressVal').innerText = press + " mT";
 
@@ -315,33 +418,21 @@
                 method: 'POST', headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({
                     material: activeWhatIfExp.target_material || 'Generic',
-                    params: [
-                        parseFloat(rf), 
-                        parseFloat(press), 
-                        parseFloat(activeWhatIfExp.target_distance) || 7.0, 
-                        parseFloat(activeWhatIfExp.film_thickness) || 200.0, 
-                        parseFloat(activeWhatIfExp.rotation_speed) || 5.0, 
-                        parseFloat(activeWhatIfExp.ar_flow) || 30.0
-                    ]
+                    params: [parseFloat(rf), parseFloat(press), parseFloat(activeWhatIfExp.target_distance) || 7.0, parseFloat(activeWhatIfExp.film_thickness) || 200.0, parseFloat(activeWhatIfExp.rotation_speed) || 5.0, parseFloat(activeWhatIfExp.ar_flow) || 30.0]
                 })
             });
             const data = await res.json();
-            
             if(data.success && data.simulation) {
                 const actualShift = parseFloat(activeWhatIfExp.wavelength_shift) || 0.0;
                 const predictedShift = parseFloat(data.simulation.predicted_wavelength_shift) || 0.0;
-                
                 const diff = (predictedShift - actualShift).toFixed(1);
                 const color = diff >= 0 ? 'text-matrix-green' : 'text-red-500';
                 const sign = diff > 0 ? '+' : '';
-                
                 document.getElementById('wiShiftDelta').className = `font-bold text-lg font-mono ${color}`;
                 document.getElementById('wiShiftDelta').innerText = `${sign}${diff} pm`;
                 document.getElementById('wiPhase').innerText = data.simulation.expected_phase;
             }
-        } catch (err) {
-            console.error("SYS_ERR:", err);
-        }
+        } catch (err) { console.error("SYS_ERR:", err); }
     }
 
     // FINGERPRINT LOGIC
@@ -349,28 +440,19 @@
         try {
             const exp = expData[index];
             const res = await fetch('/api/experiments/fingerprint', {
-                method: 'POST', headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({experiment: exp})
+                method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({experiment: exp})
             });
-            
             if (!res.ok) throw new Error("Server crashed");
-            
             const data = await res.json();
-            if(data.success && data.similar.length > 0) {
-                alert(`[SYS_MSG] DNA Match Resolved.\nNODE_ID: ${data.similar[0].id}\nPROBABILITY: ${data.similar[0].match}%`);
-            } else {
-                alert("[SYS_MSG] Topological match failed. Database variance too high.");
-            }
-        } catch (err) {
-            alert("[SYS_ERR] Fingerprint mapping unreachable.");
-        }
+            if(data.success && data.similar.length > 0) alert(`[SYS_MSG] DNA Match Resolved.\nNODE_ID: ${data.similar[0].id}\nPROBABILITY: ${data.similar[0].match}%`);
+            else alert("[SYS_MSG] Topological match failed. Database variance too high.");
+        } catch (err) { alert("[SYS_ERR] Fingerprint mapping unreachable."); }
     }
 
-    // RADAR CHART COMPARATOR LOGIC
+    // RADAR CHART COMPARATOR
     let radarChartObj = null;
     const compareCbks = document.querySelectorAll('.compare-cbk');
     const compareBar = document.getElementById('compareBar');
-    
     function updateCompareBar() {
         const checked = document.querySelectorAll('.compare-cbk:checked');
         if (checked.length === 2) {
@@ -381,198 +463,65 @@
             compareCbks.forEach(cb => cb.disabled = false);
         }
     }
-
     compareCbks.forEach(cb => cb.addEventListener('change', updateCompareBar));
-
-    document.getElementById('btnClearCompare')?.addEventListener('click', () => {
-        compareCbks.forEach(cb => cb.checked = false);
-        updateCompareBar();
-    });
+    document.getElementById('btnClearCompare')?.addEventListener('click', () => { compareCbks.forEach(cb => cb.checked = false); updateCompareBar(); });
 
     document.getElementById('btnCompare')?.addEventListener('click', () => {
         const checked = document.querySelectorAll('.compare-cbk:checked');
         if (checked.length !== 2) return;
-        
         const exp1 = expData[parseInt(checked[0].value)];
         const exp2 = expData[parseInt(checked[1].value)];
-        
         document.getElementById('radarModal').classList.remove('hidden');
-        
         const ctxRadar = document.getElementById('radarCanvas').getContext('2d');
         if (radarChartObj) radarChartObj.destroy();
-        
-        const getVals = (e) => [
-            e.rf_power, e.working_pressure * 10, e.target_distance * 10, 
-            e.sputter_time_s / 60, (e.film_thickness || 100) * 0.5, e.ar_flow
-        ];
-
+        const getVals = (e) => [e.rf_power, e.working_pressure * 10, e.target_distance * 10, e.sputter_time_s / 60, (e.film_thickness || 100) * 0.5, e.ar_flow];
         radarChartObj = new Chart(ctxRadar, {
             type: 'radar',
-            data: {
-                labels: ['PWR(W)', 'PRES(x10)', 'DIST(x10)', 'TIME(m)', 'THICK(x.5)', 'FLOW'],
-                datasets: [
-                    {
-                        label: `NODE_A (Q:${exp1.quality_score || 50})`,
-                        data: getVals(exp1),
-                        backgroundColor: 'rgba(0, 255, 65, 0.2)',
-                        borderColor: '#00FF41',
-                        pointBackgroundColor: '#00FF41'
-                    },
-                    {
-                        label: `NODE_B (Q:${exp2.quality_score || 50})`,
-                        data: getVals(exp2),
-                        backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                        borderColor: '#e5e5e5',
-                        pointBackgroundColor: '#e5e5e5'
-                    }
-                ]
-            },
-            options: {
-                responsive: true, maintainAspectRatio: false,
-                scales: {
-                    r: {
-                        grid: { color: '#171717' },
-                        angleLines: { color: '#171717' },
-                        pointLabels: { color: '#525252', font: { family: 'JetBrains Mono', size: 10 } },
-                        ticks: { display: false }
-                    }
-                },
-                plugins: { legend: { labels: { color: '#00FF41', font: { family: 'JetBrains Mono'} } } }
-            }
+            data: { labels: ['PWR(W)', 'PRES(x10)', 'DIST(x10)', 'TIME(m)', 'THICK(x.5)', 'FLOW'], datasets: [{label: `NODE_A (Q:${exp1.quality_score || 50})`, data: getVals(exp1), backgroundColor: 'rgba(0, 255, 65, 0.2)', borderColor: '#00FF41', pointBackgroundColor: '#00FF41'}, {label: `NODE_B (Q:${exp2.quality_score || 50})`, data: getVals(exp2), backgroundColor: 'rgba(255, 255, 255, 0.1)', borderColor: '#e5e5e5', pointBackgroundColor: '#e5e5e5'}] },
+            options: { responsive: true, maintainAspectRatio: false, scales: { r: { grid: { color: '#171717' }, angleLines: { color: '#171717' }, pointLabels: { color: '#525252', font: { family: 'JetBrains Mono', size: window.innerWidth < 640 ? 8 : 10 } }, ticks: { display: false } } }, plugins: { legend: { labels: { color: '#00FF41', font: { family: 'JetBrains Mono'} } } } }
         });
     });
-
-    document.getElementById('btnCloseRadar')?.addEventListener('click', () => {
-        document.getElementById('radarModal').classList.add('hidden');
-    });
+    document.getElementById('btnCloseRadar')?.addEventListener('click', () => document.getElementById('radarModal').classList.add('hidden'));
 
     // VISUAL SCIENTIST AUTO-DETECT
     async function handleVisionUpload(file, analysisType, targetInputId) {
         if (!file) return;
-        const formData = new FormData();
-        formData.append('image', file);
-        formData.append('analysis_type', analysisType);
-
-        const targetInput = document.getElementById(targetInputId);
-        const originalValue = targetInput.value;
-        targetInput.disabled = true;
-        targetInput.value = 'EXTRACTING...';
-        targetInput.classList.add('animate-pulse', 'bg-gray-800', 'border-matrix-green');
-
+        const formData = new FormData(); formData.append('image', file); formData.append('analysis_type', analysisType);
+        const targetInput = document.getElementById(targetInputId); const originalValue = targetInput.value;
+        targetInput.disabled = true; targetInput.value = 'EXTRACTING...'; targetInput.classList.add('animate-pulse', 'bg-gray-800', 'border-matrix-green');
         try {
-            const response = await fetch('/api/vision', { method: 'POST', body: formData });
-            const data = await response.json();
-            
-            if (data.success && data.extracted_value) {
-                targetInput.value = data.extracted_value;
-                targetInput.classList.remove('bg-gray-800', 'animate-pulse');
-                targetInput.classList.add('bg-matrix-green/20', 'border-matrix-green');
-                setTimeout(() => targetInput.classList.remove('bg-matrix-green/20'), 2000);
-            } else {
-                alert('[SYS_ERR] OCR parsing failed.');
-                targetInput.value = originalValue;
-            }
-        } catch (err) {
-            targetInput.value = originalValue;
-        } finally {
-            targetInput.disabled = false;
-            targetInput.classList.remove('animate-pulse', 'bg-gray-800', 'border-matrix-green');
-        }
+            const response = await fetch('/api/vision', { method: 'POST', body: formData }); const data = await response.json();
+            if (data.success && data.extracted_value) { targetInput.value = data.extracted_value; targetInput.classList.remove('bg-gray-800', 'animate-pulse'); targetInput.classList.add('bg-matrix-green/20', 'border-matrix-green'); setTimeout(() => targetInput.classList.remove('bg-matrix-green/20'), 2000); } 
+            else { alert('[SYS_ERR] OCR parsing failed.'); targetInput.value = originalValue; }
+        } catch (err) { targetInput.value = originalValue; } finally { targetInput.disabled = false; targetInput.classList.remove('animate-pulse', 'bg-gray-800', 'border-matrix-green'); }
     }
-
-    document.getElementById('uploadXRD')?.addEventListener('change', (e) => {
-        handleVisionUpload(e.target.files[0], 'XRD plot', 'xrd_phase');
-        e.target.value = '';
-    });
-
-    document.getElementById('uploadSEM')?.addEventListener('change', (e) => {
-        handleVisionUpload(e.target.files[0], 'SEM/FESEM micrograph', 'grain_size_nm');
-        e.target.value = '';
-    });
+    document.getElementById('uploadXRD')?.addEventListener('change', (e) => { handleVisionUpload(e.target.files[0], 'XRD plot', 'xrd_phase'); e.target.value = ''; });
+    document.getElementById('uploadSEM')?.addEventListener('change', (e) => { handleVisionUpload(e.target.files[0], 'SEM/FESEM micrograph', 'grain_size_nm'); e.target.value = ''; });
 
     // LITERATURE AI PDF UPLOAD LOGIC
     document.getElementById('uploadLiterature')?.addEventListener('change', async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-
-        const formData = new FormData();
-        formData.append('file', file);
-
-        const btnLabel = document.getElementById('litUploadLabel');
-        const originalText = btnLabel.innerText;
-        btnLabel.innerText = ">> SCRAPING_PDF...";
-        btnLabel.parentElement.classList.add('animate-pulse', 'border-matrix-green');
-
+        const file = e.target.files[0]; if (!file) return;
+        const formData = new FormData(); formData.append('file', file);
+        const btnLabel = document.getElementById('litUploadLabel'); const originalText = btnLabel.innerText;
+        btnLabel.innerText = ">> SCRAPING_PDF..."; btnLabel.parentElement.classList.add('animate-pulse', 'border-matrix-green');
         try {
-            const res = await fetch('/api/literature/upload', { method: 'POST', body: formData });
-            const data = await res.json();
-            
+            const res = await fetch('/api/literature/upload', { method: 'POST', body: formData }); const data = await res.json();
             if (data.success && data.extracted_data) {
                 const s = data.extracted_data;
-                const fields = [
-                    { id: 'target_material', val: s.target_material },
-                    { id: 'rf_power_w', val: s.rf_power },
-                    { id: 'working_pressure_mtorr', val: s.working_pressure },
-                    { id: 'ar_flow_sccm', val: s.ar_flow },
-                    { id: 'o2_flow_sccm', val: s.o2_flow },
-                    { id: 'substrate_temp_c', val: s.substrate_temp },
-                    { id: 'target_substrate_distance_cm', val: s.target_distance },
-                    { id: 'film_thickness_nm', val: s.film_thickness },
-                    { id: 'rotation_speed_rpm', val: s.rotation_speed },
-                    { id: 'xrd_phase', val: s.xrd_phase },
-                    { id: 'grain_size_nm', val: s.grain_size },
-                    { id: 'h2_response_time_s', val: s.h2_response_time },
-                    { id: 'wavelength_shift_pm', val: s.wavelength_shift }
-                ];
-                
-                if (s.sputter_time_s) {
-                    const mins = Math.floor(s.sputter_time_s / 60);
-                    const secs = s.sputter_time_s % 60;
-                    document.querySelector('input[name="sputtering_time_min"]').value = mins;
-                    document.querySelector('input[name="sputtering_time_sec"]').value = secs;
-                }
-
-                fields.forEach(f => {
-                    const el = document.getElementById(f.id);
-                    if (el && f.val !== undefined) {
-                        el.value = f.val;
-                        el.classList.add('bg-matrix-green/20');
-                        setTimeout(() => el.classList.remove('bg-matrix-green/20'), 1200);
-                    }
-                });
+                const fields = [{ id: 'target_material', val: s.target_material }, { id: 'rf_power_w', val: s.rf_power }, { id: 'working_pressure_mtorr', val: s.working_pressure }, { id: 'ar_flow_sccm', val: s.ar_flow }, { id: 'o2_flow_sccm', val: s.o2_flow }, { id: 'substrate_temp_c', val: s.substrate_temp }, { id: 'target_substrate_distance_cm', val: s.target_distance }, { id: 'film_thickness_nm', val: s.film_thickness }, { id: 'rotation_speed_rpm', val: s.rotation_speed }, { id: 'xrd_phase', val: s.xrd_phase }, { id: 'grain_size_nm', val: s.grain_size }, { id: 'h2_response_time_s', val: s.h2_response_time }, { id: 'wavelength_shift_pm', val: s.wavelength_shift }];
+                if (s.sputter_time_s) document.getElementById('sputtering_time_s').value = s.sputter_time_s;
+                fields.forEach(f => { const el = document.getElementById(f.id); if (el && f.val !== undefined) { el.value = f.val; el.classList.add('bg-matrix-green/20'); setTimeout(() => el.classList.remove('bg-matrix-green/20'), 1200); } });
                 alert("[SYS_MSG] Parsing complete. Vectors loaded.");
-            } else {
-                alert('[SYS_ERR] Scraping failed.');
-            }
-        } catch (err) {
-            alert('[SYS_ERR] Upload stream interrupted.');
-        } finally {
-            btnLabel.innerText = originalText;
-            btnLabel.parentElement.classList.remove('animate-pulse', 'border-matrix-green');
-            e.target.value = ''; 
-        }
+            } else alert('[SYS_ERR] Scraping failed.');
+        } catch (err) { alert('[SYS_ERR] Upload stream interrupted.'); } finally { btnLabel.innerText = originalText; btnLabel.parentElement.classList.remove('animate-pulse', 'border-matrix-green'); e.target.value = ''; }
     });
 
     document.addEventListener("DOMContentLoaded", () => {
         const storedBatch = localStorage.getItem('matrixAutoFill');
         if (storedBatch) {
             const s = JSON.parse(storedBatch);
-            const fields = [
-                { id: 'rf_power_w', val: s.rf_power },
-                { id: 'working_pressure_mtorr', val: s.working_pressure },
-                { id: 'target_substrate_distance_cm', val: s.target_distance },
-                { id: 'film_thickness_nm', val: s.film_thickness },
-                { id: 'rotation_speed_rpm', val: s.rotation_speed },
-                { id: 'ar_flow_sccm', val: s.ar_flow }
-            ];
-            fields.forEach(f => {
-                const el = document.getElementById(f.id);
-                if (el) {
-                    el.value = f.val;
-                    el.classList.add('bg-matrix-green/20');
-                    setTimeout(() => el.classList.remove('bg-matrix-green/20'), 1200);
-                }
-            });
+            const fields = [{ id: 'rf_power_w', val: s.rf_power }, { id: 'working_pressure_mtorr', val: s.working_pressure }, { id: 'target_substrate_distance_cm', val: s.target_distance }, { id: 'film_thickness_nm', val: s.film_thickness }, { id: 'rotation_speed_rpm', val: s.rotation_speed }, { id: 'ar_flow_sccm', val: s.ar_flow }];
+            fields.forEach(f => { const el = document.getElementById(f.id); if (el) { el.value = f.val; el.classList.add('bg-matrix-green/20'); setTimeout(() => el.classList.remove('bg-matrix-green/20'), 1200); } });
             localStorage.removeItem('matrixAutoFill');
         }
     });
