@@ -127,11 +127,10 @@
     <aside id="appSidebar" class="bg-black border-r border-gray-800 flex flex-col fixed h-screen z-[160] transition-transform duration-300 ease-in-out">
         <div class="h-16 flex items-center justify-between lg:justify-start px-6 border-b border-gray-800 bg-gray-900 scanline min-h-[64px]">
             <div class="flex items-center space-x-3">
-                <div class="flex items-center space-x-3">
-                    <div class="w-8 h-8 bg-matrix-green text-black flex items-center justify-center font-extrabold text-xl shadow-[2px_2px_0px_#171717]">M</div>
-                    <span class="font-display font-bold text-lg tracking-widest text-gray-200 sm:hidden lg:inline-block">MATRIX</span>
-                </div>
-                <!-- Desktop Theme Toggle -->
+                <div class="w-8 h-8 bg-matrix-green text-black flex items-center justify-center font-extrabold text-xl shadow-[2px_2px_0px_#171717]">M</div>
+                <span class="font-display font-bold text-lg tracking-widest text-gray-200 sm:hidden lg:inline-block">MATRIX</span>
+                
+                <!-- Desktop Theme Toggle (Android Style) -->
                 <button onclick="toggleTheme()" class="hidden lg:flex items-center justify-center text-gray-500 hover:text-matrix-green transition-colors focus:outline-none touch-target ml-2" title="Toggle Theme">
                     <svg class="theme-icon-moon w-5 h-5 block" fill="currentColor" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"></path></svg>
                     <svg class="theme-icon-sun w-5 h-5 hidden" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
@@ -242,7 +241,7 @@
                 </button>
                 <div class="flex items-center space-x-2">
                     <div class="w-6 h-6 bg-matrix-green text-black flex sm:hidden items-center justify-center font-extrabold text-sm">M</div>
-                    <!-- Mobile/Tablet Theme Toggle -->
+                    <!-- Mobile/Tablet Theme Toggle (Android Style) -->
                     <button onclick="toggleTheme()" class="lg:hidden flex items-center justify-center text-gray-500 hover:text-matrix-green transition-colors focus:outline-none touch-target ml-1" title="Toggle Theme">
                         <svg class="theme-icon-moon w-5 h-5 block" fill="currentColor" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"></path></svg>
                         <svg class="theme-icon-sun w-5 h-5 hidden" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
@@ -250,7 +249,7 @@
                 </div>
                 <div class="text-sm md:text-base font-display font-bold tracking-widest uppercase text-gray-300 truncate">
                     <span class="hidden sm:inline">{% block header_title %}SYSTEM DASHBOARD{% endblock %}</span>
-                    <span class="sm:hidden">{% block header_title_mobile %}{% block header_title %}{% endblock %}{% endblock %}</span>
+                    <span class="sm:hidden">{% block header_title_mobile %}DASHBOARD{% endblock %}</span>
                 </div>
             </div>
             <div class="flex items-center space-x-4 pr-2 md:pr-8">
