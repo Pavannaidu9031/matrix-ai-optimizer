@@ -66,19 +66,19 @@
         @media (min-width: 1024px) {
             .form-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
             #appSidebar { width: 280px; transform: translateX(0); }
-            .main-content { margin-left: 280px; }
+            .main-content { margin-left: 280px; width: calc(100% - 280px); }
         }
         @media (min-width: 640px) and (max-width: 1023px) {
             .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
             #appSidebar { width: 60px; transform: translateX(0); z-index: 150; }
-            .main-content { margin-left: 60px; }
+            .main-content { margin-left: 60px; width: calc(100% - 60px); }
             .nav-item:hover .tooltip-text { display: block; position: absolute; left: 100%; top: 50%; transform: translateY(-50%); background: black; border: 1px solid #00FF41; color: #00FF41; padding: 4px 8px; z-index: 200; white-space: nowrap; font-size: 10px; margin-left: 10px; }
         }
         @media (max-width: 639px) {
             .form-grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
             #appSidebar { width: 100%; transform: translateX(-100%); z-index: 160; transition: transform 0.3s ease; }
             #appSidebar.open { transform: translateX(0); }
-            .main-content { margin-left: 0; }
+            .main-content { margin-left: 0; width: 100%; }
             /* Enforce 44px touch targets on mobile */
             input, select, button, .touch-target { min-height: 44px; font-size: max(12px, 0.875rem) !important; }
         }
@@ -127,9 +127,10 @@
     <aside id="appSidebar" class="bg-black border-r border-gray-800 flex flex-col fixed h-screen z-[160] transition-transform duration-300 ease-in-out">
         <div class="h-16 flex items-center justify-between lg:justify-start px-6 border-b border-gray-800 bg-gray-900 scanline min-h-[64px]">
             <div class="flex items-center space-x-3">
-                <div class="w-8 h-8 bg-matrix-green text-black flex items-center justify-center font-extrabold text-xl shadow-[2px_2px_0px_#171717]">M</div>
-                <span class="font-display font-bold text-lg tracking-widest text-gray-200 sm:hidden lg:inline-block">MATRIX</span>
-                
+                <div class="flex items-center space-x-3">
+                    <div class="w-8 h-8 bg-matrix-green text-black flex items-center justify-center font-extrabold text-xl shadow-[2px_2px_0px_#171717]">M</div>
+                    <span class="font-display font-bold text-lg tracking-widest text-gray-200 sm:hidden lg:inline-block">MATRIX</span>
+                </div>
                 <!-- Desktop Theme Toggle (Android Style) -->
                 <button onclick="toggleTheme()" class="hidden lg:flex items-center justify-center text-gray-500 hover:text-matrix-green transition-colors focus:outline-none touch-target ml-2" title="Toggle Theme">
                     <svg class="theme-icon-moon w-5 h-5 block" fill="currentColor" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"></path></svg>
@@ -232,7 +233,7 @@
     {% endif %}
 
     <!-- MAIN CONTENT AREA -->
-    <div class="flex-1 main-content min-h-screen flex flex-col bg-black w-full">
+    <div class="flex-1 main-content min-h-screen flex flex-col bg-black min-w-0">
         {% if user %}
         <header class="h-16 border-b border-gray-800 bg-black/80 backdrop-blur-sm sticky top-0 z-40 px-4 md:px-8 flex items-center justify-between">
             <div class="flex items-center space-x-3">
@@ -264,98 +265,9 @@
         </div>
         {% endif %}
 
-        <main class="flex-1 p-4 md:p-8 space-y-8 max-w-7xl w-full mx-auto relative overflow-x-hidden">
+        <main class="flex-1 p-4 lg:p-6 space-y-8 max-w-7xl w-full mx-auto relative overflow-x-hidden min-w-0">
             {% block content %}{% endblock %}
         </main>
-    </div>
-
-    <!-- INDUSTRIAL DIGITAL TWIN SANDBOX (RESPONSIVE) -->
-    <div id="sandboxModal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-black/90 backdrop-blur-sm opacity-0 transition-opacity duration-200 p-2 md:p-4 overflow-y-auto">
-        <div class="bg-black border-2 border-gray-800 shadow-[8px_8px_0px_#171717] w-full max-w-4xl mx-auto overflow-hidden flex flex-col md:flex-row transform scale-95 transition-transform duration-200 my-auto" id="sandboxContent">
-            
-            <div class="p-6 md:p-8 md:w-1/2 border-b md:border-b-0 md:border-r border-gray-800 bg-gray-900/50 order-2 md:order-1">
-                <div class="hidden md:flex justify-between items-center mb-8 border-b border-gray-800 pb-4">
-                    <h2 class="text-lg font-display font-bold text-gray-200 tracking-widest uppercase">[SIM] Digital_Twin</h2>
-                </div>
-                
-                <div class="space-y-6 md:space-y-5">
-                    <div>
-                        <div class="flex justify-between text-[10px] uppercase tracking-widest font-bold mb-2"><span class="text-gray-500">RF Power_W</span><span id="val_rf" class="text-matrix-green">120</span></div>
-                        <input type="range" id="sim_rf" min="50" max="300" value="120" class="w-full accent-matrix-green bg-gray-800 h-1 appearance-none outline-none touch-target" oninput="updateSim()">
-                    </div>
-                    <div>
-                        <div class="flex justify-between text-[10px] uppercase tracking-widest font-bold mb-2"><span class="text-gray-500">Pressure_mT</span><span id="val_pres" class="text-matrix-green">5.0</span></div>
-                        <input type="range" id="sim_pres" min="1.0" max="20.0" step="0.5" value="5.0" class="w-full accent-matrix-green bg-gray-800 h-1 appearance-none outline-none touch-target" oninput="updateSim()">
-                    </div>
-                    <div>
-                        <div class="flex justify-between text-[10px] uppercase tracking-widest font-bold mb-2"><span class="text-gray-500">Dist_cm</span><span id="val_dist" class="text-matrix-green">7.0</span></div>
-                        <input type="range" id="sim_dist" min="3.0" max="15.0" step="0.1" value="7.0" class="w-full accent-matrix-green bg-gray-800 h-1 appearance-none outline-none touch-target" oninput="updateSim()">
-                    </div>
-                    <div>
-                        <div class="flex justify-between text-[10px] uppercase tracking-widest font-bold mb-2"><span class="text-gray-500">Time_sec</span><span id="val_time" class="text-matrix-green">600</span></div>
-                        <input type="range" id="sim_time" min="10" max="3600" step="10" value="600" class="w-full accent-matrix-green bg-gray-800 h-1 appearance-none outline-none touch-target" oninput="updateSim()">
-                    </div>
-                    <div>
-                        <div class="flex justify-between text-[10px] uppercase tracking-widest font-bold mb-2"><span class="text-gray-500">Ar_sccm</span><span id="val_ar" class="text-matrix-green">20</span></div>
-                        <input type="range" id="sim_ar" min="5" max="100" value="20" class="w-full accent-matrix-green bg-gray-800 h-1 appearance-none outline-none touch-target" oninput="updateSim()">
-                    </div>
-                    <div>
-                        <div class="flex justify-between text-[10px] uppercase tracking-widest font-bold mb-2"><span class="text-gray-500">Temp_C</span><span id="val_temp" class="text-matrix-green">300</span></div>
-                        <input type="range" id="sim_temp" min="25" max="800" step="25" value="300" class="w-full accent-matrix-green bg-gray-800 h-1 appearance-none outline-none touch-target" oninput="updateSim()">
-                    </div>
-                </div>
-            </div>
-
-            <div class="p-6 md:p-8 md:w-1/2 flex flex-col justify-center relative bg-black scanline order-1 md:order-2 border-b md:border-b-0 border-gray-800">
-                <div class="flex justify-between items-center mb-6 md:mb-8 border-b border-gray-800 pb-2">
-                    <h3 class="text-[10px] font-bold text-gray-600 uppercase tracking-widest md:hidden">Output Telemetry</h3>
-                    <h3 class="text-[10px] font-bold text-gray-600 uppercase tracking-widest hidden md:block border-none">Output Telemetry</h3>
-                    <button onclick="toggleSandbox()" class="text-gray-600 hover:text-red-500 font-mono text-sm touch-target">[CLOSE]</button>
-                </div>
-                
-                <div class="space-y-4 md:space-y-6">
-                    <div class="border-l-2 border-gray-700 pl-4 py-1">
-                        <span class="text-[10px] font-bold text-gray-500 uppercase tracking-widest block mb-1">Thickness</span>
-                        <div class="text-xl md:text-2xl font-bold text-gray-200" id="pred_thick">-- nm</div>
-                    </div>
-                    <div class="border-l-2 border-gray-700 pl-4 py-1">
-                        <span class="text-[10px] font-bold text-gray-500 uppercase tracking-widest block mb-1">Lambda Shift</span>
-                        <div class="text-xl md:text-2xl font-bold text-gray-200" id="pred_shift">-- pm</div>
-                    </div>
-                    <div class="border-l-2 border-matrix-green pl-4 py-1 bg-matrix-green/5">
-                        <span class="text-[10px] font-bold text-matrix-green uppercase tracking-widest block mb-1">Est. Score</span>
-                        <div class="text-2xl md:text-3xl font-extrabold text-matrix-green" id="pred_score">-- / 100</div>
-                    </div>
-                </div>
-                
-                <p class="text-[9px] text-gray-700 mt-6 md:mt-10 tracking-widest uppercase">Sys: Proprietary Engine Active</p>
-            </div>
-        </div>
-    </div>
-
-    <!-- TERMINAL CHAT DRAWER -->
-    <button id="btnChatToggle" class="hidden sm:flex fixed bottom-6 right-6 w-12 h-12 bg-matrix-green text-black border-2 border-matrix-green shadow-hard font-bold items-center justify-center hover:bg-green-400 hover:-translate-y-1 transition-all z-50 touch-target">>_</button>
-    <div id="chatDrawer" class="fixed top-0 right-0 w-full sm:w-[450px] h-full bg-black border-l-2 border-gray-800 shadow-2xl transform translate-x-full transition-transform duration-200 ease-out z-[160] flex flex-col">
-        <div class="h-16 border-b border-gray-800 flex items-center justify-between px-6 bg-gray-900 scanline min-h-[64px]">
-            <span class="font-display font-bold text-gray-300 tracking-widest uppercase">Terminal_Uplink</span>
-            <button id="btnCloseChat" class="text-gray-500 hover:text-red-500 font-bold tracking-widest text-xs touch-target">[X]</button>
-        </div>
-        <div id="chatHistory" class="flex-1 overflow-y-auto p-6 space-y-6 bg-black">
-            <div class="flex flex-col space-y-1">
-                <div class="text-[10px] text-gray-600 font-bold uppercase tracking-widest">System_Message</div>
-                <div class="border border-gray-800 bg-gray-900/50 p-3 text-sm text-matrix-green font-mono leading-relaxed">Root access verified. Material logic loaded. Input query parameters below.</div>
-            </div>
-        </div>
-        <div class="p-4 bg-gray-900 border-t border-gray-800 pb-8 sm:pb-4">
-            <div class="flex items-center space-x-2 mb-3">
-                <label class="text-[10px] text-gray-500 uppercase tracking-widest font-bold">Node:</label>
-                <select id="aiProvider" class="bg-black border border-gray-700 text-xs text-matrix-green p-1 uppercase focus:border-matrix-green touch-target"><option value="gemini">Gemini-Core</option><option value="groq">Llama-Fast</option></select>
-            </div>
-            <div class="relative flex space-x-2">
-                <textarea id="chatInput" rows="1" placeholder="enter sequence..." class="w-full bg-black border border-gray-700 p-3 text-sm text-gray-200 focus:border-matrix-green transition-colors resize-none placeholder-gray-700 touch-target py-3"></textarea>
-                <button id="btnSendChat" class="bg-gray-800 hover:bg-matrix-green hover:text-black border border-gray-700 text-gray-400 font-bold px-4 transition-colors uppercase text-xs tracking-widest touch-target">Run</button>
-            </div>
-        </div>
     </div>
 
     <!-- HAMBURGER & INTERACTION SCRIPTS -->
@@ -408,87 +320,6 @@
                 updateThemeIcons(false);
             }
         });
-    </script>
-    <script>
-        const sandboxModal = document.getElementById('sandboxModal');
-        const sandboxContent = document.getElementById('sandboxContent');
-        let simTimeout;
-        function toggleSandbox() {
-            if (sandboxModal.classList.contains('hidden')) {
-                sandboxModal.classList.remove('hidden');
-                setTimeout(() => { sandboxModal.classList.remove('opacity-0'); sandboxContent.classList.remove('scale-95'); runSimulation(); }, 10);
-            } else {
-                sandboxModal.classList.add('opacity-0'); sandboxContent.classList.add('scale-95');
-                setTimeout(() => sandboxModal.classList.add('hidden'), 200);
-            }
-        }
-        function updateSim() {
-            document.getElementById('val_rf').innerText = document.getElementById('sim_rf').value;
-            document.getElementById('val_pres').innerText = document.getElementById('sim_pres').value;
-            document.getElementById('val_dist').innerText = document.getElementById('sim_dist').value;
-            document.getElementById('val_time').innerText = document.getElementById('sim_time').value;
-            document.getElementById('val_ar').innerText = document.getElementById('sim_ar').value;
-            document.getElementById('val_temp').innerText = document.getElementById('sim_temp').value;
-            clearTimeout(simTimeout); simTimeout = setTimeout(runSimulation, 300);
-        }
-        async function runSimulation() {
-            const params = [document.getElementById('sim_rf').value, document.getElementById('sim_pres').value, document.getElementById('sim_dist').value, document.getElementById('sim_time').value, document.getElementById('sim_ar').value, document.getElementById('sim_temp').value];
-            try {
-                const res = await fetch('/api/sandbox/simulate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ params: params, target_material: 'Generic', branch: 'main' }) });
-                const data = await res.json();
-                if (data.success && data.simulation) {
-                    document.getElementById('pred_thick').innerText = parseFloat(data.simulation.thickness || 50).toFixed(1) + ' nm';
-                    document.getElementById('pred_shift').innerText = parseFloat(data.simulation.shift || 2).toFixed(2) + ' pm';
-                    document.getElementById('pred_score').innerText = parseFloat(data.simulation.score || 50).toFixed(1) + ' / 100';
-                }
-            } catch (e) { console.error('Sim error:', e); }
-        }
-    </script>
-    <script>
-        const chatDrawer = document.getElementById('chatDrawer');
-        const btnChatToggle = document.getElementById('btnChatToggle');
-        const btnCloseChat = document.getElementById('btnCloseChat');
-        const chatHistory = document.getElementById('chatHistory');
-        const chatInput = document.getElementById('chatInput');
-        const btnSendChat = document.getElementById('btnSendChat');
-        const aiProvider = document.getElementById('aiProvider');
-        const toggleChatDrawer = () => chatDrawer.classList.toggle('translate-x-full');
-        if(btnChatToggle) btnChatToggle.addEventListener('click', toggleChatDrawer);
-        if(btnCloseChat) btnCloseChat.addEventListener('click', toggleChatDrawer);
-
-        function appendMessage(role, text) {
-            const wrapper = document.createElement('div'); wrapper.className = 'flex flex-col space-y-1 mb-4';
-            const header = document.createElement('div');
-            header.className = role === 'user' ? 'text-[10px] text-gray-500 font-bold uppercase tracking-widest text-right' : 'text-[10px] text-matrix-green font-bold uppercase tracking-widest';
-            header.innerText = role === 'user' ? 'Local_User' : 'Matrix_Response';
-            const bubble = document.createElement('div');
-            bubble.className = role === 'user' ? 'border border-gray-700 bg-gray-900 p-3 text-sm text-gray-300 ml-8' : 'border border-gray-800 bg-gray-900/50 p-3 text-sm text-gray-300 mr-8';
-            bubble.innerHTML = text.replace(/\*\*(.*?)\*\*/g, '<strong class="text-white">$1</strong>').replace(/\n/g, '<br>');
-            wrapper.appendChild(header); wrapper.appendChild(bubble); chatHistory.appendChild(wrapper);
-            chatHistory.scrollTop = chatHistory.scrollHeight;
-        }
-
-        async function sendChatMessage() {
-            const message = chatInput.value.trim(); if (!message) return;
-            const provider = aiProvider.value; appendMessage('user', message); chatInput.value = '';
-            const loadingId = 'loading-' + Date.now();
-            const loadingWrapper = document.createElement('div'); loadingWrapper.id = loadingId; loadingWrapper.className = 'flex flex-col space-y-1 mb-4';
-            loadingWrapper.innerHTML = `<div class="text-[10px] text-matrix-green font-bold uppercase tracking-widest animate-pulse">Matrix_Computing...</div>`;
-            chatHistory.appendChild(loadingWrapper); chatHistory.scrollTop = chatHistory.scrollHeight;
-            try {
-                const res = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: message, provider: provider }) });
-                const data = await res.json(); document.getElementById(loadingId).remove();
-                if (res.ok && data.reply) appendMessage('ai', data.reply); else appendMessage('ai', '[ERROR]: Connection refused.');
-            } catch (err) { document.getElementById(loadingId).remove(); appendMessage('ai', '[ERROR]: Packet loss.'); }
-        }
-        if(btnSendChat) btnSendChat.addEventListener('click', sendChatMessage);
-        if(chatInput) chatInput.addEventListener('keypress', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChatMessage(); } });
-    </script>
-    <script>
-        setTimeout(() => {
-            const splash = document.getElementById('splashScreen');
-            if (splash) { splash.style.opacity = '0'; setTimeout(() => { splash.style.display = 'none'; }, 700); }
-        }, 500);
     </script>
 </body>
 </html>
