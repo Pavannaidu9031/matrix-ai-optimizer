@@ -101,33 +101,6 @@
 </head>
 <body class="bg-black text-gray-300 min-h-screen font-sans antialiased flex selection:bg-matrix-green selection:text-black">
 
-    <!-- THEME SWITCHER -->
-    <div class="fixed top-0 right-4 md:right-16 z-[200] flex flex-col items-center pointer-events-auto">
-        <div class="w-8 md:w-12 h-2 bg-gray-800 border-b border-gray-600 shadow-lg relative z-30"></div>
-        <div class="w-1 h-6 md:h-10 bg-gray-700 relative z-30"></div>
-        <div class="relative flex flex-col items-center">
-            <div class="w-5 md:w-6 h-4 md:h-5 bg-gray-600 rounded-t-sm z-30 flex flex-col justify-evenly py-0.5">
-                <div class="w-full h-px md:h-0.5 bg-gray-800"></div>
-                <div class="w-full h-px md:h-0.5 bg-gray-800"></div>
-            </div>
-            <div id="theme-bulb" class="w-10 h-10 md:w-14 md:h-14 bg-black border-2 border-gray-700 rounded-full -mt-1 md:-mt-2 shadow-[inset_0_-4px_10px_rgba(0,0,0,0.8)] transition-all duration-500 z-40 relative overflow-hidden flex items-center justify-center">
-                <div class="w-1.5 h-3 md:w-2 md:h-4 border-b-2 border-l-2 border-r-2 border-gray-700 rounded-b-md opacity-50" id="filament"></div>
-            </div>
-            <div class="absolute top-0 -left-10 md:-left-12 flex flex-col items-center cursor-pointer group z-50 touch-target" onclick="pullThemeCord('on')">
-                <div class="text-[8px] md:text-[9px] font-bold text-gray-500 mb-1 tracking-widest group-hover:text-yellow-400 select-none">ON</div>
-                <div id="cord-on" class="w-[2px] h-12 md:h-20 bg-gray-600 flex flex-col justify-end items-center origin-top transition-transform duration-200">
-                    <div class="w-2.5 h-3 md:w-3 md:h-4 bg-yellow-500/80 border border-yellow-400 rounded-full translate-y-1 md:translate-y-2"></div>
-                </div>
-            </div>
-            <div class="absolute top-0 -right-10 md:-right-12 flex flex-col items-center cursor-pointer group z-50 touch-target" onclick="pullThemeCord('off')">
-                <div class="text-[8px] md:text-[9px] font-bold text-gray-500 mb-1 tracking-widest group-hover:text-gray-300 select-none">OFF</div>
-                <div id="cord-off" class="w-[2px] h-12 md:h-20 bg-gray-600 flex flex-col justify-end items-center origin-top transition-transform duration-200">
-                    <div class="w-2.5 h-3 md:w-3 md:h-4 bg-gray-800 border border-gray-500 rounded-full translate-y-1 md:translate-y-2"></div>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <!-- BOOT SPLASH -->
     <div id="splashScreen" class="fixed inset-0 bg-black z-[100] flex flex-col items-center justify-center overflow-hidden transition-opacity duration-700 ease-out">
         <canvas id="latticeCanvas" class="absolute inset-0 w-full h-full opacity-20 pointer-events-none"></canvas>
@@ -153,9 +126,16 @@
     {% if user %}
     <aside id="appSidebar" class="bg-black border-r border-gray-800 flex flex-col fixed h-screen z-[160] transition-transform duration-300 ease-in-out">
         <div class="h-16 flex items-center justify-between lg:justify-start px-6 border-b border-gray-800 bg-gray-900 scanline min-h-[64px]">
-            <div class="flex items-center space-x-4">
-                <div class="w-8 h-8 bg-matrix-green text-black flex items-center justify-center font-extrabold text-xl shadow-[2px_2px_0px_#171717]">M</div>
-                <span class="font-display font-bold text-lg tracking-widest text-gray-200 sm:hidden lg:inline-block">MATRIX</span>
+            <div class="flex items-center space-x-3">
+                <div class="flex items-center space-x-3">
+                    <div class="w-8 h-8 bg-matrix-green text-black flex items-center justify-center font-extrabold text-xl shadow-[2px_2px_0px_#171717]">M</div>
+                    <span class="font-display font-bold text-lg tracking-widest text-gray-200 sm:hidden lg:inline-block">MATRIX</span>
+                </div>
+                <!-- Desktop Theme Toggle -->
+                <button onclick="toggleTheme()" class="hidden lg:flex items-center justify-center text-gray-500 hover:text-matrix-green transition-colors focus:outline-none touch-target ml-2" title="Toggle Theme">
+                    <svg class="theme-icon-moon w-5 h-5 block" fill="currentColor" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"></path></svg>
+                    <svg class="theme-icon-sun w-5 h-5 hidden" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+                </button>
             </div>
             <button id="closeSidebarBtn" class="sm:hidden text-gray-500 hover:text-red-500 font-bold p-2 touch-target">[X]</button>
         </div>
@@ -260,13 +240,20 @@
                 <button id="hamburgerBtn" class="sm:hidden text-matrix-green p-2 focus:outline-none touch-target">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
                 </button>
-                <div class="w-6 h-6 bg-matrix-green text-black flex sm:hidden items-center justify-center font-extrabold text-sm">M</div>
+                <div class="flex items-center space-x-2">
+                    <div class="w-6 h-6 bg-matrix-green text-black flex sm:hidden items-center justify-center font-extrabold text-sm">M</div>
+                    <!-- Mobile/Tablet Theme Toggle -->
+                    <button onclick="toggleTheme()" class="lg:hidden flex items-center justify-center text-gray-500 hover:text-matrix-green transition-colors focus:outline-none touch-target ml-1" title="Toggle Theme">
+                        <svg class="theme-icon-moon w-5 h-5 block" fill="currentColor" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"></path></svg>
+                        <svg class="theme-icon-sun w-5 h-5 hidden" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+                    </button>
+                </div>
                 <div class="text-sm md:text-base font-display font-bold tracking-widest uppercase text-gray-300 truncate">
                     <span class="hidden sm:inline">{% block header_title %}SYSTEM DASHBOARD{% endblock %}</span>
                     <span class="sm:hidden">{% block header_title_mobile %}{% block header_title %}{% endblock %}{% endblock %}</span>
                 </div>
             </div>
-            <div class="flex items-center space-x-4 pr-16 md:pr-32">
+            <div class="flex items-center space-x-4 pr-2 md:pr-8">
                 <span class="hidden lg:inline-flex text-[10px] px-2 py-1 bg-gray-900 text-matrix-green border border-gray-700 font-mono tracking-widest uppercase">BR: {{ current_branch|default('MAIN') }}</span>
                 <a href="/logout" class="hidden sm:inline-flex lg:hidden text-[10px] text-gray-600 hover:text-red-500 font-bold tracking-widest uppercase transition touch-target items-center">KILL</a>
             </div>
@@ -387,32 +374,39 @@
         if(closeMenuBtn) closeMenuBtn.addEventListener('click', closeSidebar);
         if(sidebarBackdrop) sidebarBackdrop.addEventListener('click', closeSidebar);
 
-        // Lightbulb Logic
-        function pullThemeCord(action) {
-            const cord = document.getElementById(`cord-${action}`);
-            const bulb = document.getElementById('theme-bulb');
-            const filament = document.getElementById('filament');
-            cord.style.transform = 'scaleY(1.5)';
-            setTimeout(() => {
-                cord.style.transform = 'scaleY(1)';
-                if (action === 'on') {
-                    bulb.className = "w-10 h-10 md:w-14 md:h-14 bg-yellow-50 border-2 border-yellow-200 rounded-full -mt-1 md:-mt-2 transition-all duration-300 z-40 relative overflow-hidden flex items-center justify-center shadow-[0_0_40px_10px_rgba(253,224,71,0.6),inset_0_0_20px_rgba(255,255,255,1)]";
-                    filament.className = "w-1.5 h-3 md:w-2 md:h-4 border-b-2 border-l-2 border-r-2 border-yellow-400 rounded-b-md opacity-100 shadow-[0_0_5px_rgba(253,224,71,1)]";
-                    document.body.classList.add('force-light-mode');
-                    localStorage.setItem('matrix_theme', 'light');
-                } else {
-                    bulb.className = "w-10 h-10 md:w-14 md:h-14 bg-black border-2 border-gray-700 rounded-full -mt-1 md:-mt-2 shadow-[inset_0_-4px_10px_rgba(0,0,0,0.8)] transition-all duration-300 z-40 relative overflow-hidden flex items-center justify-center";
-                    filament.className = "w-1.5 h-3 md:w-2 md:h-4 border-b-2 border-l-2 border-r-2 border-gray-700 rounded-b-md opacity-50";
-                    document.body.classList.remove('force-light-mode');
-                    localStorage.setItem('matrix_theme', 'dark');
-                }
-            }, 200);
-        }
-        document.addEventListener('DOMContentLoaded', () => {
-            if(localStorage.getItem('matrix_theme') === 'light') {
+        // Android-style Theme Toggle Logic
+        function toggleTheme() {
+            const isLight = document.body.classList.contains('force-light-mode');
+            if (isLight) {
+                document.body.classList.remove('force-light-mode');
+                localStorage.setItem('matrix_theme', 'dark');
+                updateThemeIcons(false);
+            } else {
                 document.body.classList.add('force-light-mode');
-                document.getElementById('theme-bulb').className = "w-10 h-10 md:w-14 md:h-14 bg-yellow-50 border-2 border-yellow-200 rounded-full -mt-1 md:-mt-2 transition-all duration-300 z-40 relative overflow-hidden flex items-center justify-center shadow-[0_0_40px_10px_rgba(253,224,71,0.6),inset_0_0_20px_rgba(255,255,255,1)]";
-                document.getElementById('filament').className = "w-1.5 h-3 md:w-2 md:h-4 border-b-2 border-l-2 border-r-2 border-yellow-400 rounded-b-md opacity-100 shadow-[0_0_5px_rgba(253,224,71,1)]";
+                localStorage.setItem('matrix_theme', 'light');
+                updateThemeIcons(true);
+            }
+        }
+
+        function updateThemeIcons(isLight) {
+            const moons = document.querySelectorAll('.theme-icon-moon');
+            const suns = document.querySelectorAll('.theme-icon-sun');
+            if (isLight) {
+                moons.forEach(m => { m.classList.add('hidden'); m.classList.remove('block'); });
+                suns.forEach(s => { s.classList.remove('hidden'); s.classList.add('block'); });
+            } else {
+                suns.forEach(s => { s.classList.add('hidden'); s.classList.remove('block'); });
+                moons.forEach(m => { m.classList.remove('hidden'); m.classList.add('block'); });
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const isLight = localStorage.getItem('matrix_theme') === 'light';
+            if(isLight) {
+                document.body.classList.add('force-light-mode');
+                updateThemeIcons(true);
+            } else {
+                updateThemeIcons(false);
             }
         });
     </script>
