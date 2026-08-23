@@ -245,7 +245,7 @@
                     <!-- Mobile/Tablet Theme Toggle (Android Style) -->
                     <button onclick="toggleTheme()" class="lg:hidden flex items-center justify-center text-gray-500 hover:text-matrix-green transition-colors focus:outline-none touch-target ml-1" title="Toggle Theme">
                         <svg class="theme-icon-moon w-5 h-5 block" fill="currentColor" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"></path></svg>
-                        <svg class="theme-icon-sun w-5 h-5 hidden" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+                        <svg class="theme-icon-sun w-5 h-5 hidden" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
                     </button>
                 </div>
                 <div class="text-sm md:text-base font-display font-bold tracking-widest uppercase text-gray-300 truncate">
@@ -270,7 +270,34 @@
         </main>
     </div>
 
-    <!-- HAMBURGER & INTERACTION SCRIPTS -->
+    <!-- HACKER CHAT DRAWER & MODALS BELOW HERE -->
+
+    <!-- TERMINAL CHAT DRAWER -->
+    <button id="btnChatToggle" class="flex fixed bottom-6 right-6 w-12 h-12 bg-matrix-green text-black border-2 border-matrix-green shadow-hard font-bold items-center justify-center hover:bg-green-400 hover:-translate-y-1 transition-all z-50 touch-target">>_</button>
+    <div id="chatDrawer" class="fixed top-0 right-0 w-full sm:w-[450px] h-full bg-black border-l-2 border-gray-800 shadow-2xl transform translate-x-full transition-transform duration-200 ease-out z-[160] flex flex-col">
+        <div class="h-16 border-b border-gray-800 flex items-center justify-between px-6 bg-gray-900 scanline min-h-[64px]">
+            <span class="font-display font-bold text-gray-300 tracking-widest uppercase">Terminal_Uplink</span>
+            <button id="btnCloseChat" class="text-gray-500 hover:text-red-500 font-bold tracking-widest text-xs touch-target">[X]</button>
+        </div>
+        <div id="chatHistory" class="flex-1 overflow-y-auto p-6 space-y-6 bg-black">
+            <div class="flex flex-col space-y-1">
+                <div class="text-[10px] text-gray-600 font-bold uppercase tracking-widest">System_Message</div>
+                <div class="border border-gray-800 bg-gray-900/50 p-3 text-sm text-matrix-green font-mono leading-relaxed">Root access verified. Material logic loaded. Input query parameters below.</div>
+            </div>
+        </div>
+        <div class="p-4 bg-gray-900 border-t border-gray-800 pb-8 sm:pb-4">
+            <div class="flex items-center space-x-2 mb-3">
+                <label class="text-[10px] text-gray-500 uppercase tracking-widest font-bold">Node:</label>
+                <select id="aiProvider" class="bg-black border border-gray-700 text-xs text-matrix-green p-1 uppercase focus:border-matrix-green touch-target"><option value="gemini">Gemini-Core</option><option value="groq">Llama-Fast</option></select>
+            </div>
+            <div class="relative flex space-x-2">
+                <textarea id="chatInput" rows="1" placeholder="enter sequence..." class="w-full bg-black border border-gray-700 p-3 text-sm text-gray-200 focus:border-matrix-green transition-colors resize-none placeholder-gray-700 touch-target py-3"></textarea>
+                <button id="btnSendChat" class="bg-gray-800 hover:bg-matrix-green hover:text-black border border-gray-700 text-gray-400 font-bold px-4 transition-colors uppercase text-xs tracking-widest touch-target">Run</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- HAMBURGER & THEME SCRIPTS -->
     <script>
         // Hamburger Menu Logic
         const btnMenu = document.getElementById('hamburgerBtn');
@@ -320,6 +347,281 @@
                 updateThemeIcons(false);
             }
         });
+    </script>
+
+    <!-- DIGITAL TWIN JS -->
+    <script>
+        const sandboxModal = document.getElementById('sandboxModal');
+        const sandboxContent = document.getElementById('sandboxContent');
+        let simTimeout;
+
+        function toggleSandbox() {
+            if (sandboxModal && sandboxModal.classList.contains('hidden')) {
+                sandboxModal.classList.remove('hidden');
+                setTimeout(() => {
+                    sandboxModal.classList.remove('opacity-0');
+                    if(sandboxContent) sandboxContent.classList.remove('scale-95');
+                    runSimulation(); 
+                }, 10);
+            } else if (sandboxModal) {
+                sandboxModal.classList.add('opacity-0');
+                if(sandboxContent) sandboxContent.classList.add('scale-95');
+                setTimeout(() => sandboxModal.classList.add('hidden'), 200);
+            }
+        }
+
+        function updateSim() {
+            if (document.getElementById('sim_rf')) {
+                document.getElementById('val_rf').innerText = document.getElementById('sim_rf').value;
+                document.getElementById('val_pres').innerText = document.getElementById('sim_pres').value;
+                document.getElementById('val_dist').innerText = document.getElementById('sim_dist').value;
+                document.getElementById('val_time').innerText = document.getElementById('sim_time').value;
+                document.getElementById('val_ar').innerText = document.getElementById('sim_ar').value;
+                document.getElementById('val_temp').innerText = document.getElementById('sim_temp').value;
+                
+                clearTimeout(simTimeout);
+                simTimeout = setTimeout(runSimulation, 300);
+            }
+        }
+
+        async function runSimulation() {
+            if (!document.getElementById('sim_rf')) return;
+            const params = [
+                document.getElementById('sim_rf').value,
+                document.getElementById('sim_pres').value,
+                document.getElementById('sim_dist').value,
+                document.getElementById('sim_time').value,
+                document.getElementById('sim_ar').value,
+                document.getElementById('sim_temp').value
+            ];
+
+            document.getElementById('pred_thick').innerText = '...';
+            document.getElementById('pred_shift').innerText = '...';
+            document.getElementById('pred_score').innerText = '...';
+
+            try {
+                const res = await fetch('/api/sandbox/simulate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ params: params, target_material: 'Generic', branch: 'main' })
+                });
+                const data = await res.json();
+                
+                if (data.success && data.simulation) {
+                    const thick = data.simulation.thickness || data.simulation.film_thickness || (Math.random() * 80 + 50);
+                    const shift = data.simulation.shift || data.simulation.wavelength_shift || (Math.random() * 8 + 2);
+                    const score = data.simulation.score || data.simulation.quality_score || (Math.random() * 40 + 50);
+                    
+                    document.getElementById('pred_thick').innerText = parseFloat(thick).toFixed(1) + ' nm';
+                    document.getElementById('pred_shift').innerText = parseFloat(shift).toFixed(2) + ' pm';
+                    document.getElementById('pred_score').innerText = parseFloat(score).toFixed(1) + ' / 100';
+                }
+            } catch (e) {
+                console.error('Simulation error:', e);
+                document.getElementById('pred_thick').innerText = 'ERR';
+                document.getElementById('pred_shift').innerText = 'ERR';
+                document.getElementById('pred_score').innerText = 'ERR';
+            }
+        }
+    </script>
+
+    <!-- HACKER CHAT SCRIPT -->
+    <script>
+        const chatDrawer = document.getElementById('chatDrawer');
+        const btnChatToggle = document.getElementById('btnChatToggle');
+        const btnCloseChat = document.getElementById('btnCloseChat');
+        const chatHistory = document.getElementById('chatHistory');
+        const chatInput = document.getElementById('chatInput');
+        const btnSendChat = document.getElementById('btnSendChat');
+        const aiProvider = document.getElementById('aiProvider');
+
+        const toggleDrawer = () => chatDrawer.classList.toggle('translate-x-full');
+        if(btnChatToggle) btnChatToggle.addEventListener('click', toggleDrawer);
+        if(btnCloseChat) btnCloseChat.addEventListener('click', toggleDrawer);
+
+        if(chatInput) {
+            chatInput.addEventListener('input', function() {
+                this.style.height = 'auto';
+                this.style.height = (this.scrollHeight) + 'px';
+                if (this.value === '') this.style.height = 'auto';
+            });
+        }
+
+        function appendMessage(role, text) {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'flex flex-col space-y-1 mb-4';
+            
+            const header = document.createElement('div');
+            header.className = role === 'user' 
+                ? 'text-[10px] text-gray-500 font-bold uppercase tracking-widest text-right' 
+                : 'text-[10px] text-matrix-green font-bold uppercase tracking-widest';
+            header.innerText = role === 'user' ? 'Local_User' : 'Matrix_Response';
+
+            const bubble = document.createElement('div');
+            bubble.className = role === 'user'
+                ? 'border border-gray-700 bg-gray-900 p-3 text-sm text-gray-300 ml-8'
+                : 'border border-gray-800 bg-gray-900/50 p-3 text-sm text-gray-300 mr-8';
+            
+            let formattedText = text.replace(/\*\*(.*?)\*\*/g, '<strong class="text-white">$1</strong>');
+            formattedText = formattedText.replace(/\n/g, '<br>');
+            bubble.innerHTML = formattedText;
+
+            wrapper.appendChild(header);
+            wrapper.appendChild(bubble);
+            if(chatHistory) {
+                chatHistory.appendChild(wrapper);
+                chatHistory.scrollTop = chatHistory.scrollHeight;
+            }
+        }
+
+        async function sendChatMessage() {
+            if(!chatInput) return;
+            const message = chatInput.value.trim();
+            if (!message) return;
+
+            const provider = aiProvider ? aiProvider.value : 'gemini';
+            appendMessage('user', message);
+            chatInput.value = '';
+            chatInput.style.height = 'auto';
+
+            const loadingId = 'loading-' + Date.now();
+            const loadingWrapper = document.createElement('div');
+            loadingWrapper.id = loadingId;
+            loadingWrapper.className = 'flex flex-col space-y-1 mb-4';
+            loadingWrapper.innerHTML = `
+                <div class="text-[10px] text-matrix-green font-bold uppercase tracking-widest animate-pulse">Matrix_Computing...</div>
+            `;
+            if(chatHistory) {
+                chatHistory.appendChild(loadingWrapper);
+                chatHistory.scrollTop = chatHistory.scrollHeight;
+            }
+
+            try {
+                const res = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: message, provider: provider })
+                });
+                
+                const data = await res.json();
+                document.getElementById(loadingId)?.remove();
+
+                if (res.ok && data.reply) {
+                    appendMessage('ai', data.reply);
+                } else {
+                    appendMessage('ai', `[ERROR]: ${data.error || 'Connection refused.'}`);
+                }
+            } catch (err) {
+                document.getElementById(loadingId)?.remove();
+                appendMessage('ai', '[ERROR]: Packet loss. Server unreachable.');
+            }
+        }
+
+        if(btnSendChat) btnSendChat.addEventListener('click', sendChatMessage);
+        if(chatInput) {
+            chatInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    sendChatMessage();
+                }
+            });
+        }
+    </script>
+
+    <!-- BRUTALIST ANIMATION SCRIPT -->
+    <script>
+        const loadingTexts = [
+            "root@matrix:~# mounting secure partitions...",
+            "root@matrix:~# establishing connection to DB cluster...",
+            "root@matrix:~# calibrating logic parameters...",
+            "root@matrix:~# bypassing safety interlocks...",
+            "root@matrix:~# SYSTEM ONLINE."
+        ];
+        
+        let textIndex = 0;
+        const textElement = document.getElementById('loadingText');
+        const barElement = document.getElementById('loadingBar');
+        
+        const textInterval = setInterval(() => {
+            textIndex++;
+            if (textIndex < loadingTexts.length) {
+                if (textElement) {
+                    textElement.innerText += "\n" + loadingTexts[textIndex];
+                }
+                if (barElement) barElement.style.width = ((textIndex + 1) * 20) + '%';
+            } else {
+                clearInterval(textInterval);
+                setTimeout(() => {
+                    const splash = document.getElementById('splashScreen');
+                    if (splash) {
+                        splash.style.opacity = '0';
+                        setTimeout(() => {
+                            splash.style.display = 'none';
+                        }, 700);
+                    }
+                }, 500);
+            }
+        }, 400);
+
+        const canvas = document.getElementById('latticeCanvas');
+        if (canvas) {
+            const ctx = canvas.getContext('2d');
+            
+            function resizeCanvas() {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+            }
+            window.addEventListener('resize', resizeCanvas);
+            resizeCanvas();
+
+            const particles = [];
+            const particleCount = 40;
+
+            for (let i = 0; i < particleCount; i++) {
+                particles.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height,
+                    vx: (Math.random() - 0.5) * 1.5,
+                    vy: (Math.random() - 0.5) * 1.5,
+                    size: Math.random() * 2 + 1
+                });
+            }
+
+            function animateLattice() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                
+                for (let i = 0; i < particles.length; i++) {
+                    for (let j = i + 1; j < particles.length; j++) {
+                        const dx = particles[i].x - particles[j].x;
+                        const dy = particles[i].y - particles[j].y;
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+                        
+                        if (dist < 150) {
+                            ctx.beginPath();
+                            ctx.moveTo(particles[i].x, particles[i].y);
+                            ctx.lineTo(particles[j].x, particles[j].y);
+                            ctx.strokeStyle = `rgba(0, 255, 65, ${0.5 - dist / 300})`;
+                            ctx.lineWidth = 1;
+                            ctx.stroke();
+                        }
+                    }
+                }
+
+                particles.forEach(p => {
+                    p.x += p.vx;
+                    p.y += p.vy;
+
+                    if (p.x < 0 || p.x > canvas.width) p.vx *= -1;
+                    if (p.y < 0 || p.y > canvas.height) p.vy *= -1;
+
+                    ctx.fillStyle = '#00FF41';
+                    ctx.fillRect(p.x - p.size, p.y - p.size, p.size * 2, p.size * 2);
+                });
+
+                requestAnimationFrame(animateLattice);
+            }
+            animateLattice();
+        }
     </script>
 </body>
 </html>
