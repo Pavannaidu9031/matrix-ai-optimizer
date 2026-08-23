@@ -58,7 +58,6 @@
                 <input type="number" step="0.1" name="target_substrate_distance_cm" id="target_substrate_distance_cm" required placeholder="7" class="w-full bg-gray-900 border border-gray-800 rounded-none p-3 text-sm text-matrix-green font-mono focus:border-matrix-green transition-colors outline-none placeholder-gray-700 touch-target">
             </div>
             
-            <!-- FIXED SPUTTER TIME -->
             <div>
                 <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Sputter_Time [S]</label>
                 <input type="number" step="0.1" name="sputtering_time_s" id="sputtering_time_s" placeholder="e.g. 1800" class="w-full bg-gray-900 border border-gray-800 rounded-none p-3 text-sm text-matrix-green font-mono focus:border-matrix-green transition-colors outline-none placeholder-gray-700 touch-target">
@@ -132,7 +131,7 @@
     </form>
 </section>
 
-<!-- LOADING SKELETON (Shows while DOM is rendering mobile layout) -->
+<!-- LOADING SKELETON -->
 <div id="loadingSkeletons" class="space-y-4 pt-8 animate-pulse hidden">
     <div class="h-8 bg-gray-900 w-1/3 mb-4"></div>
     <div class="h-32 bg-gray-900 w-full mb-4"></div>
@@ -148,54 +147,54 @@
     </div>
 
     <!-- DESKTOP TABLE VIEW -->
-    <div class="hidden lg:block bg-black border border-gray-800 overflow-x-auto relative pb-16 shadow-hard">
+    <div class="hidden lg:block bg-black border border-gray-800 overflow-x-auto relative pb-16 shadow-hard w-full">
         <table class="w-full text-left border-collapse">
             <thead>
-                <tr class="text-gray-500 border-b border-gray-800 text-[10px] uppercase tracking-widest bg-gray-900">
-                    <th class="p-4 text-center">COMP</th>
-                    <th class="p-4">DOMAIN</th>
-                    <th class="p-4">Q_SCORE</th>
-                    <th class="p-4">NOTES</th>
-                    <th class="p-4">PWR[W]</th>
-                    <th class="p-4">PRES[mT]</th>
-                    <th class="p-4">DIST[cm]</th>
-                    <th class="p-4">TIME[s]</th>
-                    <th class="p-4">ROT[rpm]</th>
-                    <th class="p-4">PHASE</th>
-                    <th class="p-4">H2[s]</th>
-                    <th class="p-4">SHIFT[pm]</th>
-                    <th class="p-4 text-center">CMD</th>
+                <tr class="text-gray-500 border-b border-gray-800 text-[9px] uppercase tracking-widest bg-gray-900">
+                    <th class="px-1.5 py-2 text-center">COMP</th>
+                    <th class="px-1.5 py-2">DOMAIN</th>
+                    <th class="px-1.5 py-2">Q_SCORE</th>
+                    <th class="px-1.5 py-2">NOTES</th>
+                    <th class="px-1.5 py-2">PWR[W]</th>
+                    <th class="px-1.5 py-2">PRES[mT]</th>
+                    <th class="px-1.5 py-2">DIST[cm]</th>
+                    <th class="px-1.5 py-2">TIME[s]</th>
+                    <th class="px-1.5 py-2">ROT[rpm]</th>
+                    <th class="px-1.5 py-2">PHASE</th>
+                    <th class="px-1.5 py-2">H2[s]</th>
+                    <th class="px-1.5 py-2">SHIFT[pm]</th>
+                    <th class="px-1.5 py-2 text-center">CMD</th>
                 </tr>
             </thead>
-            <tbody class="divide-y divide-gray-800 text-xs font-mono">
+            <tbody class="divide-y divide-gray-800 text-[9px] font-mono">
                 {% for exp in experiments %}
                 <tr id="exp-row-desktop-{{ exp.id }}" class="hover:bg-gray-900 transition-colors">
-                    <td class="p-4 text-center">
-                        <input type="checkbox" class="compare-cbk w-4 h-4 bg-black border border-gray-700 appearance-none checked:bg-matrix-green checked:border-matrix-green cursor-pointer" value="{{ loop.index0 }}">
+                    <td class="px-1.5 py-2 text-center">
+                        <input type="checkbox" class="compare-cbk w-3 h-3 bg-black border border-gray-700 appearance-none checked:bg-matrix-green checked:border-matrix-green cursor-pointer" value="{{ loop.index0 }}">
                     </td>
-                    <td class="p-4 font-bold text-gray-300">{{ exp.target_material or 'GENERIC' }}</td>
-                    <td class="p-4">
+                    <td class="px-1.5 py-2 font-bold text-gray-300">{{ exp.target_material or 'GENERIC' }}</td>
+                    <td class="px-1.5 py-2 whitespace-nowrap">
                         {% set q = exp.quality_score or 50.0 %}
-                        {% if q >= 80 %}<span class="text-matrix-green font-bold text-[10px] tracking-widest uppercase">[ OPTIMAL : {{ q }} ]</span>
-                        {% elif q >= 60 %}<span class="text-gray-300 font-bold text-[10px] tracking-widest uppercase">[ NOMINAL : {{ q }} ]</span>
-                        {% elif q >= 40 %}<span class="text-yellow-500 font-bold text-[10px] tracking-widest uppercase">[ MARGINAL : {{ q }} ]</span>
-                        {% else %}<span class="text-red-500 font-bold text-[10px] tracking-widest uppercase">[ CRITICAL : {{ q }} ]</span>{% endif %}
+                        {% if q >= 80 %}<span class="text-matrix-green font-bold text-[9px] tracking-widest uppercase">[ OPT: {{ q }} ]</span>
+                        {% elif q >= 60 %}<span class="text-gray-300 font-bold text-[9px] tracking-widest uppercase">[ NOM: {{ q }} ]</span>
+                        {% elif q >= 40 %}<span class="text-yellow-500 font-bold text-[9px] tracking-widest uppercase">[ MAR: {{ q }} ]</span>
+                        {% else %}<span class="text-red-500 font-bold text-[9px] tracking-widest uppercase">[ CRT: {{ q }} ]</span>{% endif %}
                     </td>
-                    <td class="p-4 text-gray-500 uppercase">{{ exp.batch_notes or '-' }}</td>
-                    <td class="p-4 text-gray-300">{{ exp.rf_power }}</td>
-                    <td class="p-4 text-gray-300">{{ exp.working_pressure }}</td>
-                    <td class="p-4 text-gray-300">{{ exp.target_distance }}</td>
-                    <td class="p-4 text-matrix-green">{{ exp.sputter_time_s }}</td>
-                    <td class="p-4 text-gray-300">{{ exp.rotation_speed }}</td>
-                    <td class="p-4">
-                        {% if exp.xrd_phase == 'Monoclinic' %}<span class="text-matrix-green font-bold text-[10px] uppercase">MONO</span>
-                        {% elif exp.xrd_phase == 'Partial' %}<span class="text-yellow-500 font-bold text-[10px] uppercase">PART</span>
-                        {% else %}<span class="text-red-500 font-bold text-[10px] uppercase">AMORPH</span>{% endif %}
+                    <td class="px-1.5 py-2 text-gray-500 uppercase">{{ exp.batch_notes or '-' }}</td>
+                    <td class="px-1.5 py-2 text-gray-300">{{ exp.rf_power }}</td>
+                    <td class="px-1.5 py-2 text-gray-300">{{ exp.working_pressure }}</td>
+                    <td class="px-1.5 py-2 text-gray-300">{{ exp.target_distance }}</td>
+                    <td class="px-1.5 py-2 text-matrix-green">{{ exp.sputter_time_s }}</td>
+                    <td class="px-1.5 py-2 text-gray-300">{{ exp.rotation_speed }}</td>
+                    <td class="px-1.5 py-2">
+                        {% if exp.xrd_phase == 'Monoclinic' %}<span class="text-matrix-green font-bold text-[9px] uppercase">MONO</span>
+                        {% elif exp.xrd_phase == 'Partial' %}<span class="text-yellow-500 font-bold text-[9px] uppercase">PART</span>
+                        {% else %}<span class="text-red-500 font-bold text-[9px] uppercase">AMORPH</span>{% endif %}
                     </td>
-                    <td class="p-4 text-gray-300">{{ exp.h2_response_time }}</td>
-                    <td class="p-4 font-bold text-gray-200">{{ exp.wavelength_shift if exp.wavelength_shift is not none else '-' }}</td>
+                    <td class="px-1.5 py-2 text-gray-300">{{ exp.h2_response_time }}</td>
+                    <td class="px-1.5 py-2 font-bold text-gray-200">{{ exp.wavelength_shift if exp.wavelength_shift is not none else '-' }}</td>
                     
-                    <td class="p-4 text-center space-x-2 whitespace-nowrap">
+                    <td class="px-1.5 py-2 text-center space-x-1 whitespace-nowrap">
                         <button onclick='openWhatIf({{ loop.index0 }})' class="text-gray-500 hover:text-matrix-green font-bold text-[10px] tracking-widest uppercase transition-colors" title="What-If Sandbox">[?]</button>
                         <button onclick='checkFingerprint({{ loop.index0 }})' class="text-gray-500 hover:text-matrix-green font-bold text-[10px] tracking-widest uppercase transition-colors" title="DNA Fingerprint">[&]</button>
                         <button onclick='downloadLabDossier({{ exp | tojson | safe }})' class="text-gray-500 hover:text-matrix-green font-bold text-[10px] tracking-widest uppercase transition-colors" title="Export PDF">[P]</button>
@@ -257,9 +256,12 @@
 </section>
 
 <!-- QUICK LOG FAB (Mobile Only) -->
-<button id="quickLogFab" class="lg:hidden fixed bottom-20 right-6 w-14 h-14 bg-matrix-green text-black rounded-full flex items-center justify-center font-bold text-2xl shadow-hard z-50 hover:bg-green-400 transition-transform active:scale-95" onclick="toggleQuickLog()">
+<button id="quickLogFab" class="lg:hidden fixed bottom-20 right-6 w-14 h-14 bg-matrix-green text-black rounded-full flex items-center justify-center font-bold text-2xl shadow-hard z-[140] hover:bg-green-400 transition-transform active:scale-95 touch-target" onclick="toggleQuickLog()">
     +
 </button>
+
+<!-- TERMINAL CHAT DRAWER TOGGLE (Now Visible on Mobile) -->
+<button id="btnChatToggle" class="flex fixed bottom-6 right-6 w-12 h-12 bg-matrix-green text-black border-2 border-matrix-green shadow-hard font-bold items-center justify-center hover:bg-green-400 hover:-translate-y-1 transition-all z-[150] touch-target">>_</button>
 
 <!-- QUICK LOG MODAL -->
 <div id="quickLogModal" class="fixed inset-0 bg-black/90 backdrop-blur-sm hidden z-[200] flex items-center justify-center p-4">
