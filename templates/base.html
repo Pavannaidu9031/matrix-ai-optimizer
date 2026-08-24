@@ -273,6 +273,7 @@
 
     <!-- HACKER CHAT DRAWER & MODALS BELOW HERE -->
 
+    {% if user %}
     <!-- TERMINAL CHAT DRAWER -->
     <button id="btnChatToggle" class="flex fixed bottom-6 right-6 w-12 h-12 bg-matrix-green text-black border-2 border-matrix-green shadow-hard font-bold items-center justify-center hover:bg-green-400 hover:-translate-y-1 transition-all z-50 touch-target">>_</button>
     <div id="chatDrawer" class="fixed top-0 right-0 w-full sm:w-[450px] h-full bg-black border-l-2 border-gray-800 shadow-2xl transform translate-x-full transition-transform duration-200 ease-out z-[160] flex flex-col">
@@ -297,6 +298,7 @@
             </div>
         </div>
     </div>
+    {% endif %}
 
     <!-- HAMBURGER & THEME SCRIPTS -->
     <script>
