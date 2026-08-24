@@ -6,18 +6,24 @@
 {% block content %}
 {% if not user %}
     <div class="text-center py-24 space-y-8 max-w-3xl mx-auto">
-        <div class="inline-flex items-center space-x-2 px-4 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-semibold shadow-glow">
-            <span>✨ VisionOS Spatial Materials Engine</span>
+        <div class="inline-flex items-center space-x-2 px-4 py-1.5 rounded-none border border-matrix-green text-matrix-green text-xs font-bold tracking-widest uppercase">
+            <span>>_ SYS_STATUS: OPTIMAL</span>
         </div>
-        <h1 class="text-5xl font-extrabold text-white tracking-tight leading-tight">
+        <h1 class="text-5xl font-display font-extrabold text-white tracking-tighter uppercase leading-tight">
             From first experiment to optimal parameters — intelligently.
         </h1>
-        <p class="text-slate-300 text-base leading-relaxed">
+        <p class="text-gray-400 font-mono text-sm leading-relaxed">
             MatrixAI uses advanced AI process optimization to intelligently guide your thin-film deposition experiments. Compatible with any PVD or CVD process — WO₃, TiO₂, ZnO, Pd, SnO₂, and beyond.
         </p>
-        <div class="pt-4">
-            <a href="/login/google" class="inline-flex items-center space-x-2 bg-brand-600 hover:bg-brand-500 text-white font-bold px-8 py-4 rounded-2xl transition shadow-glow">
-                <span>Get Started with Google</span>
+        <div class="pt-4 flex justify-center">
+            <a href="/login/google" class="inline-flex items-center space-x-3 bg-white hover:bg-gray-200 text-black font-bold px-6 py-3 transition shadow-hard-hover border-2 border-black">
+                <svg class="w-5 h-5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+                    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                </svg>
+                <span class="tracking-widest uppercase text-xs">Sign in with Google</span>
             </a>
         </div>
     </div>
@@ -25,80 +31,78 @@
 
     <!-- BRANCHING TABS -->
     <div class="flex items-center space-x-3 overflow-x-auto pb-2">
-        <span class="text-xs font-bold text-slate-400 uppercase tracking-wider mr-1">Branches:</span>
+        <span class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mr-1">Branches:</span>
         {% for b in branches %}
-            <a href="/?branch={{ b }}" class="px-4 py-2 rounded-2xl text-sm font-semibold transition whitespace-nowrap {% if b == current_branch %}bg-indigo-600 text-white shadow-glow border border-indigo-500/50{% else %}glass-panel text-slate-300 hover:bg-white/10{% endif %}">
+            <a href="/?branch={{ b }}" class="px-4 py-2 text-xs font-bold transition whitespace-nowrap uppercase tracking-widest {% if b == current_branch %}bg-matrix-green text-black shadow-hard{% else %}border border-gray-700 text-gray-400 hover:text-matrix-green hover:border-matrix-green{% endif %}">
                 {{ b }}
             </a>
         {% endfor %}
-        <button onclick="createNewBranch()" class="px-4 py-2 rounded-2xl text-sm font-bold text-indigo-400 border border-indigo-500/30 hover:bg-indigo-500/10 border-dashed flex items-center whitespace-nowrap transition">
+        <button onclick="createNewBranch()" class="px-4 py-2 text-xs font-bold text-gray-500 border border-gray-700 hover:text-matrix-green hover:border-matrix-green border-dashed flex items-center whitespace-nowrap transition uppercase tracking-widest">
             + New Branch
         </button>
     </div>
 
-    <!-- HERO STATS BAR (VisionOS Glass Cards) -->
+    <!-- HERO STATS BAR -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div class="glass-panel p-6 rounded-3xl border-l-4 border-l-indigo-500 relative overflow-hidden group hover:border-white/20 transition-all">
-            <div class="text-4xl font-extrabold text-white" id="totalRunsStat">{{ stats.total_runs }}</div>
-            <div class="text-xs font-medium text-slate-400 mt-2 tracking-wide uppercase">Total Experiments Logged</div>
+        <div class="bg-[#0a0a0a] p-6 border-l-2 border-l-matrix-green border border-gray-800 relative overflow-hidden group transition-all">
+            <div class="text-4xl font-mono font-extrabold text-white" id="totalRunsStat">{{ stats.total_runs }}</div>
+            <div class="text-[10px] font-bold text-gray-500 mt-2 tracking-widest uppercase">Experiments Logged</div>
         </div>
-        <div class="glass-panel p-6 rounded-3xl border-l-4 border-l-emerald-500 relative overflow-hidden group hover:border-white/20 transition-all">
-            <div class="text-4xl font-extrabold text-emerald-400">{{ stats.monoclinic_runs }}</div>
-            <div class="text-xs font-medium text-slate-400 mt-2 tracking-wide uppercase">Monoclinic Phase Runs</div>
+        <div class="bg-[#0a0a0a] p-6 border-l-2 border-l-matrix-green border border-gray-800 relative overflow-hidden group transition-all">
+            <div class="text-4xl font-mono font-extrabold text-matrix-green">{{ stats.monoclinic_runs }}</div>
+            <div class="text-[10px] font-bold text-gray-500 mt-2 tracking-widest uppercase">Monoclinic Runs</div>
         </div>
-        <div class="glass-panel p-6 rounded-3xl border-l-4 border-l-purple-500 relative overflow-hidden group hover:border-white/20 transition-all">
-            <div class="text-4xl font-extrabold text-purple-400">{{ stats.best_shift }} <span class="text-sm font-normal text-slate-400">pm</span></div>
-            <div class="text-xs font-medium text-slate-400 mt-2 tracking-wide uppercase">Best Wavelength Shift</div>
+        <div class="bg-[#0a0a0a] p-6 border-l-2 border-l-matrix-green border border-gray-800 relative overflow-hidden group transition-all">
+            <div class="text-4xl font-mono font-extrabold text-white">{{ stats.best_shift }} <span class="text-sm font-normal text-gray-500">pm</span></div>
+            <div class="text-[10px] font-bold text-gray-500 mt-2 tracking-widest uppercase">Best Lambda Shift</div>
         </div>
-        <div class="glass-panel p-6 rounded-3xl border-l-4 border-l-amber-500 relative overflow-hidden group hover:border-white/20 transition-all">
-            <div class="text-4xl font-extrabold text-amber-400">{{ stats.runs_remaining }}</div>
-            <div class="text-xs font-medium text-slate-400 mt-2 tracking-wide uppercase">Optimization Runs Remaining</div>
+        <div class="bg-[#0a0a0a] p-6 border-l-2 border-l-matrix-green border border-gray-800 relative overflow-hidden group transition-all">
+            <div class="text-4xl font-mono font-extrabold text-matrix-green">{{ stats.runs_remaining }}</div>
+            <div class="text-[10px] font-bold text-gray-500 mt-2 tracking-widest uppercase">Runs Remaining</div>
         </div>
     </div>
 
     <!-- EQUIPMENT HEALTH & CALIBRATION -->
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <section class="glass-panel p-6 rounded-3xl shadow-xl" id="healthWidget">
-            <div class="flex justify-between items-center mb-4">
-                <h2 class="text-lg font-bold text-white tracking-tight">Equipment Health</h2>
-                <span id="healthBadge" class="px-3 py-1 rounded-full text-xs font-bold bg-slate-800 text-slate-400">Loading...</span>
+        <section class="bg-black p-6 border border-gray-800 shadow-hard" id="healthWidget">
+            <div class="flex justify-between items-center mb-4 border-b border-gray-800 pb-2">
+                <h2 class="text-sm font-display font-bold text-gray-200 uppercase tracking-widest">>_SYS_HEALTH</h2>
+                <span id="healthBadge" class="px-2 py-1 text-[9px] font-bold bg-gray-900 text-gray-500 border border-gray-700 uppercase tracking-widest">LOADING...</span>
             </div>
-            <div id="healthAlerts" class="space-y-3">
-                <p class="text-xs text-slate-400">Checking CST8 status...</p>
+            <div id="healthAlerts" class="space-y-3 font-mono">
+                <p class="text-[10px] text-gray-500 uppercase tracking-widest">Checking telemetry...</p>
             </div>
         </section>
 
-        <section class="glass-panel p-6 rounded-3xl shadow-xl" id="calibrationWidget">
-            <div class="flex justify-between items-center mb-4">
-                <h2 class="text-lg font-bold text-white tracking-tight">Model Calibration</h2>
-                <span id="calibBadge" class="px-3 py-1 rounded-full text-xs font-bold bg-slate-800 text-slate-400">Checking...</span>
+        <section class="bg-black p-6 border border-gray-800 shadow-hard" id="calibrationWidget">
+            <div class="flex justify-between items-center mb-4 border-b border-gray-800 pb-2">
+                <h2 class="text-sm font-display font-bold text-gray-200 uppercase tracking-widest">>_MODEL_CALIB</h2>
+                <span id="calibBadge" class="px-2 py-1 text-[9px] font-bold bg-gray-900 text-gray-500 border border-gray-700 uppercase tracking-widest">CHECKING...</span>
             </div>
-            <div id="calibAlerts" class="space-y-3">
-                <p class="text-xs text-slate-400">Evaluating Expected Calibration Error (ECE)...</p>
+            <div id="calibAlerts" class="space-y-3 font-mono">
+                <p class="text-[10px] text-gray-500 uppercase tracking-widest">Evaluating ECE...</p>
             </div>
         </section>
     </div>
 
     <!-- SMART FAILURE ANALYSIS ALERT -->
     {% if failure_analysis and failure_analysis.is_failure %}
-    <div class="bg-red-950/30 border border-red-500/30 backdrop-blur-xl rounded-3xl p-6 shadow-xl space-y-4">
-        <div class="flex items-center space-x-3">
-            <div class="w-10 h-10 bg-red-900/40 rounded-2xl flex items-center justify-center text-red-400 border border-red-500/30">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
-            </div>
+    <div class="bg-red-950/20 border-2 border-red-500/50 p-6 shadow-hard space-y-4">
+        <div class="flex items-center space-x-3 border-b border-red-500/30 pb-2">
+            <div class="text-red-500 font-bold text-xl">[!]</div>
             <div>
-                <h3 class="text-lg font-bold text-red-300">Smart Failure Analysis Triggered</h3>
-                <p class="text-xs text-red-300/70">Latest run deviated significantly from the successful optimal region.</p>
+                <h3 class="text-sm font-display font-bold text-red-500 uppercase tracking-widest">FAILURE_ANALYSIS_TRIGGERED</h3>
+                <p class="text-[10px] text-red-400/70 font-mono tracking-widest uppercase">Deviation from optimal bounding box detected.</p>
             </div>
         </div>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
             {% for cause in failure_analysis.causes %}
-            <div class="bg-red-900/10 border border-red-500/20 rounded-2xl p-4">
+            <div class="bg-red-900/10 border border-red-500/30 p-4">
                 <div class="flex justify-between items-start mb-2">
-                    <h4 class="font-bold text-red-300 text-sm">{{ cause.cause }}</h4>
-                    <span class="text-[10px] px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider {% if cause.severity == 'CRITICAL' %}bg-red-600 text-white shadow-sm{% else %}bg-amber-600 text-white{% endif %}">{{ cause.severity }}</span>
+                    <h4 class="font-bold text-red-400 text-xs font-mono uppercase tracking-widest">>_{{ cause.cause }}</h4>
+                    <span class="text-[9px] px-2 py-0.5 font-bold uppercase tracking-widest {% if cause.severity == 'CRITICAL' %}bg-red-600 text-white{% else %}bg-yellow-600 text-black{% endif %}">{{ cause.severity }}</span>
                 </div>
-                <p class="text-xs text-red-200/70"><strong>Diagnostic Action:</strong> {{ cause.action }}</p>
+                <p class="text-[10px] text-red-300/70 font-mono uppercase tracking-widest">ACT: {{ cause.action }}</p>
             </div>
             {% endfor %}
         </div>
@@ -107,10 +111,10 @@
 
     <!-- OPTIMIZATION HISTORY LEARNING CURVE CHART -->
     {% if experiments %}
-    <section class="glass-panel p-6 rounded-3xl shadow-xl space-y-4">
-        <div>
-            <h2 class="text-lg font-bold text-white">Optimization Learning Curve</h2>
-            <p class="text-xs text-slate-400">Calculated quality score trajectory across logged experiments</p>
+    <section class="bg-black p-6 border border-gray-800 shadow-hard space-y-4">
+        <div class="border-b border-gray-800 pb-2">
+            <h2 class="text-sm font-display font-bold text-gray-200 uppercase tracking-widest">>_LEARNING_CURVE</h2>
+            <p class="text-[10px] text-gray-500 font-mono uppercase tracking-widest">Quality score trajectory across epochs.</p>
         </div>
         <div class="h-64">
             <canvas id="qualityChart"></canvas>
@@ -119,10 +123,10 @@
     
     <!-- PLOTLY HEATMAP INSIGHTS SECTION -->
     {% if experiments|length > 2 %}
-    <section class="glass-panel p-6 rounded-3xl shadow-xl space-y-4">
-        <div>
-            <h2 class="text-lg font-bold text-white">Parameter Correlation Insights</h2>
-            <p class="text-xs text-slate-400">Mathematical impact of input parameters on experimental outcomes.</p>
+    <section class="bg-black p-6 border border-gray-800 shadow-hard space-y-4">
+        <div class="border-b border-gray-800 pb-2">
+            <h2 class="text-sm font-display font-bold text-gray-200 uppercase tracking-widest">>_CORRELATION_MATRIX</h2>
+            <p class="text-[10px] text-gray-500 font-mono uppercase tracking-widest">Mathematical impact of parameters on outcomes.</p>
         </div>
         <div id="heatmapChart" class="w-full h-[400px]"></div>
     </section>
@@ -150,15 +154,15 @@
             if(data.success && data.health) {
                 const badge = document.getElementById('healthBadge');
                 const alerts = document.getElementById('healthAlerts');
-                if(data.health.status === 'GREEN') { badge.className = 'px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'; badge.innerText = 'OPTIMAL'; }
-                else if(data.health.status === 'AMBER') { badge.className = 'px-3 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30'; badge.innerText = 'WARNING'; }
-                else { badge.className = 'px-3 py-1 rounded-full text-xs font-bold bg-red-500/20 text-red-400 border border-red-500/30'; badge.innerText = 'CRITICAL DRIFT'; }
-                alerts.innerHTML = data.health.alerts.map(a => `<p class="text-sm font-medium ${a.severity === 'HIGH' ? 'text-amber-300' : 'text-slate-300'}">${a.message}</p>`).join('');
+                if(data.health.status === 'GREEN') { badge.className = 'px-2 py-1 text-[9px] font-bold bg-matrix-green text-black uppercase tracking-widest'; badge.innerText = 'OPTIMAL'; }
+                else if(data.health.status === 'AMBER') { badge.className = 'px-2 py-1 text-[9px] font-bold bg-yellow-500 text-black uppercase tracking-widest'; badge.innerText = 'WARNING'; }
+                else { badge.className = 'px-2 py-1 text-[9px] font-bold bg-red-500 text-white uppercase tracking-widest'; badge.innerText = 'CRITICAL DRIFT'; }
+                alerts.innerHTML = data.health.alerts.map(a => `<p class="text-[10px] font-mono uppercase tracking-widest ${a.severity === 'HIGH' ? 'text-yellow-500' : 'text-gray-400'}">${a.message}</p>`).join('');
             }
 
-            document.getElementById('calibBadge').className = 'px-3 py-1 rounded-full text-xs font-bold bg-indigo-500/20 text-indigo-400 border border-indigo-500/30';
+            document.getElementById('calibBadge').className = 'px-2 py-1 text-[9px] font-bold bg-gray-800 text-matrix-green border border-matrix-green uppercase tracking-widest';
             document.getElementById('calibBadge').innerText = 'CALIBRATED';
-            document.getElementById('calibAlerts').innerHTML = '<p class="text-sm font-medium text-slate-300">Model ECE is 0.08 (Good). No isotonic regression required.</p>';
+            document.getElementById('calibAlerts').innerHTML = '<p class="text-[10px] font-mono text-gray-400 uppercase tracking-widest">Model ECE is 0.08. No isotonic regression required.</p>';
         }
         setTimeout(loadHealth, 1500);
 
@@ -175,21 +179,24 @@
                     datasets: [{
                         label: 'Quality Score',
                         data: scores,
-                        borderColor: '#6366f1',
-                        backgroundColor: 'rgba(99, 102, 241, 0.1)',
-                        borderWidth: 3,
+                        borderColor: '#00FF41',
+                        backgroundColor: 'rgba(0, 255, 65, 0.1)',
+                        borderWidth: 2,
                         fill: true,
-                        tension: 0.4
+                        tension: 0,
+                        pointBackgroundColor: '#00FF41',
+                        pointBorderColor: '#000',
+                        pointRadius: 4
                     }]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
                     scales: {
-                        y: { min: 0, max: 100, grid: { color: 'rgba(255,255,255,0.06)' }, ticks: { color: '#94a3b8' } },
-                        x: { grid: { color: 'rgba(255,255,255,0.06)' }, ticks: { color: '#94a3b8' } }
+                        y: { min: 0, max: 100, grid: { color: '#171717' }, ticks: { color: '#737373', font: { family: 'JetBrains Mono', size: 10 } } },
+                        x: { grid: { color: '#171717' }, ticks: { color: '#737373', font: { family: 'JetBrains Mono', size: 10 } } }
                     },
-                    plugins: { legend: { labels: { color: '#ffffff' } } }
+                    plugins: { legend: { labels: { color: '#e5e5e5', font: { family: 'JetBrains Mono', size: 10 } } } }
                 }
             });
         }
@@ -223,13 +230,15 @@
 
         const heatmapData = [{
             z: matrix, x: labels, y: labels,
-            type: 'heatmap', colorscale: 'Viridis', zmin: -1, zmax: 1
+            type: 'heatmap', colorscale: 'Greens', zmin: -1, zmax: 1
         }];
 
         const heatmapLayout = {
             paper_bgcolor: 'transparent', plot_bgcolor: 'transparent',
-            font: { color: '#94a3b8' },
-            margin: { t: 20, l: 100, r: 20, b: 60 }
+            font: { color: '#a3a3a3', family: '"JetBrains Mono", monospace' },
+            margin: { t: 20, l: 100, r: 20, b: 60 },
+            xaxis: { gridcolor: '#1f2937' },
+            yaxis: { gridcolor: '#1f2937' }
         };
 
         Plotly.newPlot('heatmapChart', heatmapData, heatmapLayout, {responsive: true, displayModeBar: false});
