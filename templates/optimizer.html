@@ -443,11 +443,13 @@
             const data = await res.json();
             if (data.success && data.pd_recipe) {
                 const r = data.pd_recipe;
-                let msg = `[PD DEPOSITION STEP -- separate run, Pd target]\n\n`;
+                let msg = `[PD DEPOSITION STEP -- separate DC sputtering run, Pd target]\n\n`;
                 msg += `Target thickness: ${r.target_pd_thickness_nm} nm\n`;
-                msg += `Suggested RF power: ${r.suggested_rf_power_w} W\n`;
+                msg += `Suggested DC power: ${r.suggested_dc_power_w} W\n`;
+                msg += `Suggested pressure: ${r.suggested_pressure_mtorr} mT\n`;
                 msg += `Suggested distance: ${r.suggested_distance_cm} cm\n`;
-                msg += `Suggested Ar flow: ${r.suggested_ar_flow_sccm} sccm\n\n`;
+                msg += `Suggested Ar flow: ${r.suggested_ar_flow_sccm} sccm\n`;
+                msg += `Suggested O2 flow: ${r.suggested_o2_flow_sccm} sccm\n\n`;
                 if (r.is_calibrated) {
                     msg += `Suggested time: ${r.suggested_time_min} min (${r.suggested_time_s} s)\n`;
                 } else {
