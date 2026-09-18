@@ -35,11 +35,24 @@
             </div>
 
             <div id="pdStepBlock" class="lg:col-span-3 sm:col-span-2 pb-4 border-b border-gray-800 mb-2 mt-2" style="display:none;">
-                <label class="block text-[10px] font-bold text-matrix-green uppercase tracking-widest mb-3">Step 2: Pd Deposition (separate sputtering run, Pd target)</label>
+                <label class="block text-[10px] font-bold text-matrix-green uppercase tracking-widest mb-3">Step 2: Pd Deposition (separate sputtering run, Pd target, DC magnetron)</label>
                 <div class="form-grid">
                     <div>
-                        <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Pd_RF_Power [W]</label>
-                        <input type="number" step="0.1" name="pd_rf_power" id="pd_rf_power" placeholder="50" class="w-full bg-gray-900 border border-gray-800 rounded-none p-3 text-sm text-matrix-green font-mono focus:border-matrix-green transition-colors outline-none placeholder-gray-700 touch-target">
+                        <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Pd_DC_Power [W]</label>
+                        <input type="number" step="0.1" name="pd_dc_power" id="pd_dc_power" placeholder="100" class="w-full bg-gray-900 border border-gray-800 rounded-none p-3 text-sm text-matrix-green font-mono focus:border-matrix-green transition-colors outline-none placeholder-gray-700 touch-target">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Pd_Pressure [MT]</label>
+                        <input type="number" step="0.01" name="pd_pressure_mtorr" id="pd_pressure_mtorr" placeholder="5.0" class="w-full bg-gray-900 border border-gray-800 rounded-none p-3 text-sm text-matrix-green font-mono focus:border-matrix-green transition-colors outline-none placeholder-gray-700 touch-target">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Pd_Ar_Flow [SCCM]</label>
+                        <input type="number" step="0.1" name="pd_ar_flow" id="pd_ar_flow" placeholder="30" class="w-full bg-gray-900 border border-gray-800 rounded-none p-3 text-sm text-matrix-green font-mono focus:border-matrix-green transition-colors outline-none placeholder-gray-700 touch-target">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Pd_O2_Flow [SCCM]</label>
+                        <input type="number" step="0.1" name="pd_o2_flow" id="pd_o2_flow" value="0" placeholder="0" class="w-full bg-gray-900 border border-gray-800 rounded-none p-3 text-sm text-matrix-green font-mono focus:border-matrix-green transition-colors outline-none placeholder-gray-700 touch-target">
+                        <p class="text-[9px] text-gray-600 mt-1 uppercase tracking-widest">0 for pure Pd metal</p>
                     </div>
                     <div>
                         <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Pd_Distance [CM]</label>
@@ -534,7 +547,7 @@
             const res = await fetch('/api/literature/upload', { method: 'POST', body: formData }); const data = await res.json();
             if (data.success && data.extracted_data) {
                 const s = data.extracted_data;
-                const fields = [{ id: 'target_material', val: s.target_material }, { id: 'rf_power_w', val: s.rf_power }, { id: 'working_pressure_mtorr', val: s.working_pressure }, { id: 'ar_flow_sccm', val: s.ar_flow }, { id: 'o2_flow_sccm', val: s.o2_flow }, { id: 'substrate_temp_c', val: s.substrate_temp }, { id: 'target_substrate_distance_cm', val: s.target_distance }, { id: 'film_thickness_nm', val: s.film_thickness }, { id: 'rotation_speed_rpm', val: s.rotation_speed }, { id: 'xrd_phase', val: s.xrd_phase }, { id: 'grain_size_nm', val: s.grain_size }, { id: 'h2_response_time_s', val: s.h2_response_time }, { id: 'wavelength_shift_pm', val: s.wavelength_shift }, { id: 'pd_thickness', val: s.pd_thickness }, { id: 'pd_rf_power', val: s.pd_rf_power }, { id: 'pd_distance_cm', val: s.pd_distance_cm }, { id: 'pd_sputter_time_s', val: s.pd_sputter_time_s }];
+                const fields = [{ id: 'target_material', val: s.target_material }, { id: 'rf_power_w', val: s.rf_power }, { id: 'working_pressure_mtorr', val: s.working_pressure }, { id: 'ar_flow_sccm', val: s.ar_flow }, { id: 'o2_flow_sccm', val: s.o2_flow }, { id: 'substrate_temp_c', val: s.substrate_temp }, { id: 'target_substrate_distance_cm', val: s.target_distance }, { id: 'film_thickness_nm', val: s.film_thickness }, { id: 'rotation_speed_rpm', val: s.rotation_speed }, { id: 'xrd_phase', val: s.xrd_phase }, { id: 'grain_size_nm', val: s.grain_size }, { id: 'h2_response_time_s', val: s.h2_response_time }, { id: 'wavelength_shift_pm', val: s.wavelength_shift }, { id: 'pd_thickness', val: s.pd_thickness }, { id: 'pd_dc_power', val: s.pd_dc_power }, { id: 'pd_distance_cm', val: s.pd_distance_cm }, { id: 'pd_sputter_time_s', val: s.pd_sputter_time_s }, { id: 'pd_pressure_mtorr', val: s.pd_pressure_mtorr }, { id: 'pd_ar_flow', val: s.pd_ar_flow }, { id: 'pd_o2_flow', val: s.pd_o2_flow }];
                 if (s.sputter_time_s) document.getElementById('sputtering_time_s').value = s.sputter_time_s;
                 fields.forEach(f => { const el = document.getElementById(f.id); if (el && f.val !== undefined) { el.value = f.val; el.classList.add('bg-matrix-green/20'); setTimeout(() => el.classList.remove('bg-matrix-green/20'), 1200); } });
                 alert("[SYS_MSG] Parsing complete. Vectors loaded.");
