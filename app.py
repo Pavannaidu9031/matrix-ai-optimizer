@@ -1575,3 +1575,26 @@ async def api_generate_recipe(request: Request):
     params = body.get("params", {})
     recipe = optimizer.generate_synthesis_recipe(params, target_material)
     return JSONResponse({"success": True, "recipe": recipe})
+
+@app.post("/api/optimizer/pd-recipe")
+async def api_pd_recipe(request: Request):
+    # Pd is a separate sputtering run from WO3 (different target, different
+    # process) with no experimental data yet -- see suggest_pd_deposition_step
+    # docstring in optimizer.py for what this is and isn't.
+    user = request.session.get("user")
+    if not user: return JSONResponse({"error": "not_authenticated"}, status_code=401)
+
+    body = await request.json()
+    target_thickness = float(body.get("target_pd_thickness_nm", 8.0))
+    calibrated_rate = body.get("calibrated_rate_nm_per_min")
+    calibrated_rate = float(calibrated_rate) if calibrated_rate else None
+    distance = float(body.get("distance_cm", 5.0))
+    ar_flow = float(body.get("ar_flow_sccm", 30.0))
+
+    recipe = optimizer.suggest_pd_deposition_step(
+        target_pd_thickness_nm=target_thickness,
+        calibrated_rate_nm_per_min=calibrated_rate,
+        distance_cm=distance,
+        ar_flow_sccm=ar_flow,
+    )
+    return JSONResponse({"success": True, "pd_recipe": recipe})
