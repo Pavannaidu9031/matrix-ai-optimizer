@@ -812,3 +812,73 @@ def generate_synthesis_recipe(params: dict, target_material: str) -> str:
 * **Gas Flow:** Maintain Ar flow for 10 minutes during chamber vent cool down.
 """
     return recipe
+
+
+def suggest_pd_deposition_step(
+    target_pd_thickness_nm: float,
+    calibrated_rate_nm_per_min: float = None,
+    distance_cm: float = 5.0,
+    ar_flow_sccm: float = 30.0,
+) -> dict:
+    """
+    Pd is deposited in a SEPARATE sputtering run from WO3 -- different target,
+    different process. There is no experimental Pd-deposition data yet for
+    this system, so this is NOT a Bayesian-optimized suggestion the way the
+    WO3 parameters are. It's a literature-informed starting recipe, meant to
+    be calibrated against your own measured deposition rate after a first
+    test run.
+
+    Literature reference points used for the defaults below (RF/DC magnetron
+    Pd sputtering onto Si/glass, lab-scale systems comparable to CST8):
+      - Slavcheva et al. 2014 (Sci. World J.): 100 W DC, 78mm target-substrate
+        distance, deposition rate 3.2-4.5 nm/min (varies with Ar pressure
+        5e-3 to 1e-1 mbar)
+      - Catalytic Pd thin-film studies (J. Phys. Chem. C, 2025): 50 W RF
+        (13.56 MHz), Ar 1.8 mL/min, pressure 4e-3 mbar, films in the 3-20 nm
+        range
+
+    These are starting points, not predictions -- your actual rate depends on
+    target purity, chamber geometry, and base pressure, which is why the
+    calibrated_rate_nm_per_min argument exists: once you've measured your own
+    rate from a single test deposition, pass it in for an exact time instead
+    of the literature-based range.
+    """
+    LIT_RF_POWER_W = 50.0
+    LIT_RATE_LOW_NM_MIN = 3.0
+    LIT_RATE_HIGH_NM_MIN = 5.0
+
+    target_pd_thickness_nm = max(0.1, float(target_pd_thickness_nm))
+
+    result = {
+        "step": "Pd catalyst layer -- separate sputtering run, Pd metal target",
+        "suggested_rf_power_w": LIT_RF_POWER_W,
+        "suggested_ar_flow_sccm": float(ar_flow_sccm),
+        "suggested_distance_cm": float(distance_cm),
+        "target_pd_thickness_nm": round(target_pd_thickness_nm, 1),
+        "is_calibrated": calibrated_rate_nm_per_min is not None,
+    }
+
+    if calibrated_rate_nm_per_min and calibrated_rate_nm_per_min > 0:
+        rate = float(calibrated_rate_nm_per_min)
+        time_min = target_pd_thickness_nm / rate
+        result["calibrated_rate_nm_per_min"] = rate
+        result["suggested_time_min"] = round(time_min, 2)
+        result["suggested_time_s"] = round(time_min * 60, 0)
+        result["note"] = (
+            f"Calculated directly from your calibrated deposition rate of "
+            f"{rate} nm/min. This is a real number for your system, not an estimate."
+        )
+    else:
+        t_low = target_pd_thickness_nm / LIT_RATE_HIGH_NM_MIN
+        t_high = target_pd_thickness_nm / LIT_RATE_LOW_NM_MIN
+        result["estimated_time_min_range"] = [round(t_low, 2), round(t_high, 2)]
+        result["note"] = (
+            "ESTIMATE ONLY, based on published Pd sputtering rates (3-5 nm/min) "
+            "at comparable RF power on comparable lab-scale systems -- not "
+            "calibrated to your CST8 system yet. Run one short test deposition, "
+            "measure the actual thickness (SEM or profilometer), divide "
+            "thickness by time to get your real rate, then re-run this with "
+            "that number for an exact suggested time."
+        )
+
+    return result
