@@ -33,6 +33,7 @@
                     <option value="WO3">WO3_TUNGSTEN_TRIOXIDE</option>
                     <option value="TiO2">TIO2_TITANIUM_DIOXIDE</option>
                     <option value="ZnO">ZNO_ZINC_OXIDE</option>
+                    <option value="WO3_Pd">WO3_PD_CATALYST</option>
                 </select>
             </div>
             <div class="flex flex-col space-y-2 lg:col-span-1">
@@ -325,6 +326,7 @@
                                         <div class="flex justify-between"><span>DIST:</span> <span class="text-white">${opt.data.target_distance} cm</span></div>
                                         <div class="flex justify-between"><span>FLOW:</span> <span class="text-white">${opt.data.ar_flow} sccm</span></div>
                                         <div class="flex justify-between"><span>THICK:</span> <span class="text-white">${opt.data.film_thickness} nm</span></div>
+                                        ${opt.data.pd_thickness ? `<div class="flex justify-between"><span>PD:</span> <span class="text-white">${opt.data.pd_thickness} nm</span></div>` : ''}
                                         <div class="flex justify-between pt-4 mt-2 border-t border-gray-800 ${titleColor} font-bold tracking-widest"><span>EXP_SHIFT:</span> <span>${opt.data.expected_shift} pm</span></div>
                                     </div>
                                 </div>
@@ -414,6 +416,7 @@
         doc.setTextColor(255, 255, 255); doc.setFont("helvetica", "bold"); doc.text("SUGGESTED_PARAMETERS (MAX_QUALITY):", 20, 75); doc.setFont("helvetica", "normal");
         const p = s.suggested; let y = 85;
         const params = [`RF Power: ${p.rf_power} W`, `Working Pressure: ${p.working_pressure} mTorr`, `Target Distance: ${p.target_distance} cm`, `Film Thickness: ${p.film_thickness} nm`, `Rotation Speed: ${p.rotation_speed} rpm`, `Ar Flow: ${p.ar_flow} sccm`];
+        if (p.pd_thickness) params.push(`Pd Thickness: ${p.pd_thickness} nm`);
         params.forEach(param => { doc.text(param, 25, y); y += 8; });
         doc.setFont("helvetica", "bold"); doc.text("HEURISTIC_OUTCOMES:", 20, y + 10); doc.setFont("helvetica", "normal"); y += 20;
         doc.text(`Target XRD Phase: ${s.expected.xrd_phase}`, 25, y); doc.text(`Expected Shift: ${s.expected.wavelength_shift_estimate} pm`, 25, y+8);
