@@ -25,12 +25,19 @@
         <div class="form-grid">
             <div class="lg:col-span-3 sm:col-span-2 pb-4 border-b border-gray-800 mb-2">
                 <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Target_Domain</label>
-                <select name="target_material" id="target_material" class="w-full lg:w-1/3 bg-gray-900 border border-gray-800 rounded-none p-3 text-sm text-matrix-green font-mono focus:border-matrix-green transition-colors outline-none cursor-pointer touch-target">
+                <select name="target_material" id="target_material" class="w-full lg:w-1/3 bg-gray-900 border border-gray-800 rounded-none p-3 text-sm text-matrix-green font-mono focus:border-matrix-green transition-colors outline-none cursor-pointer touch-target" onchange="toggleWpFields()">
                     <option value="Generic">GENERIC_MIXED</option>
                     <option value="WO3">WO3</option>
                     <option value="TiO2">TIO2</option>
                     <option value="ZnO">ZNO</option>
+                    <option value="WO3_Pd">WO3 + PD</option>
                 </select>
+            </div>
+
+            <div id="pdThicknessField" style="display:none;">
+                <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Pd_Thickness [NM]</label>
+                <input type="number" step="0.1" name="pd_thickness" id="pd_thickness" value="0" placeholder="8" class="w-full bg-gray-900 border border-gray-800 rounded-none p-3 text-sm text-matrix-green font-mono focus:border-matrix-green transition-colors outline-none placeholder-gray-700 touch-target">
+                <p class="text-[9px] text-gray-600 mt-1 uppercase tracking-widest">Only used for WO3_Pd track</p>
             </div>
 
             <div>
@@ -510,7 +517,7 @@
             const res = await fetch('/api/literature/upload', { method: 'POST', body: formData }); const data = await res.json();
             if (data.success && data.extracted_data) {
                 const s = data.extracted_data;
-                const fields = [{ id: 'target_material', val: s.target_material }, { id: 'rf_power_w', val: s.rf_power }, { id: 'working_pressure_mtorr', val: s.working_pressure }, { id: 'ar_flow_sccm', val: s.ar_flow }, { id: 'o2_flow_sccm', val: s.o2_flow }, { id: 'substrate_temp_c', val: s.substrate_temp }, { id: 'target_substrate_distance_cm', val: s.target_distance }, { id: 'film_thickness_nm', val: s.film_thickness }, { id: 'rotation_speed_rpm', val: s.rotation_speed }, { id: 'xrd_phase', val: s.xrd_phase }, { id: 'grain_size_nm', val: s.grain_size }, { id: 'h2_response_time_s', val: s.h2_response_time }, { id: 'wavelength_shift_pm', val: s.wavelength_shift }];
+                const fields = [{ id: 'target_material', val: s.target_material }, { id: 'rf_power_w', val: s.rf_power }, { id: 'working_pressure_mtorr', val: s.working_pressure }, { id: 'ar_flow_sccm', val: s.ar_flow }, { id: 'o2_flow_sccm', val: s.o2_flow }, { id: 'substrate_temp_c', val: s.substrate_temp }, { id: 'target_substrate_distance_cm', val: s.target_distance }, { id: 'film_thickness_nm', val: s.film_thickness }, { id: 'rotation_speed_rpm', val: s.rotation_speed }, { id: 'xrd_phase', val: s.xrd_phase }, { id: 'grain_size_nm', val: s.grain_size }, { id: 'h2_response_time_s', val: s.h2_response_time }, { id: 'wavelength_shift_pm', val: s.wavelength_shift }, { id: 'pd_thickness', val: s.pd_thickness }];
                 if (s.sputter_time_s) document.getElementById('sputtering_time_s').value = s.sputter_time_s;
                 fields.forEach(f => { const el = document.getElementById(f.id); if (el && f.val !== undefined) { el.value = f.val; el.classList.add('bg-matrix-green/20'); setTimeout(() => el.classList.remove('bg-matrix-green/20'), 1200); } });
                 alert("[SYS_MSG] Parsing complete. Vectors loaded.");
@@ -518,11 +525,19 @@
         } catch (err) { alert('[SYS_ERR] Upload stream interrupted.'); } finally { btnLabel.innerText = originalText; btnLabel.parentElement.classList.remove('animate-pulse', 'border-matrix-green'); e.target.value = ''; }
     });
 
+    function toggleWpFields() {
+        const sel = document.getElementById('target_material');
+        const pdField = document.getElementById('pdThicknessField');
+        if (!sel || !pdField) return;
+        pdField.style.display = (sel.value === 'WO3_Pd') ? '' : 'none';
+    }
+
     document.addEventListener("DOMContentLoaded", () => {
+        toggleWpFields();
         const storedBatch = localStorage.getItem('matrixAutoFill');
         if (storedBatch) {
             const s = JSON.parse(storedBatch);
-            const fields = [{ id: 'rf_power_w', val: s.rf_power }, { id: 'working_pressure_mtorr', val: s.working_pressure }, { id: 'target_substrate_distance_cm', val: s.target_distance }, { id: 'film_thickness_nm', val: s.film_thickness }, { id: 'rotation_speed_rpm', val: s.rotation_speed }, { id: 'ar_flow_sccm', val: s.ar_flow }];
+            const fields = [{ id: 'rf_power_w', val: s.rf_power }, { id: 'working_pressure_mtorr', val: s.working_pressure }, { id: 'target_substrate_distance_cm', val: s.target_distance }, { id: 'film_thickness_nm', val: s.film_thickness }, { id: 'rotation_speed_rpm', val: s.rotation_speed }, { id: 'ar_flow_sccm', val: s.ar_flow }, { id: 'pd_thickness', val: s.pd_thickness }];
             fields.forEach(f => { const el = document.getElementById(f.id); if (el) { el.value = f.val; el.classList.add('bg-matrix-green/20'); setTimeout(() => el.classList.remove('bg-matrix-green/20'), 1200); } });
             localStorage.removeItem('matrixAutoFill');
         }
