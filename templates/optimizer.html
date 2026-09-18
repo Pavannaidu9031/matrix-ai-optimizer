@@ -28,13 +28,17 @@
         <div class="form-grid mb-8">
             <div class="flex flex-col space-y-2 lg:col-span-1">
                 <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Target_Domain</label>
-                <select id="targetMaterialSuggest" class="w-full bg-[#111] border border-gray-700 hover:border-gray-500 text-matrix-green text-sm p-3 font-mono outline-none focus:border-matrix-green transition-colors cursor-pointer touch-target">
+                <select id="targetMaterialSuggest" class="w-full bg-[#111] border border-gray-700 hover:border-gray-500 text-matrix-green text-sm p-3 font-mono outline-none focus:border-matrix-green transition-colors cursor-pointer touch-target" onchange="togglePdRateField()">
                     <option value="Generic">GENERIC_MIXED</option>
                     <option value="WO3">WO3_TUNGSTEN_TRIOXIDE</option>
                     <option value="TiO2">TIO2_TITANIUM_DIOXIDE</option>
                     <option value="ZnO">ZNO_ZINC_OXIDE</option>
                     <option value="WO3_Pd">WO3_PD_CATALYST</option>
                 </select>
+            </div>
+            <div id="pdRateField" class="flex flex-col space-y-2 lg:col-span-1" style="display:none;">
+                <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Pd_Rate [nm/min] (optional)</label>
+                <input type="number" step="0.1" id="pdCalibratedRate" placeholder="e.g. 4.0 -- leave blank for literature estimate" class="w-full bg-[#111] border border-gray-700 hover:border-gray-500 text-matrix-green text-sm p-3 font-mono outline-none focus:border-matrix-green transition-colors placeholder-gray-700 touch-target">
             </div>
             <div class="flex flex-col space-y-2 lg:col-span-1">
                 <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Model_Architecture</label>
@@ -330,9 +334,12 @@
                                         <div class="flex justify-between pt-4 mt-2 border-t border-gray-800 ${titleColor} font-bold tracking-widest"><span>EXP_SHIFT:</span> <span>${opt.data.expected_shift} pm</span></div>
                                     </div>
                                 </div>
-                                <button type="button" onclick="applyBatch(${idx})" class="mt-8 w-full bg-gray-800 hover:bg-matrix-green hover:text-black text-gray-300 font-bold text-[10px] uppercase tracking-widest py-3 transition-colors border border-gray-700 touch-target">
-                                    APPLY_NODE
-                                </button>
+                                <div class="mt-8 space-y-2">
+                                    <button type="button" onclick="applyBatch(${idx})" class="w-full bg-gray-800 hover:bg-matrix-green hover:text-black text-gray-300 font-bold text-[10px] uppercase tracking-widest py-3 transition-colors border border-gray-700 touch-target">
+                                        APPLY_NODE
+                                    </button>
+                                    ${opt.data.pd_thickness ? `<button type="button" onclick="calcPdRecipe(${idx})" class="w-full bg-transparent hover:bg-gray-800 text-gray-400 hover:text-matrix-green font-bold text-[10px] uppercase tracking-widest py-3 transition-colors border border-gray-700 touch-target">CALC_PD_RECIPE</button>` : ''}
+                                </div>
                             </div>
                         `;
                     });
@@ -403,6 +410,55 @@
         const s = window.latestBatch[index].data;
         localStorage.setItem('matrixAutoFill', JSON.stringify(s));
         window.location.href = '/experiments-view';
+    }
+
+    function togglePdRateField() {
+        const sel = document.getElementById('targetMaterialSuggest');
+        const field = document.getElementById('pdRateField');
+        if (!sel || !field) return;
+        field.style.display = (sel.value === 'WO3_Pd') ? '' : 'none';
+    }
+    togglePdRateField();
+
+    // Pd is deposited in a SEPARATE sputtering run (different target) from
+    // WO3, so it needs its own recipe -- this is a literature-informed
+    // starting point, not a Bayesian suggestion (no Pd experimental data
+    // exists yet). See suggest_pd_deposition_step() in optimizer.py.
+    async function calcPdRecipe(index) {
+        if (!window.latestBatch) return;
+        const opt = window.latestBatch[index].data;
+        const calibratedRateInput = document.getElementById('pdCalibratedRate')?.value;
+        const calibratedRate = calibratedRateInput ? parseFloat(calibratedRateInput) : null;
+
+        try {
+            const res = await fetch('/api/optimizer/pd-recipe', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    target_pd_thickness_nm: opt.pd_thickness,
+                    calibrated_rate_nm_per_min: calibratedRate,
+                    distance_cm: opt.target_distance,
+                    ar_flow_sccm: opt.ar_flow
+                })
+            });
+            const data = await res.json();
+            if (data.success && data.pd_recipe) {
+                const r = data.pd_recipe;
+                let msg = `[PD DEPOSITION STEP -- separate run, Pd target]\n\n`;
+                msg += `Target thickness: ${r.target_pd_thickness_nm} nm\n`;
+                msg += `Suggested RF power: ${r.suggested_rf_power_w} W\n`;
+                msg += `Suggested distance: ${r.suggested_distance_cm} cm\n`;
+                msg += `Suggested Ar flow: ${r.suggested_ar_flow_sccm} sccm\n\n`;
+                if (r.is_calibrated) {
+                    msg += `Suggested time: ${r.suggested_time_min} min (${r.suggested_time_s} s)\n`;
+                } else {
+                    msg += `Estimated time range: ${r.estimated_time_min_range[0]}-${r.estimated_time_min_range[1]} min\n`;
+                }
+                msg += `\n${r.note}`;
+                alert(msg);
+            } else {
+                alert('[SYS_ERR] Pd recipe calculation failed.');
+            }
+        } catch (err) { alert('[SYS_ERR] Pd recipe endpoint unreachable.'); }
     }
 
     document.getElementById('btnPdf')?.addEventListener('click', () => {
