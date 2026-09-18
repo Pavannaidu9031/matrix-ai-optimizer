@@ -69,10 +69,16 @@ def train_dkl_model(X, y, epochs=50):
 # UPGRADE 2 & 3: HYBRID ACQUISITION & PHYSICAL CONSTRAINTS
 # ==============================================================================
 def apply_physical_constraints(candidates, expected_thickness=200, planned_sputter_time_s=1800):
-    """Filters out candidates that violate physics rules."""
+    """Filters out candidates that violate physics rules.
+    Candidates are 6-wide for every existing material track, and 7-wide
+    (with a trailing Pd thickness column) for the WO3_Pd track. Unpacking
+    defensively here means this function needs no other changes."""
     valid, warnings = [], []
     for c in candidates:
-        rf, press, dist, thick, rot, ar = c
+        if len(c) >= 7:
+            rf, press, dist, thick, rot, ar = c[0], c[1], c[2], c[3], c[4], c[5]
+        else:
+            rf, press, dist, thick, rot, ar = c
         
         # New Deposition Rate Calculation (nm/min) using seconds
         rate = expected_thickness / (planned_sputter_time_s / 60.0) if planned_sputter_time_s > 0 else 0
