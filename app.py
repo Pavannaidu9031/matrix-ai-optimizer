@@ -121,10 +121,20 @@ def ensure_material_column(cur):
         cur.execute("ALTER TABLE experiments ADD COLUMN IF NOT EXISTS target_material VARCHAR DEFAULT 'Generic'")
     except Exception:
         pass
+    ensure_pd_thickness_column(cur)
 
 def ensure_branch_column(cur):
     try:
         cur.execute("ALTER TABLE experiments ADD COLUMN IF NOT EXISTS branch_name VARCHAR DEFAULT 'main'")
+    except Exception:
+        pass
+    ensure_pd_thickness_column(cur)
+
+def ensure_pd_thickness_column(cur):
+    # NEW — self-migrating, same pattern as the two helpers above. Idempotent,
+    # so calling it from both helpers on the same request is harmless.
+    try:
+        cur.execute("ALTER TABLE experiments ADD COLUMN IF NOT EXISTS pd_thickness FLOAT DEFAULT 0")
     except Exception:
         pass
 
@@ -160,6 +170,7 @@ class ExperimentModel(BaseModel):
     grain_size: Optional[float] = None
     h2_response_time: float
     wavelength_shift: Optional[float] = None
+    pd_thickness: Optional[float] = 0.0
     batch_notes: Optional[str] = None
     branch_name: str = "main"
 
@@ -221,7 +232,8 @@ def index(request: Request, branch: str = 'main'):
                 SELECT id, user_email, target_material, rf_power, working_pressure, ar_flow, o2_flow,
                        substrate_temp, target_distance, sputter_time_s, film_thickness,
                        rotation_speed, substrate_type, xrd_phase, grain_size,
-                       h2_response_time, wavelength_shift, batch_notes, quality_score, created_at, branch_name
+                       h2_response_time, wavelength_shift, batch_notes, quality_score, created_at, branch_name,
+                       pd_thickness
                 FROM experiments
                 WHERE user_email = %s AND branch_name = %s
                 ORDER BY created_at DESC
@@ -295,7 +307,8 @@ def experiments_page(request: Request, branch: str = 'main'):
             SELECT id, user_email, target_material, rf_power, working_pressure, ar_flow, o2_flow,
                    substrate_temp, target_distance, sputter_time_s, film_thickness,
                    rotation_speed, substrate_type, xrd_phase, grain_size,
-                   h2_response_time, wavelength_shift, batch_notes, quality_score, created_at, branch_name
+                   h2_response_time, wavelength_shift, batch_notes, quality_score, created_at, branch_name,
+                   pd_thickness
             FROM experiments
             WHERE user_email = %s AND branch_name = %s
             ORDER BY created_at DESC
@@ -509,6 +522,7 @@ async def add_experiment_form(request: Request):
             return default
 
         target_material = get_str(["target_material"], "Generic")
+        pd_thickness = get_float(["pd_thickness"], 0.0)
         rf_power = get_float(["rf_power_w", "rf_power"], 120.0)
         working_pressure = get_float(["working_pressure_mtorr", "working_pressure", "pressure"], 5.0)
         ar_flow = get_float(["ar_flow_sccm", "ar_flow"], 30.0)
@@ -565,16 +579,16 @@ async def add_experiment_form(request: Request):
                 o2_flow, substrate_temp, target_distance, sputter_time_s,
                 film_thickness, rotation_speed, substrate_type, xrd_phase,
                 grain_size, h2_response_time, wavelength_shift, batch_notes,
-                quality_score, branch_name, created_at
+                quality_score, branch_name, pd_thickness, created_at
             ) VALUES (
-                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW()
+                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW()
             )
         """, (
             user_email, target_material, rf_power, working_pressure, ar_flow,
             o2_flow, substrate_temp, target_distance, sputter_time_s,
             film_thickness, rotation_speed, substrate_type, xrd_phase,
             grain_size, h2_response_time, wavelength_shift, batch_notes,
-            quality_score, branch_name
+            quality_score, branch_name, pd_thickness
         ))
         conn.commit()
         cur.close()
@@ -617,16 +631,16 @@ async def save_experiment_json(request: Request, data: ExperimentModel):
                 o2_flow, substrate_temp, target_distance, sputter_time_s,
                 film_thickness, rotation_speed, substrate_type, xrd_phase,
                 grain_size, h2_response_time, wavelength_shift, batch_notes,
-                quality_score, branch_name, created_at
+                quality_score, branch_name, pd_thickness, created_at
             ) VALUES (
-                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW()
+                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW()
             ) RETURNING id
         """, (
             user_email, data.rf_power, data.working_pressure, data.ar_flow,
             data.o2_flow, data.substrate_temp, data.target_distance, data.sputter_time_s,
             data.film_thickness, data.rotation_speed, data.substrate_type, data.xrd_phase,
             data.grain_size, data.h2_response_time, data.wavelength_shift, data.batch_notes,
-            quality_score, data.branch_name
+            quality_score, data.branch_name, data.pd_thickness or 0.0
         ))
         
         new_id = cur.fetchone()[0]
@@ -840,7 +854,8 @@ async def upload_literature_pdf(request: Request, file: UploadFile = File(...)):
             "'target_material' (string), 'rf_power' (float), 'working_pressure' (float), 'ar_flow' (float), "
             "'o2_flow' (float), 'substrate_temp' (float), 'target_distance' (float), 'sputter_time_s' (float in seconds), "
             "'film_thickness' (float), 'rotation_speed' (float), 'xrd_phase' (string: Monoclinic, Partial, or Amorphous), "
-            "'grain_size' (float), 'h2_response_time' (float), 'wavelength_shift' (float)."
+            "'grain_size' (float), 'h2_response_time' (float), 'wavelength_shift' (float), "
+            "'pd_thickness' (float, nm — Pd catalyst layer thickness if the paper uses one, else 0)."
         )
         
         # Automatically rotate through stable production models if a 503 spike occurs
@@ -889,9 +904,9 @@ async def upload_literature_pdf(request: Request, file: UploadFile = File(...)):
                     o2_flow, substrate_temp, target_distance, sputter_time_s,
                     film_thickness, rotation_speed, substrate_type, xrd_phase,
                     grain_size, h2_response_time, wavelength_shift, batch_notes,
-                    quality_score, created_at
+                    quality_score, pd_thickness, created_at
                 ) VALUES (
-                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW()
+                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW()
                 )
             """, (
                 user.get("email"), 
@@ -911,7 +926,8 @@ async def upload_literature_pdf(request: Request, file: UploadFile = File(...)):
                 float(data.get("h2_response_time", 10.0)),
                 float(data.get("wavelength_shift", 100.0)),
                 "Literature Prior (AI Extracted)",
-                quality_score
+                quality_score,
+                float(data.get("pd_thickness", 0.0))
             ))
             conn.commit()
             cur.close()
