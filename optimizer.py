@@ -30,12 +30,25 @@ MATERIAL_PRIORS = {
     "ZnO": [
         [80.0, 6.0, 6.0, 300.0, 5.0, 20.0, 0.0, 30.0],
         [100.0, 4.0, 5.0, 250.0, 5.0, 25.0, 1.0, 85.0],
-    ]
+    ],
+    # NEW — WO3 + Pd catalyst track. Rows keep the original 8-value layout
+    # ([rf, pressure, distance, thickness, rotation, ar, xrd, wave]) and
+    # APPEND pd_thickness (nm) as a 9th value, so any existing code reading
+    # p[6]/p[7] (xrd/wave) on other material keys is completely unaffected.
+    # PLACEHOLDER seed values — the literature we reviewed reports optical
+    # transmittance % / resistance-ratio, not pm wavelength shift, so these
+    # need calibrating against your own first few WO3_Pd runs before they're
+    # trustworthy priors. The structure is correct; the numbers aren't yet.
+    "WO3_Pd": [
+        [100.0, 5.0, 7.0, 200.0, 5.0, 30.0, 0.0, 90.0, 8.0],
+        [130.0, 4.0, 4.0, 300.0, 10.0, 35.0, 0.5, 160.0, 6.0],
+        [150.0, 3.0, 3.0, 250.0, 10.0, 40.0, 1.0, 250.0, 10.0],
+    ],
 }
 
 XRD_MAP = {"Monoclinic": 1.0, "Partial": 0.75, "Amorphous": 0.0}
-PARAM_NAMES = ["RF Power", "Pressure", "Target Distance", "Film Thickness", "Rotation Speed", "Ar Flow"]
-PHYSICS_FEATURE_NAMES = ["Energy Density", "Dep Rate Est", "Energy Per nm", "Plasma Density", "Rotation Factor", "Ar Normalized"]
+PARAM_NAMES = ["RF Power", "Pressure", "Target Distance", "Film Thickness", "Rotation Speed", "Ar Flow", "Pd Thickness"]
+PHYSICS_FEATURE_NAMES = ["Energy Density", "Dep Rate Est", "Energy Per nm", "Plasma Density", "Rotation Factor", "Ar Normalized", "Catalyst Loading"]
 
 # ------------------------------------------------------------------------------
 # UPGRADE 1: PHYSICS-INFORMED FEATURE TRANSFORMATION
@@ -47,15 +60,19 @@ def transform_to_physics_features(
     thickness: float = 200.0,
     rotation: float = 5.0,
     ar_flow: float = 30.0,
+    pd_thickness: float = 0.0,
     sputter_time_s: float = None,
     substrate_type: str = "Si Wafer"
 ) -> list:
-    """Transforms raw machine parameters into kinetic and thermodynamic derived features."""
+    """Transforms raw machine parameters into kinetic and thermodynamic derived features.
+    pd_thickness (nm) defaults to 0.0, so every existing caller that doesn't pass it
+    keeps behaving exactly as before — this is purely additive."""
     rf_power = max(10.0, float(rf_power))
     distance = max(1.0, float(distance))
     pressure = max(0.5, float(pressure))
     rotation = max(0.0, float(rotation))
     ar_flow = max(1.0, float(ar_flow))
+    pd_thickness = max(0.0, float(pd_thickness))
 
     # 1. Energy Density (W/cm^2 scaling)
     energy_density = rf_power / (distance ** 2)
@@ -81,13 +98,17 @@ def transform_to_physics_features(
     # 6. Normalized Argon Flow (Gas density / mean free path baseline)
     ar_normalized = ar_flow / 30.0
 
+    # 7. Catalyst Loading (NEW — normalized Pd thickness, 0 when no catalyst present)
+    pd_normalized = pd_thickness / 30.0
+
     return [
         float(energy_density),
         float(dep_rate_estimate),
         float(energy_per_nm),
         float(plasma_density),
         float(rotation_factor),
-        float(ar_normalized)
+        float(ar_normalized),
+        float(pd_normalized)
     ]
 
 # ------------------------------------------------------------------------------
@@ -108,6 +129,31 @@ def physics_prior_mean(X_physics: np.ndarray) -> np.ndarray:
     xrd_prior = 0.25 + 0.5 * (1.0 / (1.0 + np.exp(-steepness * (energy_density - threshold))))
     return xrd_prior
 
+# ------------------------------------------------------------------------------
+# NEW: PD CATALYST PRIOR (peaked, not monotonic)
+# ------------------------------------------------------------------------------
+def pd_catalyst_prior(X_physics: np.ndarray) -> np.ndarray:
+    """
+    Literature-informed prior for the Pd-catalyzed sensor-response objective.
+    Unlike the XRD prior (monotonic sigmoid), catalytic enhancement from a Pd
+    layer PEAKS at a moderate thickness: too thin gives insufficient catalytic
+    coverage for H2 dissociation, too thick blocks the optical path into the
+    WO3 film underneath. Returns an enhancement factor (roughly 0-1).
+
+    PLACEHOLDER optimum (~8nm) and width (~6nm) — calibrate against your own
+    early WO3_Pd runs, or against pm-scale literature data, once available.
+    Only used when target_material == "WO3_Pd"; has zero effect otherwise.
+    """
+    if X_physics.ndim == 1:
+        X_physics = X_physics.reshape(1, -1)
+    pd_norm = X_physics[:, 6]            # normalized pd_thickness (feature 7, /30nm)
+    pd_nm = pd_norm * 30.0
+    optimum_nm = 8.0
+    # Zero-preserving bump: exactly 0 at pd_nm=0 (every existing zero-Pd
+    # experiment is completely unaffected), peaks at optimum_nm, decays beyond it.
+    enhancement = (pd_nm / optimum_nm) * np.exp(1.0 - (pd_nm / optimum_nm))
+    return np.clip(enhancement, 0.0, None)
+
 def build_physics_kernel() -> ConstantKernel:
     """Constructs an RBF Kernel bounded directly to physical length-scales."""
     kernel = ConstantKernel(1.0, (0.01, 100.0)) * RBF(
@@ -117,7 +163,8 @@ def build_physics_kernel() -> ConstantKernel:
             3.0,   # Energy Per nm
             1.5,   # Plasma Density
             0.5,   # Rotation Factor
-            2.0    # Ar Normalized
+            2.0,   # Ar Normalized
+            1.0    # Catalyst Loading (NEW)
         ],
         length_scale_bounds=(0.1, 100.0)
     ) + WhiteKernel(
@@ -146,7 +193,13 @@ def calculate_quality_score(xrd_phase, wavelength_shift_pm, h2_response_s, grain
     return round(float(np.clip(quality, 0.0, 100.0)), 1)
 
 def format_candidate(candidate_array, mean_xrd, mean_wave, min_w, denom):
-    s_rf, s_press, s_dist, s_thick, s_rot, s_ar = candidate_array
+    # candidate_array is now 7-wide (added Pd Thickness); unpack defensively so
+    # this still works if ever called with an old 6-wide array.
+    if len(candidate_array) >= 7:
+        s_rf, s_press, s_dist, s_thick, s_rot, s_ar, s_pd = candidate_array[:7]
+    else:
+        s_rf, s_press, s_dist, s_thick, s_rot, s_ar = candidate_array[:6]
+        s_pd = 0.0
     pred_xrd = float(mean_xrd)
     pred_wave_pm = round(float(min_w + float(mean_wave) * denom), 1)
 
@@ -164,6 +217,7 @@ def format_candidate(candidate_array, mean_xrd, mean_wave, min_w, denom):
         "film_thickness": round(float(s_thick), 1),
         "rotation_speed": float(s_rot),
         "ar_flow": round(float(s_ar), 1),
+        "pd_thickness": round(float(s_pd), 1),
         "expected_phase": phase,
         "expected_shift": pred_wave_pm
     }
@@ -205,8 +259,13 @@ def generate_bayesian_suggestion(
     # Inject Literature Priors transformed through physics pipeline
     priors = MATERIAL_PRIORS.get(target_material, MATERIAL_PRIORS["Generic"])
     for p in priors:
+        # pd_thickness is the OPTIONAL 9th value (index 8). len(p)==8 for every
+        # pre-existing material key, so this defaults to 0.0 for all of them —
+        # nothing about Generic/WO3/TiO2/ZnO changes.
+        p_pd = float(p[8]) if len(p) > 8 else 0.0
         p_feat = transform_to_physics_features(
-            rf_power=p[0], pressure=p[1], distance=p[2], thickness=p[3], rotation=p[4], ar_flow=p[5], substrate_type="Si Wafer"
+            rf_power=p[0], pressure=p[1], distance=p[2], thickness=p[3], rotation=p[4], ar_flow=p[5],
+            pd_thickness=p_pd, substrate_type="Si Wafer"
         )
         X_physics_list.append(p_feat)
         y_xrd_list.append(p[6])
@@ -223,10 +282,12 @@ def generate_bayesian_suggestion(
         thick = float(exp.get("film_thickness") or exp.get("film_thickness_nm") or 200.0)
         rot = float(exp.get("rotation_speed") or exp.get("rotation_speed_rpm") or 5.0)
         ar = float(exp.get("ar_flow") or exp.get("ar_flow_sccm") or 30.0)
+        pd_t = float(exp.get("pd_thickness") or 0.0)   # NEW — defaults to 0 if not present
         stype = str(exp.get("substrate_type", "Si Wafer")).strip()
 
         p_feat = transform_to_physics_features(
-            rf_power=rf, pressure=press, distance=dist, thickness=thick, rotation=rot, ar_flow=ar, substrate_type=stype
+            rf_power=rf, pressure=press, distance=dist, thickness=thick, rotation=rot, ar_flow=ar,
+            pd_thickness=pd_t, substrate_type=stype
         )
 
         phase = str(exp.get("xrd_phase") or "Amorphous").strip()
@@ -259,19 +320,26 @@ def generate_bayesian_suggestion(
     )
     gp_xrd.fit(X_physics, y_xrd_adjusted)
 
+    # Pd catalyst prior: exactly 0 for every zero-Pd experiment (see
+    # pd_catalyst_prior docstring), so this is a strict no-op for the WO3-only
+    # track and every other existing material track.
+    wave_prior_train = pd_catalyst_prior(X_physics)
+    y_wave_adjusted = y_wave_norm - (0.3 * wave_prior_train)
+
     gp_wave = GaussianProcessRegressor(
         kernel=build_physics_kernel(), 
         n_restarts_optimizer=15, 
         normalize_y=True, 
         random_state=42
     )
-    gp_wave.fit(X_physics, y_wave_norm)
+    gp_wave.fit(X_physics, y_wave_adjusted)
     using_dkl = False
 
     anomaly_detected = False
     if real_count > 0:
         pred_last, _ = gp_wave.predict([X_physics[-1]], return_std=True)
-        if abs(pred_last[0] - y_wave_norm[-1]) > 0.45:
+        pred_last_full = pred_last[0] + (0.3 * wave_prior_train[-1])
+        if abs(pred_last_full - y_wave_norm[-1]) > 0.45:
             anomaly_detected = True
 
     # --------------------------------------------------------------------------
@@ -284,12 +352,22 @@ def generate_bayesian_suggestion(
         b_dist = float(best_run.get("target_distance") or best_run.get("target_substrate_distance_cm") or 5.0)
         b_thick = float(best_run.get("film_thickness") or best_run.get("film_thickness_nm") or 200.0)
         b_ar = float(best_run.get("ar_flow") or best_run.get("ar_flow_sccm") or 30.0)
+        b_pd = float(best_run.get("pd_thickness") or 0.0)
     else:
         b_rf, b_press, b_dist, b_thick, b_ar = 120.0, 5.0, 5.0, 200.0, 30.0
+        b_pd = 0.0
+
+    # Pd search range only active for the WO3_Pd track; every other material
+    # track keeps pd_thickness pinned to (0.0, 0.0) so candidates never vary
+    # it and behavior is byte-for-byte identical to before this feature existed.
+    if target_material == "WO3_Pd":
+        pd_bounds = (0.0, 30.0)
+    else:
+        pd_bounds = (0.0, 0.0)
 
     # Physical machine constraints: CST8 RF magnetron sputtering
     if real_count <= 5:
-        bounds = [(80.0, 150.0), (3.0, 10.0), (3.0, 7.0), (100.0, 500.0), [1.0, 5.0, 10.0], (20.0, 40.0)]
+        bounds = [(80.0, 150.0), (3.0, 10.0), (3.0, 7.0), (100.0, 500.0), [1.0, 5.0, 10.0], (20.0, 40.0), pd_bounds]
     elif real_count <= 12:
         bounds = [
             (max(80.0, b_rf * 0.75), min(150.0, b_rf * 1.25)),
@@ -297,7 +375,8 @@ def generate_bayesian_suggestion(
             (max(3.0, b_dist * 0.75), min(7.0, b_dist * 1.25)),
             (max(100.0, b_thick * 0.75), min(500.0, b_thick * 1.25)),
             [1.0, 5.0, 10.0],
-            (max(20.0, b_ar * 0.75), min(40.0, b_ar * 1.25))
+            (max(20.0, b_ar * 0.75), min(40.0, b_ar * 1.25)),
+            pd_bounds if pd_bounds[1] == 0.0 else (max(0.0, b_pd * 0.6), min(30.0, max(b_pd * 1.4, 5.0)))
         ]
     else:
         bounds = [
@@ -306,7 +385,8 @@ def generate_bayesian_suggestion(
             (max(3.0, b_dist * 0.88), min(7.0, b_dist * 1.12)),
             (max(100.0, b_thick * 0.88), min(500.0, b_thick * 1.12)),
             [1.0, 5.0, 10.0],
-            (max(20.0, b_ar * 0.88), min(40.0, b_ar * 1.12))
+            (max(20.0, b_ar * 0.88), min(40.0, b_ar * 1.12)),
+            pd_bounds if pd_bounds[1] == 0.0 else (max(0.0, b_pd * 0.8), min(30.0, max(b_pd * 1.2, 3.0)))
         ]
 
     np.random.seed(42)
@@ -317,7 +397,9 @@ def generate_bayesian_suggestion(
         np.random.uniform(bounds[2][0], bounds[2][1], num_candidates),
         np.random.uniform(bounds[3][0], bounds[3][1], num_candidates),
         np.random.choice(bounds[4], num_candidates),
-        np.random.uniform(bounds[5][0], bounds[5][1], num_candidates)
+        np.random.uniform(bounds[5][0], bounds[5][1], num_candidates),
+        np.random.uniform(bounds[6][0], bounds[6][1], num_candidates) if bounds[6][1] > bounds[6][0]
+            else np.zeros(num_candidates)
     ])
 
     validated_cands = matrix_ml_engine.apply_physical_constraints(raw_candidates)
@@ -330,7 +412,8 @@ def generate_bayesian_suggestion(
     # Transform candidate array into physics features
     candidates_physics = np.array([
         transform_to_physics_features(
-            rf_power=c[0], pressure=c[1], distance=c[2], thickness=c[3], rotation=c[4], ar_flow=c[5], substrate_type=target_substrate
+            rf_power=c[0], pressure=c[1], distance=c[2], thickness=c[3], rotation=c[4], ar_flow=c[5],
+            pd_thickness=c[6], substrate_type=target_substrate
         )
         for c in candidates
     ])
@@ -340,7 +423,9 @@ def generate_bayesian_suggestion(
     pred_xrd_res, std_xrd = gp_xrd.predict(candidates_physics, return_std=True)
     mean_xrd = np.clip(pred_xrd_res + cand_xrd_prior, 0.0, 1.0)
 
-    mean_wave, std_wave = gp_wave.predict(candidates_physics, return_std=True)
+    mean_wave_res, std_wave = gp_wave.predict(candidates_physics, return_std=True)
+    cand_wave_prior = pd_catalyst_prior(candidates_physics)
+    mean_wave = mean_wave_res + (0.3 * cand_wave_prior)
 
     # Substrate Specific Multi-Objective Balance
     if target_substrate == "Optical Fiber":
@@ -368,6 +453,11 @@ def generate_bayesian_suggestion(
     opt1 = candidates[idx_1]
     
     cost_penalty = 0.5 * (candidates[:, 3] / bounds[3][1]) + 0.5 * (candidates[:, 5] / bounds[5][1])
+    if bounds[6][1] > 0:
+        # Pd is a precious-metal catalyst layer — penalize thicker Pd candidates
+        # too, on top of the existing thickness/Ar cost terms. No effect on any
+        # track where bounds[6][1] == 0 (i.e. every non-WO3_Pd material).
+        cost_penalty = cost_penalty + 0.3 * (candidates[:, 6] / bounds[6][1])
     acq_eff = acquisition - (1.2 * cost_penalty) 
     
     dist_to_opt1 = np.linalg.norm(candidates - opt1, axis=1)
@@ -388,7 +478,7 @@ def generate_bayesian_suggestion(
     ]
 
     best_candidate = opt1
-    s_rf, s_press, s_dist, s_thick, s_rot, s_ar = best_candidate
+    s_rf, s_press, s_dist, s_thick, s_rot, s_ar, s_pd = best_candidate
     pred_xrd_val = float(mean_xrd[idx_1])
     pred_wave_pm = round(float(min_w + float(mean_wave[idx_1]) * denom), 1)
 
@@ -410,12 +500,14 @@ def generate_bayesian_suggestion(
         
         sandbox_physics = np.array([
             transform_to_physics_features(
-                rf_power=pt[0], pressure=pt[1], distance=pt[2], thickness=pt[3], rotation=pt[4], ar_flow=pt[5], substrate_type=target_substrate
+                rf_power=pt[0], pressure=pt[1], distance=pt[2], thickness=pt[3], rotation=pt[4], ar_flow=pt[5],
+                pd_thickness=pt[6], substrate_type=target_substrate
             )
             for pt in sandbox_raw
         ])
         
-        mean_w, std_w = gp_wave.predict(sandbox_physics, return_std=True)
+        mean_w_res, std_w = gp_wave.predict(sandbox_physics, return_std=True)
+        mean_w = mean_w_res + (0.3 * pd_catalyst_prior(sandbox_physics))
         return {
             "x": test_vals.tolist(),
             "y": (mean_w * denom + min_w).tolist(),
@@ -426,21 +518,25 @@ def generate_bayesian_suggestion(
         "rf_curve": generate_sandbox_curve(0, best_candidate, bounds[0]),
         "pressure_curve": generate_sandbox_curve(1, best_candidate, bounds[1])
     }
+    # Pd-thickness sandbox curve — only meaningful (non-flat) on the WO3_Pd track
+    if bounds[6][1] > bounds[6][0]:
+        sandbox_data["pd_curve"] = generate_sandbox_curve(6, best_candidate, bounds[6])
 
     try:
         rbf_k = gp_xrd.kernel_.k1.k2
         l_scales = rbf_k.length_scale
         scaled_ls = (l_scales - np.min(l_scales)) / (np.max(l_scales) - np.min(l_scales) + 1e-6)
     except Exception:
-        scaled_ls = np.ones(6) * 0.5
+        scaled_ls = np.ones(7) * 0.5
         
-    uncertainties = {PARAM_NAMES[i]: round(float(np.clip(scaled_ls[i], 0.1, 1.0)), 2) for i in range(6)}
+    uncertainties = {PARAM_NAMES[i]: round(float(np.clip(scaled_ls[i], 0.1, 1.0)), 2) for i in range(len(PARAM_NAMES))}
 
     converged = False
     if recent_suggestions and len(recent_suggestions) >= 2:
         last3 = [
             [float(r["suggested_rf_power"]), float(r["suggested_pressure"]), float(r["suggested_distance"]), 
-             float(r["suggested_thickness"]), float(r["suggested_rotation"]), float(r["suggested_ar_flow"])] 
+             float(r["suggested_thickness"]), float(r["suggested_rotation"]), float(r["suggested_ar_flow"]),
+             float(r.get("suggested_pd_thickness") or 0.0)]
             for r in recent_suggestions
         ]
         last3.append(best_candidate.tolist())
@@ -472,6 +568,7 @@ def generate_bayesian_suggestion(
             "film_thickness": round(float(s_thick), 1),
             "rotation_speed": float(s_rot),
             "ar_flow": round(float(s_ar), 1),
+            "pd_thickness": round(float(s_pd), 1),
         },
         "expected": {
             "xrd_phase": expected_phase,
