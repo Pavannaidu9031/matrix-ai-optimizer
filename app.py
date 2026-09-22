@@ -38,7 +38,13 @@ import matrix_ml_engine
 # ==============================================================================
 app = FastAPI(title="MatrixAI — Intelligent Materials Optimizer")
 
-SECRET_KEY = os.getenv("SECRET_KEY", "matrix-ai-permanent-production-secret-key-2026")
+SECRET_KEY = os.getenv("SECRET_KEY")
+if not SECRET_KEY:
+    raise RuntimeError(
+        "SECRET_KEY environment variable is not set. Generate one with: "
+        "python -c \"import secrets; print(secrets.token_hex(32))\" "
+        "and add it in Render -> Environment."
+    )
 
 app.add_middleware(
     SessionMiddleware,
