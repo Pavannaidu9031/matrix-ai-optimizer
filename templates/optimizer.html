@@ -134,8 +134,8 @@
             </div>
             <div class="w-full lg:w-auto bg-[#0a0a0a] px-4 md:px-6 py-4 border border-gray-800 flex items-center justify-between space-x-4 md:space-x-8">
                 <div>
-                    <div class="text-[10px] text-gray-500 font-bold uppercase tracking-widest">PRED_SHIFT</div>
-                    <div class="text-lg md:text-2xl font-mono font-bold text-matrix-green" id="simShift">-- pm</div>
+                    <div class="text-[10px] text-gray-500 font-bold uppercase tracking-widest">PRED_INTENSITY</div>
+                    <div class="text-lg md:text-2xl font-mono font-bold text-matrix-green" id="simShift">--</div>
                 </div>
                 <div class="text-right">
                     <div class="text-[10px] text-gray-500 font-bold uppercase tracking-widest">EXP_PHASE</div>
@@ -168,7 +168,7 @@
                 <div class="flex justify-between text-[10px] font-bold tracking-widest uppercase">
                     <span class="text-gray-400">Thickness</span><span class="text-matrix-green font-mono text-xs" id="valThick">200 nm</span>
                 </div>
-                <input type="range" id="sliderThick" min="100" max="500" step="10" value="200" class="w-full accent-matrix-green bg-gray-800 h-1.5 appearance-none outline-none cursor-pointer touch-target">
+                <input type="range" id="sliderThick" min="30" max="500" step="10" value="200" class="w-full accent-matrix-green bg-gray-800 h-1.5 appearance-none outline-none cursor-pointer touch-target">
             </div>
             <div class="space-y-3">
                 <div class="flex justify-between text-[10px] font-bold tracking-widest uppercase">
@@ -180,7 +180,7 @@
                 <div class="flex justify-between text-[10px] font-bold tracking-widest uppercase">
                     <span class="text-gray-400">Ar_Flow</span><span class="text-matrix-green font-mono text-xs" id="valAr">30 sccm</span>
                 </div>
-                <input type="range" id="sliderAr" min="20" max="40" step="1" value="30" class="w-full accent-matrix-green bg-gray-800 h-1.5 appearance-none outline-none cursor-pointer touch-target">
+                <input type="range" id="sliderAr" min="3" max="40" step="1" value="30" class="w-full accent-matrix-green bg-gray-800 h-1.5 appearance-none outline-none cursor-pointer touch-target">
             </div>
             <div class="space-y-3 md:col-span-2 lg:col-span-3">
                 <div class="flex justify-between text-[10px] font-bold tracking-widest uppercase">
@@ -331,7 +331,7 @@
                                         <div class="flex justify-between"><span>FLOW:</span> <span class="text-white">${opt.data.ar_flow} sccm</span></div>
                                         <div class="flex justify-between"><span>THICK:</span> <span class="text-white">${opt.data.film_thickness} nm</span></div>
                                         ${opt.data.pd_thickness ? `<div class="flex justify-between"><span>PD:</span> <span class="text-white">${opt.data.pd_thickness} nm</span></div>` : ''}
-                                        <div class="flex justify-between pt-4 mt-2 border-t border-gray-800 ${titleColor} font-bold tracking-widest"><span>EXP_SHIFT:</span> <span>${opt.data.expected_shift} pm</span></div>
+                                        <div class="flex justify-between pt-4 mt-2 border-t border-gray-800 ${titleColor} font-bold tracking-widest"><span>EXP_INTENSITY:</span> <span>${opt.data.expected_shift}</span></div>
                                     </div>
                                 </div>
                                 <div class="mt-8 space-y-2">
@@ -477,7 +477,7 @@
         if (p.pd_thickness) params.push(`Pd Thickness: ${p.pd_thickness} nm`);
         params.forEach(param => { doc.text(param, 25, y); y += 8; });
         doc.setFont("helvetica", "bold"); doc.text("HEURISTIC_OUTCOMES:", 20, y + 10); doc.setFont("helvetica", "normal"); y += 20;
-        doc.text(`Target XRD Phase: ${s.expected.xrd_phase}`, 25, y); doc.text(`Expected Shift: ${s.expected.wavelength_shift_estimate} pm`, 25, y+8);
+        doc.text(`Target XRD Phase: ${s.expected.xrd_phase}`, 25, y); doc.text(`Expected Intensity Change: ${s.expected.wavelength_shift_estimate}`, 25, y+8);
         doc.setFont("helvetica", "bold"); doc.text("SYS_RATIONALE:", 20, y + 25); doc.setFont("helvetica", "normal");
         const lines = doc.splitTextToSize(s.explanation, 170); doc.text(lines, 20, y + 35);
         doc.save(`MATRIX_REPORT_RUN_${s.run_number}.pdf`);
@@ -493,7 +493,7 @@
         const branchName = document.getElementById('branch_name')?.value || 'main'; 
 
         fetch('/api/sandbox/simulate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ target_material: targetMaterial, params: params, branch: branchName }) })
-        .then(res => res.json()).then(data => { if(data.success) { document.getElementById('simShift').innerText = data.simulation.predicted_wavelength_shift + " pm (±" + data.simulation.uncertainty + ")"; document.getElementById('simPhase').innerText = data.simulation.expected_phase; } });
+        .then(res => res.json()).then(data => { if(data.success) { document.getElementById('simShift').innerText = data.simulation.predicted_wavelength_shift + " (±" + data.simulation.uncertainty + ")"; document.getElementById('simPhase').innerText = data.simulation.expected_phase; } });
         fetch('/api/sensor/predict', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ params: { rf_power: params[0], working_pressure: params[1] } }) })
         .then(res => res.json()).then(data => { if(data.success) { document.getElementById('predLimit').innerText = data.predictions.detection_limit_h2 + " %"; document.getElementById('predResp').innerText = data.predictions.response_time_s + " s"; document.getElementById('predRecov').innerText = data.predictions.recovery_time_s + " s"; document.getElementById('predStab').innerText = data.predictions.stability_score + " / 1.0"; } });
     }
