@@ -367,32 +367,51 @@ def generate_bayesian_suggestion(
     # track keeps pd_thickness pinned to (0.0, 0.0) so candidates never vary
     # it and behavior is byte-for-byte identical to before this feature existed.
     if target_material == "WO3_Pd":
-        pd_bounds = (0.0, 30.0)
+        pd_bounds = (3.0, 15.0)
     else:
         pd_bounds = (0.0, 0.0)
 
+    # WO3 thickness range depends on geometry. The etched-core evanescent
+    # sensor only uses the first ~100-200 nm of film, and thick high-index WO3
+    # (n ~2.0-2.2 vs silica ~1.45) pulls light out of the bare core. So the
+    # fiber / WO3_Pd track searches a thinner range than flat-wafer work.
+    if target_material == "WO3_Pd" or target_substrate == "Optical Fiber":
+        thick_lo, thick_hi = 30.0, 200.0
+    else:
+        thick_lo, thick_hi = 100.0, 500.0
+
+    # Ar flow range (sccm)
+    ar_lo, ar_hi = 3.0, 40.0
+
+    # Keep best-run centres inside the active ranges so narrowed bounds
+    # never invert (lo > hi) when a best run came from a wider range.
+    b_thick = min(max(b_thick, thick_lo), thick_hi)
+    b_ar = min(max(b_ar, ar_lo), ar_hi)
+    if pd_bounds[1] > 0.0:
+        b_pd = min(max(b_pd, pd_bounds[0]), pd_bounds[1])
+
     # Physical machine constraints: CST8 RF magnetron sputtering
     if real_count <= 5:
-        bounds = [(80.0, 150.0), (3.0, 10.0), (3.0, 7.0), (100.0, 500.0), [1.0, 5.0, 10.0], (20.0, 40.0), pd_bounds]
+        bounds = [(80.0, 150.0), (3.0, 10.0), (3.0, 7.0), (thick_lo, thick_hi), [1.0, 5.0, 10.0], (ar_lo, ar_hi), pd_bounds]
     elif real_count <= 12:
         bounds = [
             (max(80.0, b_rf * 0.75), min(150.0, b_rf * 1.25)),
             (max(3.0, b_press * 0.75), min(10.0, b_press * 1.25)),
             (max(3.0, b_dist * 0.75), min(7.0, b_dist * 1.25)),
-            (max(100.0, b_thick * 0.75), min(500.0, b_thick * 1.25)),
+            (max(thick_lo, b_thick * 0.75), min(thick_hi, b_thick * 1.25)),
             [1.0, 5.0, 10.0],
-            (max(20.0, b_ar * 0.75), min(40.0, b_ar * 1.25)),
-            pd_bounds if pd_bounds[1] == 0.0 else (max(0.0, b_pd * 0.6), min(30.0, max(b_pd * 1.4, 5.0)))
+            (max(ar_lo, b_ar * 0.75), min(ar_hi, b_ar * 1.25)),
+            pd_bounds if pd_bounds[1] == 0.0 else (max(pd_bounds[0], b_pd * 0.6), min(pd_bounds[1], max(b_pd * 1.4, pd_bounds[0] + 2.0)))
         ]
     else:
         bounds = [
             (max(80.0, b_rf * 0.88), min(150.0, b_rf * 1.12)),
             (max(3.0, b_press * 0.88), min(10.0, b_press * 1.12)),
             (max(3.0, b_dist * 0.88), min(7.0, b_dist * 1.12)),
-            (max(100.0, b_thick * 0.88), min(500.0, b_thick * 1.12)),
+            (max(thick_lo, b_thick * 0.88), min(thick_hi, b_thick * 1.12)),
             [1.0, 5.0, 10.0],
-            (max(20.0, b_ar * 0.88), min(40.0, b_ar * 1.12)),
-            pd_bounds if pd_bounds[1] == 0.0 else (max(0.0, b_pd * 0.8), min(30.0, max(b_pd * 1.2, 3.0)))
+            (max(ar_lo, b_ar * 0.88), min(ar_hi, b_ar * 1.12)),
+            pd_bounds if pd_bounds[1] == 0.0 else (max(pd_bounds[0], b_pd * 0.8), min(pd_bounds[1], max(b_pd * 1.2, pd_bounds[0] + 1.0)))
         ]
 
     np.random.seed(42)
