@@ -148,7 +148,7 @@
                 <input type="number" step="0.1" name="h2_response_time_s" required placeholder="12" class="w-full bg-gray-900 border border-gray-800 rounded-none p-3 text-sm text-matrix-green font-mono focus:border-matrix-green transition-colors outline-none placeholder-gray-700 touch-target">
             </div>
             <div>
-                <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Lambda_Shift [pm]</label>
+                <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Intensity_Change</label>
                 <input type="number" step="0.1" name="wavelength_shift_pm" placeholder="150" class="w-full bg-gray-900 border border-gray-800 rounded-none p-3 text-sm text-matrix-green font-mono focus:border-matrix-green transition-colors outline-none placeholder-gray-700 touch-target">
             </div>
             <div>
@@ -199,7 +199,7 @@
                     <th class="px-1.5 py-2">ROT[rpm]</th>
                     <th class="px-1.5 py-2">PHASE</th>
                     <th class="px-1.5 py-2">H2[s]</th>
-                    <th class="px-1.5 py-2">SHIFT[pm]</th>
+                    <th class="px-1.5 py-2">INTENSITY</th>
                     <th class="px-1.5 py-2 text-center">CMD</th>
                 </tr>
             </thead>
@@ -264,7 +264,7 @@
                 <div>DIST: <span class="text-white font-bold">{{ exp.target_distance }}cm</span></div>
                 <div>THICK: <span class="text-white font-bold">{{ exp.film_thickness }}nm</span></div>
                 <div>ROT: <span class="text-white font-bold">{{ exp.rotation_speed }}rpm</span></div>
-                <div>SHIFT: <span class="text-white font-bold">{{ exp.wavelength_shift }}pm</span></div>
+                <div>INTENSITY: <span class="text-white font-bold">{{ exp.wavelength_shift }}</span></div>
                 <div>QUALITY: <span class="text-white font-bold">{{ exp.quality_score }}</span></div>
             </div>
             <div class="flex gap-2 text-[10px] font-bold tracking-widest uppercase">
@@ -340,7 +340,7 @@
                 </select>
             </div>
             <div>
-                <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Wave_Shift [pm]</label>
+                <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Intensity_Change</label>
                 <input type="number" step="0.1" name="wavelength_shift_pm" class="w-full bg-gray-900 border border-gray-800 rounded-none p-3 text-sm text-matrix-green font-mono focus:border-matrix-green transition-colors outline-none touch-target">
             </div>
 
@@ -374,7 +374,7 @@
         <div class="bg-gray-900 p-4 border border-gray-800">
             <h4 class="text-[10px] font-bold text-gray-500 uppercase tracking-widest border-b border-gray-800 pb-2 mb-4">SIM_RESULTS</h4>
             <div class="flex justify-between items-center text-xs mb-3">
-                <span class="text-gray-400 font-bold tracking-widest uppercase">Shift_Delta:</span>
+                <span class="text-gray-400 font-bold tracking-widest uppercase">Intensity_Delta:</span>
                 <span id="wiShiftDelta" class="font-bold text-lg font-mono">--</span>
             </div>
             <div class="flex justify-between items-center text-xs">
@@ -468,7 +468,7 @@
                 const color = diff >= 0 ? 'text-matrix-green' : 'text-red-500';
                 const sign = diff > 0 ? '+' : '';
                 document.getElementById('wiShiftDelta').className = `font-bold text-lg font-mono ${color}`;
-                document.getElementById('wiShiftDelta').innerText = `${sign}${diff} pm`;
+                document.getElementById('wiShiftDelta').innerText = `${sign}${diff}`;
                 document.getElementById('wiPhase').innerText = data.simulation.expected_phase;
             }
         } catch (err) { console.error("SYS_ERR:", err); }
