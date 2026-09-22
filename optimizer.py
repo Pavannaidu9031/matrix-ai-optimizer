@@ -263,9 +263,15 @@ def generate_bayesian_suggestion(
         # pre-existing material key, so this defaults to 0.0 for all of them —
         # nothing about Generic/WO3/TiO2/ZnO changes.
         p_pd = float(p[8]) if len(p) > 8 else 0.0
+        # substrate_type is the OPTIONAL 10th value (index 9). Defaults to
+        # "Si Wafer" for every existing row (accurate — these are flat-substrate
+        # literature examples), but a row can now carry "Optical Fiber" if it
+        # genuinely was deposited on a fiber, which changes its rotation_factor
+        # physics feature to reflect that rotation actually matters for it.
+        p_stype = str(p[9]).strip() if len(p) > 9 else "Si Wafer"
         p_feat = transform_to_physics_features(
             rf_power=p[0], pressure=p[1], distance=p[2], thickness=p[3], rotation=p[4], ar_flow=p[5],
-            pd_thickness=p_pd, substrate_type="Si Wafer"
+            pd_thickness=p_pd, substrate_type=p_stype
         )
         X_physics_list.append(p_feat)
         y_xrd_list.append(p[6])
