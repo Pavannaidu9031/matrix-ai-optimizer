@@ -895,7 +895,13 @@ async def upload_literature_pdf(request: Request, file: UploadFile = File(...)):
             "'pd_sputter_time_s' (float, s — Pd deposition time, if reported), "
             "'pd_pressure_mtorr' (float, mTorr — working pressure for the Pd step, if reported), "
             "'pd_ar_flow' (float, sccm — Ar flow for the Pd step, if reported), "
-            "'pd_o2_flow' (float, sccm — O2 flow for the Pd step, usually 0 for pure Pd metal)."
+            "'pd_o2_flow' (float, sccm — O2 flow for the Pd step, usually 0 for pure Pd metal), "
+            "'substrate_type' (string — MUST be exactly 'Si Wafer' or 'Optical Fiber'. Use "
+            "'Optical Fiber' only if the paper deposited its sensing film directly onto an "
+            "optical fiber, fiber core, fiber cladding, or any fiber-optic substrate. Use "
+            "'Si Wafer' for every other substrate -- flat silicon, glass, quartz, sapphire, "
+            "ITO-coated glass, ceramic, or any substrate that is not a fiber. When in doubt "
+            "or not stated, use 'Si Wafer'.)."
         )
         
         # Automatically rotate through stable production models if a 503 spike occurs
@@ -962,7 +968,7 @@ async def upload_literature_pdf(request: Request, file: UploadFile = File(...)):
                 float(data.get("sputter_time_s", 1800.0)),
                 float(data.get("film_thickness", 100.0)),
                 float(data.get("rotation_speed", 5.0)),
-                "Si Wafer",
+                data.get("substrate_type") if data.get("substrate_type") in ("Si Wafer", "Optical Fiber") else "Si Wafer",
                 data.get("xrd_phase", "Monoclinic"),
                 float(data.get("grain_size", 15.0)),
                 float(data.get("h2_response_time", 10.0)),
