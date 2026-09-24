@@ -24,7 +24,7 @@
                 <h3 class="text-lg font-bold text-slate-300">Best Shift Found</h3>
                 <div class="text-4xl font-extrabold text-purple-500 mt-2">
                     {% if experiments %}
-                        {{ experiments | map(attribute='wavelength_shift') | reject('none') | max | default('0') }} pm
+                        {{ experiments | map(attribute='light_intensity_uw') | reject('none') | max | default('0') }} µW
                     {% else %}
                         0 pm
                     {% endif %}
@@ -53,7 +53,7 @@
                         <td class="p-4">{{ exp.quality_score }}</td>
                         <td class="p-4">{{ exp.rf_power }} W</td>
                         <td class="p-4">{{ exp.xrd_phase }}</td>
-                        <td class="p-4 font-bold text-purple-400">{{ exp.wavelength_shift }} pm</td>
+                        <td class="p-4 font-bold text-purple-400">{{ exp.light_intensity_uw }} µW</td>
                     </tr>
                     {% endfor %}
                 </tbody>
