@@ -628,8 +628,11 @@ def simulate_sandbox_point(user_experiments: list, target_material: str, slider_
 
     priors = MATERIAL_PRIORS.get(target_material, MATERIAL_PRIORS["Generic"])
     for p in priors:
+        p_pd = float(p[8]) if len(p) > 8 else 0.0
+        p_stype = str(p[9]).strip() if len(p) > 9 else "Si Wafer"
         p_feat = transform_to_physics_features(
-            rf_power=p[0], pressure=p[1], distance=p[2], thickness=p[3], rotation=p[4], ar_flow=p[5]
+            rf_power=p[0], pressure=p[1], distance=p[2], thickness=p[3], rotation=p[4], ar_flow=p[5],
+            pd_thickness=p_pd, substrate_type=p_stype
         )
         X_physics_list.append(p_feat)
         y_xrd_list.append(p[6])
@@ -644,10 +647,12 @@ def simulate_sandbox_point(user_experiments: list, target_material: str, slider_
         thick = float(exp.get("film_thickness") or exp.get("film_thickness_nm") or 200.0)
         rot = float(exp.get("rotation_speed") or exp.get("rotation_speed_rpm") or 5.0)
         ar = float(exp.get("ar_flow") or exp.get("ar_flow_sccm") or 30.0)
+        pd_t = float(exp.get("pd_thickness") or 0.0)
         stype = str(exp.get("substrate_type", "Si Wafer")).strip()
 
         p_feat = transform_to_physics_features(
-            rf_power=rf, pressure=press, distance=dist, thickness=thick, rotation=rot, ar_flow=ar, substrate_type=stype
+            rf_power=rf, pressure=press, distance=dist, thickness=thick, rotation=rot, ar_flow=ar,
+            pd_thickness=pd_t, substrate_type=stype
         )
 
         phase = str(exp.get("xrd_phase") or "Amorphous").strip()
@@ -671,7 +676,10 @@ def simulate_sandbox_point(user_experiments: list, target_material: str, slider_
     gp_xrd = GaussianProcessRegressor(kernel=build_physics_kernel(), normalize_y=False, random_state=42).fit(X_physics, y_xrd_adjusted)
     gp_wave = GaussianProcessRegressor(kernel=build_physics_kernel(), normalize_y=True, random_state=42).fit(X_physics, y_wave_norm)
 
-    # Transform slider input
+    # Transform slider input. pd_thickness (index 6) is optional so this stays
+    # backward-compatible with any caller still sending only 6 slider values --
+    # it simply defaults to 0, same as before this fix.
+    target_substrate = "Optical Fiber" if target_material == "WO3_Pd" else "Si Wafer"
     slider_physics = np.array([
         transform_to_physics_features(
             rf_power=slider_params[0],
@@ -679,7 +687,9 @@ def simulate_sandbox_point(user_experiments: list, target_material: str, slider_
             distance=slider_params[2],
             thickness=slider_params[3] if len(slider_params) > 3 else 200.0,
             rotation=slider_params[4] if len(slider_params) > 4 else 5.0,
-            ar_flow=slider_params[5] if len(slider_params) > 5 else 30.0
+            ar_flow=slider_params[5] if len(slider_params) > 5 else 30.0,
+            pd_thickness=slider_params[6] if len(slider_params) > 6 else 0.0,
+            substrate_type=target_substrate
         )
     ])
 
@@ -712,10 +722,19 @@ def generate_phase_map(user_experiments: list, target_material: str, param_x: st
     X_physics_list = []
     y_xrd_list = []
 
+    # Phase Map is only ever meaningfully requested for a WO3-family track, so
+    # target_substrate follows the same WO3_Pd -> fiber convention used in
+    # generate_bayesian_suggestion, keeping this heatmap physically consistent
+    # with what the suggestion engine actually assumes for this track.
+    target_substrate = "Optical Fiber" if target_material == "WO3_Pd" else "Si Wafer"
+
     priors = MATERIAL_PRIORS.get(target_material, MATERIAL_PRIORS["Generic"])
     for p in priors:
+        p_pd = float(p[8]) if len(p) > 8 else 0.0
+        p_stype = str(p[9]).strip() if len(p) > 9 else "Si Wafer"
         p_feat = transform_to_physics_features(
-            rf_power=p[0], pressure=p[1], distance=p[2], thickness=p[3], rotation=p[4], ar_flow=p[5]
+            rf_power=p[0], pressure=p[1], distance=p[2], thickness=p[3], rotation=p[4], ar_flow=p[5],
+            pd_thickness=p_pd, substrate_type=p_stype
         )
         X_physics_list.append(p_feat)
         y_xrd_list.append(p[6])
@@ -729,9 +748,12 @@ def generate_phase_map(user_experiments: list, target_material: str, param_x: st
         thick = float(exp.get("film_thickness") or exp.get("film_thickness_nm") or 200.0)
         rot = float(exp.get("rotation_speed") or exp.get("rotation_speed_rpm") or 5.0)
         ar = float(exp.get("ar_flow") or exp.get("ar_flow_sccm") or 30.0)
+        pd_t = float(exp.get("pd_thickness") or 0.0)
+        stype = str(exp.get("substrate_type", "Si Wafer")).strip()
 
         p_feat = transform_to_physics_features(
-            rf_power=rf, pressure=press, distance=dist, thickness=thick, rotation=rot, ar_flow=ar
+            rf_power=rf, pressure=press, distance=dist, thickness=thick, rotation=rot, ar_flow=ar,
+            pd_thickness=pd_t, substrate_type=stype
         )
         phase = str(exp.get("xrd_phase") or "Amorphous").strip()
         y_xrd_list.append(XRD_MAP.get(phase, 0.0))
@@ -749,14 +771,15 @@ def generate_phase_map(user_experiments: list, target_material: str, param_x: st
     idx_x = param_indices.get(param_x, 0)
     idx_y = param_indices.get(param_y, 1)
 
-    defaults = [120.0, 5.0, 5.0, 200.0, 5.0, 30.0]
+    defaults = [120.0, 8.0, 5.0, 200.0, 5.0, 30.0, 0.0]
     if user_experiments:
         best_run = max(user_experiments, key=lambda e: float(e.get("quality_score") or 0.0))
         defaults[0] = float(best_run.get("rf_power") or best_run.get("rf_power_w") or 120.0)
-        defaults[1] = float(best_run.get("working_pressure") or best_run.get("working_pressure_mtorr") or 5.0)
+        defaults[1] = float(best_run.get("working_pressure") or best_run.get("working_pressure_mtorr") or 8.0)
         defaults[2] = float(best_run.get("target_distance") or best_run.get("target_substrate_distance_cm") or 5.0)
         defaults[3] = float(best_run.get("film_thickness") or best_run.get("film_thickness_nm") or 200.0)
         defaults[5] = float(best_run.get("ar_flow") or best_run.get("ar_flow_sccm") or 30.0)
+        defaults[6] = float(best_run.get("pd_thickness") or 0.0)
 
     x_min, x_max = (80.0, 150.0) if idx_x == 0 else (3.0, 10.0)
     y_min, y_max = (80.0, 150.0) if idx_y == 0 else (3.0, 10.0)
@@ -771,7 +794,7 @@ def generate_phase_map(user_experiments: list, target_material: str, param_x: st
             pt = list(defaults)
             pt[idx_x] = x_v
             pt[idx_y] = y_v
-            p_feat = np.array([transform_to_physics_features(pt[0], pt[1], pt[2], pt[3], pt[4], pt[5])])
+            p_feat = np.array([transform_to_physics_features(pt[0], pt[1], pt[2], pt[3], pt[4], pt[5], pd_thickness=pt[6], substrate_type=target_substrate)])
             prior_val = physics_prior_mean(p_feat)[0]
             pred_res = gp_xrd.predict(p_feat)[0]
             pred = np.clip(pred_res + prior_val, 0.0, 1.0)
@@ -808,18 +831,19 @@ def calibrate_noise_variance(user_experiments: list) -> dict:
 # ------------------------------------------------------------------------------
 def generate_synthesis_recipe(params: dict, target_material: str) -> str:
     rf = params.get("rf_power", 120.0)
-    press = params.get("working_pressure", 5.0)
+    press = params.get("working_pressure", 8.0)
     ar = params.get("ar_flow", 30.0)
     o2 = params.get("o2_flow", 5.0)
     dist = params.get("target_distance", 7.0)
     thick = params.get("film_thickness", 100.0)
     rot = params.get("rotation_speed", 5.0)
+    pd_thick = params.get("pd_thickness")
 
     recipe = f"""# MatrixAI PVD Deposition Recipe ({target_material})
 ## Target Thickness: {thick} nm | Substrate Rotation: {rot} RPM
 
 ### Step 1: Chamber Evacuation & Base Pressure
-* **Target Base Pressure:** < $5.0 \\times 10^{-6}$ Torr
+* **Target Base Pressure:** ≤ $5.0 \\times 10^{-5}$ Torr
 * **Substrate Pre-heating:** Room temperature baseline (No in-situ heater). Post-anneal max: 230 °C.
 
 ### Step 2: Gas Stabilization
@@ -832,7 +856,7 @@ def generate_synthesis_recipe(params: dict, target_material: str) -> str:
 * **RF Power Ramp:** Ramp to {rf} W at 20 W/min to prevent ceramic target thermal shock.
 * **Duration:** 5 minutes (Target cleaning phase).
 
-### Step 4: Thin-Film Deposition
+### Step 4: Thin-Film Deposition (WO3, RF magnetron)
 * **Shutter Status:** OPEN
 * **Target-Substrate Distance:** {dist} cm
 * **Estimated Deposition Time:** {int(thick * 0.35)} minutes (Based on kinetic energy density rate model).
@@ -840,6 +864,22 @@ def generate_synthesis_recipe(params: dict, target_material: str) -> str:
 ### Step 5: Post-Deposition Cool Down
 * **RF Power:** Ramp down to 0 W.
 * **Gas Flow:** Maintain Ar flow for 10 minutes during chamber vent cool down.
+"""
+
+    if target_material == "WO3_Pd" and pd_thick:
+        recipe += f"""
+### Step 6: Pd Catalyst Layer -- SEPARATE sputtering run, Pd metal target, DC magnetron
+* **Vent chamber, swap to Pd target, re-pump to base pressure** (this is a distinct
+  run from Steps 1-5, not a continuation -- CST8 cannot hold both targets at once).
+* **Target Pd Thickness:** {pd_thick} nm
+* **Suggested starting point:** see CALC_PD_RECIPE on the Process Engine page for
+  a DC power / time estimate based on your calibrated (or literature) deposition rate.
+* **Shutter Status:** OPEN only for the calculated deposition time, then CLOSED.
+
+### Step 7: Final Cool Down & Unload
+* **DC Power:** Ramp down to 0 W.
+* **Gas Flow:** Maintain Ar flow for 10 minutes during chamber vent cool down.
+* Sample is now the complete WO3 + Pd bilayer sensor, ready for characterization.
 """
     return recipe
 
