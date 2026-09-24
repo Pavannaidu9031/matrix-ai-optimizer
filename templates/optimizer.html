@@ -331,7 +331,7 @@
                                         <div class="flex justify-between"><span>FLOW:</span> <span class="text-white">${opt.data.ar_flow} sccm</span></div>
                                         <div class="flex justify-between"><span>THICK:</span> <span class="text-white">${opt.data.film_thickness} nm</span></div>
                                         ${opt.data.pd_thickness ? `<div class="flex justify-between"><span>PD:</span> <span class="text-white">${opt.data.pd_thickness} nm</span></div>` : ''}
-                                        <div class="flex justify-between pt-4 mt-2 border-t border-gray-800 ${titleColor} font-bold tracking-widest"><span>EXP_INTENSITY:</span> <span>${opt.data.expected_shift}</span></div>
+                                        <div class="flex justify-between pt-4 mt-2 border-t border-gray-800 ${titleColor} font-bold tracking-widest"><span>EXP_INTENSITY:</span> <span>${opt.data.expected_shift}µW</span></div>
                                     </div>
                                 </div>
                                 <div class="mt-8 space-y-2">
@@ -477,7 +477,7 @@
         if (p.pd_thickness) params.push(`Pd Thickness: ${p.pd_thickness} nm`);
         params.forEach(param => { doc.text(param, 25, y); y += 8; });
         doc.setFont("helvetica", "bold"); doc.text("HEURISTIC_OUTCOMES:", 20, y + 10); doc.setFont("helvetica", "normal"); y += 20;
-        doc.text(`Target XRD Phase: ${s.expected.xrd_phase}`, 25, y); doc.text(`Expected Intensity Change: ${s.expected.wavelength_shift_estimate}`, 25, y+8);
+        doc.text(`Target XRD Phase: ${s.expected.xrd_phase}`, 25, y); doc.text(`Expected Intensity Change: ${s.expected.light_intensity_uw_estimate}`, 25, y+8);
         doc.setFont("helvetica", "bold"); doc.text("SYS_RATIONALE:", 20, y + 25); doc.setFont("helvetica", "normal");
         const lines = doc.splitTextToSize(s.explanation, 170); doc.text(lines, 20, y + 35);
         doc.save(`MATRIX_REPORT_RUN_${s.run_number}.pdf`);
@@ -493,7 +493,7 @@
         const branchName = document.getElementById('branch_name')?.value || 'main'; 
 
         fetch('/api/sandbox/simulate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ target_material: targetMaterial, params: params, branch: branchName }) })
-        .then(res => res.json()).then(data => { if(data.success) { document.getElementById('simShift').innerText = data.simulation.predicted_wavelength_shift + " (±" + data.simulation.uncertainty + ")"; document.getElementById('simPhase').innerText = data.simulation.expected_phase; } });
+        .then(res => res.json()).then(data => { if(data.success) { document.getElementById('simShift').innerText = data.simulation.predicted_light_intensity_uw + " (±" + data.simulation.uncertainty + ")"; document.getElementById('simPhase').innerText = data.simulation.expected_phase; } });
         fetch('/api/sensor/predict', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ params: { rf_power: params[0], working_pressure: params[1] } }) })
         .then(res => res.json()).then(data => { if(data.success) { document.getElementById('predLimit').innerText = data.predictions.detection_limit_h2 + " %"; document.getElementById('predResp').innerText = data.predictions.response_time_s + " s"; document.getElementById('predRecov').innerText = data.predictions.recovery_time_s + " s"; document.getElementById('predStab').innerText = data.predictions.stability_score + " / 1.0"; } });
     }
