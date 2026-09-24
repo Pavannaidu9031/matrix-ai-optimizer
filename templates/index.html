@@ -53,8 +53,8 @@
             <div class="text-[10px] font-bold text-gray-500 mt-2 tracking-widest uppercase">Monoclinic Runs</div>
         </div>
         <div class="bg-[#0a0a0a] p-6 border-l-2 border-l-matrix-green border border-gray-800 relative overflow-hidden group transition-all">
-            <div class="text-4xl font-mono font-extrabold text-white">{{ stats.best_shift }} <span class="text-sm font-normal text-gray-500">pm</span></div>
-            <div class="text-[10px] font-bold text-gray-500 mt-2 tracking-widest uppercase">Best Lambda Shift</div>
+            <div class="text-4xl font-mono font-extrabold text-white">{{ stats.best_shift }} <span class="text-sm font-normal text-gray-500">µW</span></div>
+            <div class="text-[10px] font-bold text-gray-500 mt-2 tracking-widest uppercase">Best Intensity Change</div>
         </div>
         <div class="bg-[#0a0a0a] p-6 border-l-2 border-l-matrix-green border border-gray-800 relative overflow-hidden group transition-all">
             <div class="text-4xl font-mono font-extrabold text-matrix-green">{{ stats.runs_remaining }}</div>
@@ -215,8 +215,8 @@
             return num / den;
         }
 
-        const features = ['rf_power', 'working_pressure', 'target_distance', 'sputter_time_s', 'ar_flow', 'quality_score', 'wavelength_shift'];
-        const labels = ['RF Power', 'Pressure', 'Distance', 'Time (s)', 'Ar Flow', 'Quality Score', 'Wave Shift'];
+        const features = ['rf_power', 'working_pressure', 'target_distance', 'sputter_time_s', 'ar_flow', 'quality_score', 'light_intensity_uw'];
+        const labels = ['RF Power', 'Pressure', 'Distance', 'Time (s)', 'Ar Flow', 'Quality Score', 'Intensity (µW)'];
         
         const matrix = [];
         for (let i = 0; i < features.length; i++) {
