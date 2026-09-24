@@ -148,8 +148,8 @@
                 <input type="number" step="0.1" name="h2_response_time_s" required placeholder="12" class="w-full bg-gray-900 border border-gray-800 rounded-none p-3 text-sm text-matrix-green font-mono focus:border-matrix-green transition-colors outline-none placeholder-gray-700 touch-target">
             </div>
             <div>
-                <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Intensity_Change</label>
-                <input type="number" step="0.1" name="wavelength_shift_pm" placeholder="150" class="w-full bg-gray-900 border border-gray-800 rounded-none p-3 text-sm text-matrix-green font-mono focus:border-matrix-green transition-colors outline-none placeholder-gray-700 touch-target">
+                <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Intensity_Change [µW]</label>
+                <input type="number" step="0.01" name="light_intensity_uw" id="light_intensity_uw" placeholder="e.g. 12.5" class="w-full bg-gray-900 border border-gray-800 rounded-none p-3 text-sm text-matrix-green font-mono focus:border-matrix-green transition-colors outline-none placeholder-gray-700 touch-target">
             </div>
             <div>
                 <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Sys_Notes</label>
@@ -199,7 +199,7 @@
                     <th class="px-1.5 py-2">ROT[rpm]</th>
                     <th class="px-1.5 py-2">PHASE</th>
                     <th class="px-1.5 py-2">H2[s]</th>
-                    <th class="px-1.5 py-2">INTENSITY</th>
+                    <th class="px-1.5 py-2">INTENSITY[µW]</th>
                     <th class="px-1.5 py-2 text-center">CMD</th>
                 </tr>
             </thead>
@@ -229,7 +229,7 @@
                         {% else %}<span class="text-red-500 font-bold text-[9px] uppercase">AMORPH</span>{% endif %}
                     </td>
                     <td class="px-1.5 py-2 text-gray-300">{{ exp.h2_response_time }}</td>
-                    <td class="px-1.5 py-2 font-bold text-gray-200">{{ exp.wavelength_shift if exp.wavelength_shift is not none else '-' }}</td>
+                    <td class="px-1.5 py-2 font-bold text-gray-200">{{ exp.light_intensity_uw if exp.light_intensity_uw is not none else '-' }}</td>
                     
                     <td class="px-1.5 py-2 text-center space-x-1 whitespace-nowrap">
                         <button onclick='openWhatIf({{ loop.index0 }})' class="text-gray-500 hover:text-matrix-green font-bold text-[10px] tracking-widest uppercase transition-colors" title="What-If Sandbox">[?]</button>
@@ -264,7 +264,7 @@
                 <div>DIST: <span class="text-white font-bold">{{ exp.target_distance }}cm</span></div>
                 <div>THICK: <span class="text-white font-bold">{{ exp.film_thickness }}nm</span></div>
                 <div>ROT: <span class="text-white font-bold">{{ exp.rotation_speed }}rpm</span></div>
-                <div>INTENSITY: <span class="text-white font-bold">{{ exp.wavelength_shift }}</span></div>
+                <div>INTENSITY: <span class="text-white font-bold">{{ exp.light_intensity_uw }}µW</span></div>
                 <div>QUALITY: <span class="text-white font-bold">{{ exp.quality_score }}</span></div>
             </div>
             <div class="flex gap-2 text-[10px] font-bold tracking-widest uppercase">
@@ -340,8 +340,8 @@
                 </select>
             </div>
             <div>
-                <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Intensity_Change</label>
-                <input type="number" step="0.1" name="wavelength_shift_pm" class="w-full bg-gray-900 border border-gray-800 rounded-none p-3 text-sm text-matrix-green font-mono focus:border-matrix-green transition-colors outline-none touch-target">
+                <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Intensity_Change [µW]</label>
+                <input type="number" step="0.01" name="light_intensity_uw" class="w-full bg-gray-900 border border-gray-800 rounded-none p-3 text-sm text-matrix-green font-mono focus:border-matrix-green transition-colors outline-none touch-target">
             </div>
 
             <button type="submit" class="w-full bg-matrix-green hover:bg-green-400 text-black font-bold py-3 mt-4 transition-colors text-xs uppercase tracking-widest touch-target">
@@ -462,8 +462,8 @@
             });
             const data = await res.json();
             if(data.success && data.simulation) {
-                const actualShift = parseFloat(activeWhatIfExp.wavelength_shift) || 0.0;
-                const predictedShift = parseFloat(data.simulation.predicted_wavelength_shift) || 0.0;
+                const actualShift = parseFloat(activeWhatIfExp.light_intensity_uw) || 0.0;
+                const predictedShift = parseFloat(data.simulation.predicted_light_intensity_uw) || 0.0;
                 const diff = (predictedShift - actualShift).toFixed(1);
                 const color = diff >= 0 ? 'text-matrix-green' : 'text-red-500';
                 const sign = diff > 0 ? '+' : '';
@@ -547,7 +547,7 @@
             const res = await fetch('/api/literature/upload', { method: 'POST', body: formData }); const data = await res.json();
             if (data.success && data.extracted_data) {
                 const s = data.extracted_data;
-                const fields = [{ id: 'target_material', val: s.target_material }, { id: 'rf_power_w', val: s.rf_power }, { id: 'working_pressure_mtorr', val: s.working_pressure }, { id: 'ar_flow_sccm', val: s.ar_flow }, { id: 'o2_flow_sccm', val: s.o2_flow }, { id: 'substrate_temp_c', val: s.substrate_temp }, { id: 'target_substrate_distance_cm', val: s.target_distance }, { id: 'film_thickness_nm', val: s.film_thickness }, { id: 'rotation_speed_rpm', val: s.rotation_speed }, { id: 'xrd_phase', val: s.xrd_phase }, { id: 'grain_size_nm', val: s.grain_size }, { id: 'h2_response_time_s', val: s.h2_response_time }, { id: 'wavelength_shift_pm', val: s.wavelength_shift }, { id: 'pd_thickness', val: s.pd_thickness }, { id: 'pd_dc_power', val: s.pd_dc_power }, { id: 'pd_distance_cm', val: s.pd_distance_cm }, { id: 'pd_sputter_time_s', val: s.pd_sputter_time_s }, { id: 'pd_pressure_mtorr', val: s.pd_pressure_mtorr }, { id: 'pd_ar_flow', val: s.pd_ar_flow }, { id: 'pd_o2_flow', val: s.pd_o2_flow }];
+                const fields = [{ id: 'target_material', val: s.target_material }, { id: 'rf_power_w', val: s.rf_power }, { id: 'working_pressure_mtorr', val: s.working_pressure }, { id: 'ar_flow_sccm', val: s.ar_flow }, { id: 'o2_flow_sccm', val: s.o2_flow }, { id: 'substrate_temp_c', val: s.substrate_temp }, { id: 'target_substrate_distance_cm', val: s.target_distance }, { id: 'film_thickness_nm', val: s.film_thickness }, { id: 'rotation_speed_rpm', val: s.rotation_speed }, { id: 'xrd_phase', val: s.xrd_phase }, { id: 'grain_size_nm', val: s.grain_size }, { id: 'h2_response_time_s', val: s.h2_response_time }, { id: 'light_intensity_uw', val: s.light_intensity_uw }, { id: 'pd_thickness', val: s.pd_thickness }, { id: 'pd_dc_power', val: s.pd_dc_power }, { id: 'pd_distance_cm', val: s.pd_distance_cm }, { id: 'pd_sputter_time_s', val: s.pd_sputter_time_s }, { id: 'pd_pressure_mtorr', val: s.pd_pressure_mtorr }, { id: 'pd_ar_flow', val: s.pd_ar_flow }, { id: 'pd_o2_flow', val: s.pd_o2_flow }];
                 if (s.sputter_time_s) document.getElementById('sputtering_time_s').value = s.sputter_time_s;
                 fields.forEach(f => { const el = document.getElementById(f.id); if (el && f.val !== undefined) { el.value = f.val; el.classList.add('bg-matrix-green/20'); setTimeout(() => el.classList.remove('bg-matrix-green/20'), 1200); } });
                 alert("[SYS_MSG] Parsing complete. Vectors loaded.");
