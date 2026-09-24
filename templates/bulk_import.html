@@ -12,7 +12,7 @@
             <h1 class="text-2xl font-bold text-white tracking-tight">Experimental Data Batch Ingestion</h1>
             <p class="text-xs text-slate-400 mt-1">Upload CSV or spreadsheet exports to backfill lab history into Supabase automatically.</p>
         </div>
-        <a href="data:text/csv;charset=utf-8,rf_power,working_pressure,target_distance,sputter_time_s,ar_flow,o2_flow,substrate_temp,film_thickness_nm,crystal_phase,wavelength_shift,quality_score,notes%0A150,4.5,50,600,25,2.5,100,120,Monoclinic,2.4,88.5,Baseline WO3 run" download="matrixai_sample_template.csv" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-blue-400 border border-blue-500/20 text-xs font-semibold rounded-xl transition flex items-center space-x-2">
+        <a href="data:text/csv;charset=utf-8,rf_power,working_pressure,target_distance,sputter_time_s,ar_flow,o2_flow,substrate_temp,film_thickness_nm,crystal_phase,light_intensity_uw,quality_score,notes%0A150,4.5,50,600,25,2.5,100,120,Monoclinic,2.4,88.5,Baseline WO3 run" download="matrixai_sample_template.csv" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-blue-400 border border-blue-500/20 text-xs font-semibold rounded-xl transition flex items-center space-x-2">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
             <span>Download CSV Template</span>
         </a>
@@ -126,7 +126,7 @@
                 <td class="p-3">${rowObj.sputter_time_s || '300'} s</td>
                 <td class="p-3">${rowObj.ar_flow || '20'} / ${rowObj.o2_flow || '2'}</td>
                 <td class="p-3 text-blue-400">${rowObj.crystal_phase || 'Monoclinic'}</td>
-                <td class="p-3 text-purple-400">${rowObj.wavelength_shift || '0.0'} pm</td>
+                <td class="p-3 text-purple-400">${rowObj.light_intensity_uw || '0.0'} µW</td>
                 <td class="p-3 text-emerald-400 font-bold">${rowObj.quality_score || '50.0'}</td>
             `;
             previewTableBody.appendChild(tr);
