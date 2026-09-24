@@ -412,11 +412,11 @@
                 
                 if (data.success && data.simulation) {
                     const thick = data.simulation.thickness || data.simulation.film_thickness || (Math.random() * 80 + 50);
-                    const shift = data.simulation.shift || data.simulation.wavelength_shift || (Math.random() * 8 + 2);
+                    const shift = data.simulation.predicted_light_intensity_uw || data.simulation.shift || (Math.random() * 8 + 2);
                     const score = data.simulation.score || data.simulation.quality_score || (Math.random() * 40 + 50);
                     
                     document.getElementById('pred_thick').innerText = parseFloat(thick).toFixed(1) + ' nm';
-                    document.getElementById('pred_shift').innerText = parseFloat(shift).toFixed(2) + ' pm';
+                    document.getElementById('pred_shift').innerText = parseFloat(shift).toFixed(2) + ' µW';
                     document.getElementById('pred_score').innerText = parseFloat(score).toFixed(1) + ' / 100';
                 }
             } catch (e) {
