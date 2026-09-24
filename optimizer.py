@@ -299,7 +299,7 @@ def generate_bayesian_suggestion(
         phase = str(exp.get("xrd_phase") or "Amorphous").strip()
         y_xrd_list.append(XRD_MAP.get(phase, 0.0))
         
-        wave_key = "wavelength_shift" if "wavelength_shift" in exp else "wavelength_shift_pm"
+        wave_key = "light_intensity_uw" if "light_intensity_uw" in exp else "wavelength_shift_pm"
         y_wave_list.append(float(exp[wave_key]) if exp.get(wave_key) is not None else None)
         X_physics_list.append(p_feat)
 
@@ -360,8 +360,13 @@ def generate_bayesian_suggestion(
         b_ar = float(best_run.get("ar_flow") or best_run.get("ar_flow_sccm") or 30.0)
         b_pd = float(best_run.get("pd_thickness") or 0.0)
     else:
-        b_rf, b_press, b_dist, b_thick, b_ar = 120.0, 5.0, 5.0, 200.0, 30.0
+        b_rf, b_press, b_dist, b_thick, b_ar = 120.0, 8.0, 5.0, 200.0, 30.0
         b_pd = 0.0
+
+    # Pressure is now fixed, not searched: 5 mTorr was confirmed not to work
+    # well on the actual CST8 system, so 8 mTorr is used every time instead.
+    press_lo, press_hi = 8.0, 8.0
+    b_press = 8.0
 
     # Pd search range only active for the WO3_Pd track; every other material
     # track keeps pd_thickness pinned to (0.0, 0.0) so candidates never vary
@@ -392,11 +397,11 @@ def generate_bayesian_suggestion(
 
     # Physical machine constraints: CST8 RF magnetron sputtering
     if real_count <= 5:
-        bounds = [(80.0, 150.0), (3.0, 10.0), (3.0, 7.0), (thick_lo, thick_hi), [1.0, 5.0, 10.0], (ar_lo, ar_hi), pd_bounds]
+        bounds = [(80.0, 150.0), (press_lo, press_hi), (3.0, 7.0), (thick_lo, thick_hi), [1.0, 5.0, 10.0], (ar_lo, ar_hi), pd_bounds]
     elif real_count <= 12:
         bounds = [
             (max(80.0, b_rf * 0.75), min(150.0, b_rf * 1.25)),
-            (max(3.0, b_press * 0.75), min(10.0, b_press * 1.25)),
+            (press_lo, press_hi),
             (max(3.0, b_dist * 0.75), min(7.0, b_dist * 1.25)),
             (max(thick_lo, b_thick * 0.75), min(thick_hi, b_thick * 1.25)),
             [1.0, 5.0, 10.0],
@@ -406,7 +411,7 @@ def generate_bayesian_suggestion(
     else:
         bounds = [
             (max(80.0, b_rf * 0.88), min(150.0, b_rf * 1.12)),
-            (max(3.0, b_press * 0.88), min(10.0, b_press * 1.12)),
+            (press_lo, press_hi),
             (max(3.0, b_dist * 0.88), min(7.0, b_dist * 1.12)),
             (max(thick_lo, b_thick * 0.88), min(thick_hi, b_thick * 1.12)),
             [1.0, 5.0, 10.0],
@@ -597,7 +602,7 @@ def generate_bayesian_suggestion(
         },
         "expected": {
             "xrd_phase": expected_phase,
-            "wavelength_shift_estimate": pred_wave_pm,
+            "light_intensity_uw_estimate": pred_wave_pm,
         },
         "confidence": {
             "score": int(np.clip((40 if real_count < 6 else 92) + (8 if converged else 0), 10, 99)),
@@ -648,7 +653,7 @@ def simulate_sandbox_point(user_experiments: list, target_material: str, slider_
         phase = str(exp.get("xrd_phase") or "Amorphous").strip()
         y_xrd_list.append(XRD_MAP.get(phase, 0.0))
         
-        wave_key = "wavelength_shift" if "wavelength_shift" in exp else "wavelength_shift_pm"
+        wave_key = "light_intensity_uw" if "light_intensity_uw" in exp else "wavelength_shift_pm"
         y_wave_list.append(float(exp[wave_key]) if exp.get(wave_key) is not None else None)
         X_physics_list.append(p_feat)
 
@@ -694,7 +699,7 @@ def simulate_sandbox_point(user_experiments: list, target_material: str, slider_
         phase = "Amorphous"
 
     return {
-        "predicted_wavelength_shift": predicted_shift,
+        "predicted_light_intensity_uw": predicted_shift,
         "uncertainty": uncertainty_pm,
         "expected_phase": phase,
         "xrd_score": round(xrd_score, 2)
@@ -788,7 +793,7 @@ def calibrate_noise_variance(user_experiments: list) -> dict:
     if not user_experiments or len(user_experiments) < 3:
         return {"calibrated_noise": 0.05, "message": "Insufficient experiments for robust calibration (need at least 3). Defaulting to 0.05."}
     
-    shifts = [float(e.get("wavelength_shift") or e.get("wavelength_shift_pm") or 0.0) for e in user_experiments]
+    shifts = [float(e.get("light_intensity_uw") or e.get("wavelength_shift_pm") or 0.0) for e in user_experiments]
     variance = float(np.var(shifts))
     calibrated_noise = round(float(np.clip(variance / (np.mean(shifts) + 1e-6), 0.001, 0.5)), 4)
     
@@ -868,7 +873,7 @@ def suggest_pd_deposition_step(
     of the literature-based range.
     """
     LIT_DC_POWER_W = 100.0
-    LIT_PRESSURE_MTORR = 5.0
+    LIT_PRESSURE_MTORR = 8.0  # matches the fixed working pressure now used system-wide
     LIT_RATE_LOW_NM_MIN = 3.0
     LIT_RATE_HIGH_NM_MIN = 5.0
 
