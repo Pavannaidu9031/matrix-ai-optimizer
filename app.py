@@ -105,18 +105,18 @@ def release_db_connection(conn):
         except Exception:
             pass
 
-def safe_calculate_quality_score(xrd_phase, wavelength_shift, h2_response_time, grain_size, existing_exps):
+def safe_calculate_quality_score(xrd_phase, light_intensity_uw, h2_response_time, grain_size, existing_exps):
     try:
         formatted_exps = []
         for e in existing_exps:
             item = dict(e)
             item["h2_response_time_s"] = item.get("h2_response_time") or item.get("h2_response_time_s")
-            item["wavelength_shift_pm"] = item.get("wavelength_shift") or item.get("wavelength_shift_pm")
+            item["wavelength_shift_pm"] = item.get("light_intensity_uw") or item.get("wavelength_shift_pm")
             item["grain_size_nm"] = item.get("grain_size") or item.get("grain_size_nm")
             formatted_exps.append(item)
 
         return optimizer.calculate_quality_score(
-            xrd_phase, wavelength_shift, h2_response_time, grain_size, formatted_exps
+            xrd_phase, light_intensity_uw, h2_response_time, grain_size, formatted_exps
         )
     except Exception as err:
         print(f"Quality score fallback: {err}")
@@ -155,6 +155,29 @@ def ensure_pd_thickness_column(cur):
             cur.execute(f"ALTER TABLE experiments ADD COLUMN IF NOT EXISTS {col} {ddl}")
         except Exception:
             pass
+    # Sensor is intensity-based (uW), not wavelength-shift-based -- rename the
+    # column to match. Runs once: after the first successful rename the old
+    # column name no longer exists, so this becomes a harmless no-op on every
+    # later call. The ADD COLUMN after it is a safety net for a fresh DB where
+    # wavelength_shift never existed at all, so light_intensity_uw still gets created.
+    try:
+        cur.execute("ALTER TABLE experiments RENAME COLUMN wavelength_shift TO light_intensity_uw")
+    except Exception:
+        # Expected on every call after the first (old column no longer
+        # exists). Unlike ADD COLUMN IF NOT EXISTS above, this failure is a
+        # real Postgres error and leaves the transaction aborted, so every
+        # later query on this connection would fail until it's rolled back.
+        try:
+            cur.connection.rollback()
+        except Exception:
+            pass
+    try:
+        cur.execute("ALTER TABLE experiments ADD COLUMN IF NOT EXISTS light_intensity_uw FLOAT")
+    except Exception:
+        try:
+            cur.connection.rollback()
+        except Exception:
+            pass
 
 # ==============================================================================
 # OAUTH CONFIGURATION
@@ -187,7 +210,7 @@ class ExperimentModel(BaseModel):
     xrd_phase: str = "Amorphous"
     grain_size: Optional[float] = None
     h2_response_time: float
-    wavelength_shift: Optional[float] = None
+    light_intensity_uw: Optional[float] = None
     pd_thickness: Optional[float] = 0.0
     pd_dc_power: Optional[float] = None
     pd_distance_cm: Optional[float] = None
@@ -256,7 +279,7 @@ def index(request: Request, branch: str = 'main'):
                 SELECT id, user_email, target_material, rf_power, working_pressure, ar_flow, o2_flow,
                        substrate_temp, target_distance, sputter_time_s, film_thickness,
                        rotation_speed, substrate_type, xrd_phase, grain_size,
-                       h2_response_time, wavelength_shift, batch_notes, quality_score, created_at, branch_name,
+                       h2_response_time, light_intensity_uw, batch_notes, quality_score, created_at, branch_name,
                        pd_thickness, pd_dc_power, pd_distance_cm, pd_sputter_time_s,
                        pd_pressure_mtorr, pd_ar_flow, pd_o2_flow
                 FROM experiments
@@ -285,7 +308,7 @@ def index(request: Request, branch: str = 'main'):
     
     shifts = []
     for e in experiments:
-        w_val = e.get("wavelength_shift") if e.get("wavelength_shift") is not None else e.get("wavelength_shift_pm")
+        w_val = e.get("light_intensity_uw") if e.get("light_intensity_uw") is not None else e.get("wavelength_shift_pm")
         if w_val is not None:
             try:
                 shifts.append(float(w_val))
@@ -332,7 +355,7 @@ def experiments_page(request: Request, branch: str = 'main'):
             SELECT id, user_email, target_material, rf_power, working_pressure, ar_flow, o2_flow,
                    substrate_temp, target_distance, sputter_time_s, film_thickness,
                    rotation_speed, substrate_type, xrd_phase, grain_size,
-                   h2_response_time, wavelength_shift, batch_notes, quality_score, created_at, branch_name,
+                   h2_response_time, light_intensity_uw, batch_notes, quality_score, created_at, branch_name,
                    pd_thickness, pd_dc_power, pd_distance_cm, pd_sputter_time_s,
                        pd_pressure_mtorr, pd_ar_flow, pd_o2_flow
             FROM experiments
@@ -575,7 +598,7 @@ async def add_experiment_form(request: Request):
         xrd_phase = get_str(["xrd_phase"], "Amorphous")
         grain_size = get_float(["grain_size_nm", "grain_size"], 10.0)
         h2_response_time = get_float(["h2_response_time_s", "h2_response_time", "h2_response"], 10.0)
-        wavelength_shift = get_float(["wavelength_shift_pm", "wavelength_shift"], 0.0)
+        light_intensity_uw = get_float(["light_intensity_uw", "wavelength_shift_pm"], 0.0)
         batch_notes = get_str(["notes", "batch_notes"], "Manual Entry")
         branch_name = get_str(["branch_name", "branch"], "main")
 
@@ -602,7 +625,7 @@ async def add_experiment_form(request: Request):
         all_exps = [dict(zip(cols, r)) for r in existing_rows]
 
         quality_score = safe_calculate_quality_score(
-            xrd_phase, wavelength_shift, h2_response_time, grain_size, all_exps
+            xrd_phase, light_intensity_uw, h2_response_time, grain_size, all_exps
         )
 
         cur.execute("""
@@ -610,7 +633,7 @@ async def add_experiment_form(request: Request):
                 user_email, target_material, rf_power, working_pressure, ar_flow,
                 o2_flow, substrate_temp, target_distance, sputter_time_s,
                 film_thickness, rotation_speed, substrate_type, xrd_phase,
-                grain_size, h2_response_time, wavelength_shift, batch_notes,
+                grain_size, h2_response_time, light_intensity_uw, batch_notes,
                 quality_score, branch_name, pd_thickness, pd_dc_power,
                 pd_distance_cm, pd_sputter_time_s, pd_pressure_mtorr,
                 pd_ar_flow, pd_o2_flow, created_at
@@ -621,7 +644,7 @@ async def add_experiment_form(request: Request):
             user_email, target_material, rf_power, working_pressure, ar_flow,
             o2_flow, substrate_temp, target_distance, sputter_time_s,
             film_thickness, rotation_speed, substrate_type, xrd_phase,
-            grain_size, h2_response_time, wavelength_shift, batch_notes,
+            grain_size, h2_response_time, light_intensity_uw, batch_notes,
             quality_score, branch_name, pd_thickness, pd_dc_power,
             pd_distance_cm, pd_sputter_time_s, pd_pressure_mtorr,
             pd_ar_flow, pd_o2_flow
@@ -658,7 +681,7 @@ async def save_experiment_json(request: Request, data: ExperimentModel):
         all_exps = [dict(zip(cols, r)) for r in existing_rows]
         
         quality_score = safe_calculate_quality_score(
-            data.xrd_phase, data.wavelength_shift, data.h2_response_time, data.grain_size, all_exps
+            data.xrd_phase, data.light_intensity_uw, data.h2_response_time, data.grain_size, all_exps
         )
 
         cur.execute("""
@@ -666,7 +689,7 @@ async def save_experiment_json(request: Request, data: ExperimentModel):
                 user_email, rf_power, working_pressure, ar_flow,
                 o2_flow, substrate_temp, target_distance, sputter_time_s,
                 film_thickness, rotation_speed, substrate_type, xrd_phase,
-                grain_size, h2_response_time, wavelength_shift, batch_notes,
+                grain_size, h2_response_time, light_intensity_uw, batch_notes,
                 quality_score, branch_name, pd_thickness, pd_dc_power,
                 pd_distance_cm, pd_sputter_time_s, pd_pressure_mtorr,
                 pd_ar_flow, pd_o2_flow, created_at
@@ -677,7 +700,7 @@ async def save_experiment_json(request: Request, data: ExperimentModel):
             user_email, data.rf_power, data.working_pressure, data.ar_flow,
             data.o2_flow, data.substrate_temp, data.target_distance, data.sputter_time_s,
             data.film_thickness, data.rotation_speed, data.substrate_type, data.xrd_phase,
-            data.grain_size, data.h2_response_time, data.wavelength_shift, data.batch_notes,
+            data.grain_size, data.h2_response_time, data.light_intensity_uw, data.batch_notes,
             quality_score, data.branch_name, data.pd_thickness or 0.0, data.pd_dc_power,
             data.pd_distance_cm, data.pd_sputter_time_s, data.pd_pressure_mtorr,
             data.pd_ar_flow, data.pd_o2_flow or 0.0
@@ -717,7 +740,7 @@ async def get_experiments(request: Request, branch: str = "main"):
             SELECT id, user_email, rf_power, working_pressure, ar_flow, o2_flow,
                    substrate_temp, target_distance, sputter_time_s, film_thickness,
                    rotation_speed, substrate_type, xrd_phase, grain_size,
-                   h2_response_time, wavelength_shift, batch_notes, quality_score, created_at, branch_name
+                   h2_response_time, light_intensity_uw, batch_notes, quality_score, created_at, branch_name
             FROM experiments
             WHERE user_email = %s AND branch_name = %s
             ORDER BY created_at DESC
@@ -820,7 +843,7 @@ async def get_ai_suggestion(request: Request):
                 user_email, s.get("rf_power"), s.get("working_pressure"),
                 s.get("target_distance"), s.get("film_thickness"), s.get("rotation_speed"),
                 s.get("ar_flow"), result.get("expected", {}).get("xrd_score"),
-                result.get("expected", {}).get("wavelength_shift_estimate"),
+                result.get("expected", {}).get("light_intensity_uw_estimate"),
                 result.get("confidence", {}).get("score"), result.get("convergence", {}).get("converged"),
                 result.get("kappa_used")
             ))
@@ -894,7 +917,7 @@ async def upload_literature_pdf(request: Request, file: UploadFile = File(...)):
             "'target_material' (string), 'rf_power' (float), 'working_pressure' (float), 'ar_flow' (float), "
             "'o2_flow' (float), 'substrate_temp' (float), 'target_distance' (float), 'sputter_time_s' (float in seconds), "
             "'film_thickness' (float), 'rotation_speed' (float), 'xrd_phase' (string: Monoclinic, Partial, or Amorphous), "
-            "'grain_size' (float), 'h2_response_time' (float), 'wavelength_shift' (float), "
+            "'grain_size' (float), 'h2_response_time' (float), 'light_intensity_uw' (float), "
             "'pd_thickness' (float, nm — Pd catalyst layer thickness if the paper uses one, else 0), "
             "'pd_dc_power' (float, W — DC power used for the separate Pd sputtering step, if reported), "
             "'pd_distance_cm' (float, cm — target-substrate distance for the Pd step, if reported), "
@@ -955,7 +978,7 @@ async def upload_literature_pdf(request: Request, file: UploadFile = File(...)):
                     user_email, target_material, rf_power, working_pressure, ar_flow,
                     o2_flow, substrate_temp, target_distance, sputter_time_s,
                     film_thickness, rotation_speed, substrate_type, xrd_phase,
-                    grain_size, h2_response_time, wavelength_shift, batch_notes,
+                    grain_size, h2_response_time, light_intensity_uw, batch_notes,
                     quality_score, pd_thickness, pd_dc_power, pd_distance_cm,
                     pd_sputter_time_s, pd_pressure_mtorr, pd_ar_flow, pd_o2_flow,
                     created_at
@@ -978,7 +1001,7 @@ async def upload_literature_pdf(request: Request, file: UploadFile = File(...)):
                 data.get("xrd_phase", "Monoclinic"),
                 float(data.get("grain_size", 15.0)),
                 float(data.get("h2_response_time", 10.0)),
-                float(data.get("wavelength_shift", 100.0)),
+                float(data.get("light_intensity_uw", 100.0)),
                 "Literature Prior (AI Extracted)",
                 quality_score,
                 float(data.get("pd_thickness", 0.0)),
@@ -1230,18 +1253,18 @@ async def bulk_import_experiments(request: Request):
             inserted_count = 0
             for r in runs:
                 crystal_phase = str(r.get("crystal_phase", "Amorphous"))
-                wavelength_shift = float(r.get("wavelength_shift", 0.0))
+                light_intensity_uw = float(r.get("light_intensity_uw", 0.0))
                 qs_input = r.get("quality_score")
                 
                 if qs_input:
                     quality_score = float(qs_input)
                 else:
-                    quality_score = safe_calculate_quality_score(crystal_phase, wavelength_shift, 10.0, 10.0, all_exps)
+                    quality_score = safe_calculate_quality_score(crystal_phase, light_intensity_uw, 10.0, 10.0, all_exps)
 
                 cur.execute("""
                     INSERT INTO experiments (
                         user_email, target_material, rf_power, working_pressure, target_distance, sputter_time_s,
-                        ar_flow, o2_flow, substrate_temp, film_thickness, xrd_phase, wavelength_shift, 
+                        ar_flow, o2_flow, substrate_temp, film_thickness, xrd_phase, light_intensity_uw, 
                         quality_score, batch_notes, branch_name, rotation_speed, substrate_type, grain_size, h2_response_time, created_at
                     ) VALUES (
                         %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW()
@@ -1250,7 +1273,7 @@ async def bulk_import_experiments(request: Request):
                     user.get("email"), "Generic", float(r.get("rf_power", 100)), float(r.get("working_pressure", 5.0)), 
                     float(r.get("target_distance", 50.0)), float(r.get("sputter_time_s", 300)), float(r.get("ar_flow", 20.0)), 
                     float(r.get("o2_flow", 2.0)), float(r.get("substrate_temp", 25.0)), float(r.get("film_thickness_nm", 100.0)), 
-                    crystal_phase, wavelength_shift, quality_score, str(r.get("notes", "Batch CSV Import")), 
+                    crystal_phase, light_intensity_uw, quality_score, str(r.get("notes", "Batch CSV Import")), 
                     current_branch, 5.0, "Si Wafer", 10.0, 10.0
                 ))
                 inserted_count += 1
@@ -1619,7 +1642,7 @@ async def api_calibrate_noise(request: Request):
     conn = get_db_connection()
     try:
         cur = conn.cursor()
-        cur.execute("SELECT wavelength_shift, wavelength_shift_pm FROM experiments WHERE user_email = %s", (user.get("email"),))
+        cur.execute("SELECT light_intensity_uw, wavelength_shift_pm FROM experiments WHERE user_email = %s", (user.get("email"),))
         cols = [desc[0] for desc in cur.description]
         experiments = [dict(zip(cols, row)) for row in cur.fetchall()]
     finally:
