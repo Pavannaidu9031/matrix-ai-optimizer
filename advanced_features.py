@@ -70,7 +70,7 @@ def generate_thesis_content(experiments, section):
     client = genai.Client(api_key=api_key)
     df = pd.DataFrame(experiments)
     
-    context = f"Total Runs: {len(df)}. Best Shift: {df['wavelength_shift'].max() if 'wavelength_shift' in df else 'N/A'}. Materials: {df['target_material'].unique() if 'target_material' in df else 'WO3'}."
+    context = f"Total Runs: {len(df)}. Best Intensity Change (uW): {df['light_intensity_uw'].max() if 'light_intensity_uw' in df else 'N/A'}. Materials: {df['target_material'].unique() if 'target_material' in df else 'WO3'}."
     
     prompts = {
         "results": f"Write an academic results chapter paragraph summarizing this PVD optimization data: {context}",
@@ -154,7 +154,7 @@ def check_publication_readiness(experiments):
     
     claims = [
         "To the best of our knowledge this is the first study to systematically optimize this material using advanced Machine Learning Methods.",
-        "Demonstrated optimal wavelength shifts significantly exceeding baseline literature parameters."
+        "Demonstrated optimal light-intensity sensor response significantly exceeding baseline literature parameters."
     ]
     journals = [
         {"name": "Sensors and Actuators B: Chemical", "if": "8.4"},
