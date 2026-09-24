@@ -28,7 +28,7 @@
         <div class="form-grid mb-8">
             <div class="flex flex-col space-y-2 lg:col-span-1">
                 <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Target_Domain</label>
-                <select id="targetMaterialSuggest" class="w-full bg-[#111] border border-gray-700 hover:border-gray-500 text-matrix-green text-sm p-3 font-mono outline-none focus:border-matrix-green transition-colors cursor-pointer touch-target" onchange="togglePdRateField()">
+                <select id="targetMaterialSuggest" class="w-full bg-[#111] border border-gray-700 hover:border-gray-500 text-matrix-green text-sm p-3 font-mono outline-none focus:border-matrix-green transition-colors cursor-pointer touch-target" onchange="togglePdRateField(); triggerSimulation();">
                     <option value="Generic">GENERIC_MIXED</option>
                     <option value="WO3">WO3_TUNGSTEN_TRIOXIDE</option>
                     <option value="TiO2">TIO2_TITANIUM_DIOXIDE</option>
@@ -181,6 +181,12 @@
                     <span class="text-gray-400">Ar_Flow</span><span class="text-matrix-green font-mono text-xs" id="valAr">30 sccm</span>
                 </div>
                 <input type="range" id="sliderAr" min="3" max="40" step="1" value="30" class="w-full accent-matrix-green bg-gray-800 h-1.5 appearance-none outline-none cursor-pointer touch-target">
+            </div>
+            <div class="space-y-3" id="sliderPdBlock" style="display:none;">
+                <div class="flex justify-between text-[10px] font-bold tracking-widest uppercase">
+                    <span class="text-gray-400">Pd_Thickness</span><span class="text-matrix-green font-mono text-xs" id="valPd">8 nm</span>
+                </div>
+                <input type="range" id="sliderPd" min="3" max="15" step="0.5" value="8" class="w-full accent-matrix-green bg-gray-800 h-1.5 appearance-none outline-none cursor-pointer touch-target">
             </div>
             <div class="space-y-3 md:col-span-2 lg:col-span-3">
                 <div class="flex justify-between text-[10px] font-bold tracking-widest uppercase">
@@ -483,10 +489,23 @@
         doc.save(`MATRIX_REPORT_RUN_${s.run_number}.pdf`);
     });
 
-    const sliders = ['Rf', 'Press', 'Dist', 'Thick', 'Rot', 'Ar', 'Time'].map(name => document.getElementById('slider' + name));
+    const sliders = ['Rf', 'Press', 'Dist', 'Thick', 'Rot', 'Ar', 'Time', 'Pd'].map(name => document.getElementById('slider' + name));
+    function toggleSandboxPdSlider() {
+        const sel = document.getElementById('targetMaterialSuggest');
+        const block = document.getElementById('sliderPdBlock');
+        if (!sel || !block) return;
+        block.style.display = (sel.value === 'WO3_Pd') ? '' : 'none';
+    }
+
     function triggerSimulation() {
         if (!document.getElementById('sliderRf')) return;
+        toggleSandboxPdSlider();
         const params = [parseFloat(document.getElementById('sliderRf').value), parseFloat(document.getElementById('sliderPress').value), parseFloat(document.getElementById('sliderDist').value), parseFloat(document.getElementById('sliderThick').value), parseFloat(document.getElementById('sliderRot').value), parseFloat(document.getElementById('sliderAr').value)];
+        const pdSlider = document.getElementById('sliderPd');
+        if (pdSlider) {
+            document.getElementById('valPd').innerText = pdSlider.value + " nm";
+            params.push(parseFloat(pdSlider.value));
+        }
         document.getElementById('valRf').innerText = params[0] + " W"; document.getElementById('valPress').innerText = params[1] + " mT"; document.getElementById('valDist').innerText = params[2] + " cm"; document.getElementById('valThick').innerText = params[3] + " nm"; document.getElementById('valRot').innerText = params[4] + " rpm"; document.getElementById('valAr').innerText = params[5] + " sccm";
         const timeSlider = document.getElementById('sliderTime'); if(timeSlider) { document.getElementById('valTime').innerText = timeSlider.value + " s"; }
         const targetMaterial = document.getElementById('targetMaterialSuggest')?.value || 'Generic';
