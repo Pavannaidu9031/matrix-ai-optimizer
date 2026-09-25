@@ -55,6 +55,11 @@
                     <option value="hybrid">HYBRID_ACQ</option>
                 </select>
             </div>
+            <div class="flex flex-col space-y-2 lg:col-span-1">
+                <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Today's_Core_Diameter [\u00b5m]</label>
+                <input type="number" step="0.01" id="measuredCoreDiameter" value="9.0" placeholder="9.0" class="w-full bg-[#111] border border-gray-700 hover:border-gray-500 text-matrix-green text-sm p-3 font-mono outline-none focus:border-matrix-green transition-colors placeholder-gray-700 touch-target">
+                <p class="text-[9px] text-gray-600 mt-1">Only affects fiber-track suggestions -- measure under microscope after etching</p>
+            </div>
         </div>
 
         <button id="btnSuggest" class="w-full md:w-4/5 md:mx-auto lg:w-auto lg:mx-0 bg-matrix-green hover:bg-green-400 text-black font-extrabold py-3 md:py-4 lg:py-3 px-8 transition-all text-xs uppercase tracking-widest shadow-hard-hover flex items-center justify-center space-x-3 touch-target">
@@ -301,6 +306,8 @@
         const branchName = document.getElementById('branch_name')?.value || 'main';
         const modelType = document.getElementById('modelType')?.value || 'standard';
         const acqStrategy = document.getElementById('acqStrategy')?.value || 'ucb';
+        const diameterInput = document.getElementById('measuredCoreDiameter')?.value;
+        const measuredCoreDiameter = diameterInput ? parseFloat(diameterInput) : null;
 
         btn.disabled = true;
         btnText.innerText = "COMPUTING...";
@@ -309,7 +316,7 @@
         try {
             const response = await fetch('/suggest', { 
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ target_material: targetMaterial, branch: branchName, model_type: modelType, acquisition: acqStrategy }) 
+                body: JSON.stringify({ target_material: targetMaterial, branch: branchName, model_type: modelType, acquisition: acqStrategy, measured_core_diameter_um: measuredCoreDiameter }) 
             });
             const data = await response.json();
 
@@ -337,6 +344,7 @@
                                         <div class="flex justify-between"><span>FLOW:</span> <span class="text-white">${opt.data.ar_flow} sccm</span></div>
                                         <div class="flex justify-between"><span>THICK:</span> <span class="text-white">${opt.data.film_thickness} nm</span></div>
                                         ${opt.data.pd_thickness ? `<div class="flex justify-between"><span>PD:</span> <span class="text-white">${opt.data.pd_thickness} nm</span></div>` : ''}
+                                        ${opt.data.core_diameter_um && opt.data.core_diameter_um != 9.0 ? `<div class="flex justify-between"><span>CORE_DIA:</span> <span class="text-white">${opt.data.core_diameter_um}µm</span></div>` : ''}
                                         <div class="flex justify-between pt-4 mt-2 border-t border-gray-800 ${titleColor} font-bold tracking-widest"><span>EXP_INTENSITY:</span> <span>${opt.data.expected_shift}µW</span></div>
                                     </div>
                                 </div>
