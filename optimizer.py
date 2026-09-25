@@ -62,11 +62,15 @@ def transform_to_physics_features(
     ar_flow: float = 30.0,
     pd_thickness: float = 0.0,
     sputter_time_s: float = None,
-    substrate_type: str = "Si Wafer"
+    substrate_type: str = "Si Wafer",
+    core_diameter_um: float = 9.0
 ) -> list:
     """Transforms raw machine parameters into kinetic and thermodynamic derived features.
     pd_thickness (nm) defaults to 0.0, so every existing caller that doesn't pass it
-    keeps behaving exactly as before — this is purely additive."""
+    keeps behaving exactly as before — this is purely additive.
+    core_diameter_um defaults to 9.0 (the middle of the 8-10um etch target), which
+    makes diameter_effect exactly neutral (1.0) for every existing caller that
+    doesn't pass a real measured diameter -- also purely additive."""
     rf_power = max(10.0, float(rf_power))
     distance = max(1.0, float(distance))
     pressure = max(0.5, float(pressure))
@@ -98,8 +102,20 @@ def transform_to_physics_features(
     # 6. Normalized Argon Flow (Gas density / mean free path baseline)
     ar_normalized = ar_flow / 30.0
 
-    # 7. Catalyst Loading (NEW — normalized Pd thickness, 0 when no catalyst present)
+    # 7. Catalyst Loading (normalized Pd thickness, 0 when no catalyst present)
     pd_normalized = pd_thickness / 30.0
+
+    # 8. Core Diameter Effect (NEW) -- a thinner fiber core means a larger
+    # fraction of the guided light's evanescent field extends into the
+    # coating, i.e. stronger optical/gasochromic interaction. Normalized
+    # against 9.0um (the middle of the 8-10um etch target) so this feature
+    # is exactly neutral (1.0) for Si Wafer runs and any caller that doesn't
+    # pass a real measured diameter. PLACEHOLDER functional form (simple
+    # inverse ratio) -- the GP learns the real relationship from your actual
+    # fiber data over time; this just gives it a physically-motivated
+    # starting direction instead of no signal at all.
+    core_diameter_um = max(1.0, float(core_diameter_um))
+    diameter_effect = 9.0 / core_diameter_um
 
     return [
         float(energy_density),
@@ -108,7 +124,8 @@ def transform_to_physics_features(
         float(plasma_density),
         float(rotation_factor),
         float(ar_normalized),
-        float(pd_normalized)
+        float(pd_normalized),
+        float(diameter_effect)
     ]
 
 # ------------------------------------------------------------------------------
@@ -164,7 +181,8 @@ def build_physics_kernel() -> ConstantKernel:
             1.5,   # Plasma Density
             0.5,   # Rotation Factor
             2.0,   # Ar Normalized
-            1.0    # Catalyst Loading (NEW)
+            1.0,   # Catalyst Loading
+            1.0    # Core Diameter Effect (NEW)
         ],
         length_scale_bounds=(0.1, 100.0)
     ) + WhiteKernel(
@@ -192,7 +210,7 @@ def calculate_quality_score(xrd_phase, wavelength_shift_pm, h2_response_s, grain
     quality = (xrd_score * 40.0) + (wave_norm * 30.0) + (h2_norm * 20.0) + (grain_norm * 10.0)
     return round(float(np.clip(quality, 0.0, 100.0)), 1)
 
-def format_candidate(candidate_array, mean_xrd, mean_wave, min_w, denom):
+def format_candidate(candidate_array, mean_xrd, mean_wave, min_w, denom, core_diameter_um=9.0):
     # candidate_array is now 7-wide (added Pd Thickness); unpack defensively so
     # this still works if ever called with an old 6-wide array.
     if len(candidate_array) >= 7:
@@ -218,6 +236,7 @@ def format_candidate(candidate_array, mean_xrd, mean_wave, min_w, denom):
         "rotation_speed": float(s_rot),
         "ar_flow": round(float(s_ar), 1),
         "pd_thickness": round(float(s_pd), 1),
+        "core_diameter_um": round(float(core_diameter_um), 2),
         "expected_phase": phase,
         "expected_shift": pred_wave_pm
     }
@@ -230,7 +249,8 @@ def generate_bayesian_suggestion(
     recent_suggestions: list = None, 
     target_material: str = "Generic", 
     model_type: str = "standard", 
-    acquisition_strategy: str = "ucb"
+    acquisition_strategy: str = "ucb",
+    measured_core_diameter_um: float = None
 ) -> dict:
     real_count = len(user_experiments)
     kappa = 1.5 if real_count <= 15 else 0.5  
@@ -269,9 +289,13 @@ def generate_bayesian_suggestion(
         # genuinely was deposited on a fiber, which changes its rotation_factor
         # physics feature to reflect that rotation actually matters for it.
         p_stype = str(p[9]).strip() if len(p) > 9 else "Si Wafer"
+        # core_diameter_um is the OPTIONAL 11th value (index 10). Defaults to
+        # 9.0 (neutral) for every existing row -- flat-substrate literature
+        # examples have no fiber core diameter concept at all.
+        p_diam = float(p[10]) if len(p) > 10 else 9.0
         p_feat = transform_to_physics_features(
             rf_power=p[0], pressure=p[1], distance=p[2], thickness=p[3], rotation=p[4], ar_flow=p[5],
-            pd_thickness=p_pd, substrate_type=p_stype
+            pd_thickness=p_pd, substrate_type=p_stype, core_diameter_um=p_diam
         )
         X_physics_list.append(p_feat)
         y_xrd_list.append(p[6])
@@ -288,12 +312,13 @@ def generate_bayesian_suggestion(
         thick = float(exp.get("film_thickness") or exp.get("film_thickness_nm") or 200.0)
         rot = float(exp.get("rotation_speed") or exp.get("rotation_speed_rpm") or 5.0)
         ar = float(exp.get("ar_flow") or exp.get("ar_flow_sccm") or 30.0)
-        pd_t = float(exp.get("pd_thickness") or 0.0)   # NEW — defaults to 0 if not present
+        pd_t = float(exp.get("pd_thickness") or 0.0)
         stype = str(exp.get("substrate_type", "Si Wafer")).strip()
+        diam = float(exp.get("core_diameter_um") or 9.0)   # NEW — measured etched-core diameter
 
         p_feat = transform_to_physics_features(
             rf_power=rf, pressure=press, distance=dist, thickness=thick, rotation=rot, ar_flow=ar,
-            pd_thickness=pd_t, substrate_type=stype
+            pd_thickness=pd_t, substrate_type=stype, core_diameter_um=diam
         )
 
         phase = str(exp.get("xrd_phase") or "Amorphous").strip()
@@ -439,11 +464,18 @@ def generate_bayesian_suggestion(
     candidates = np.array([c["params"] for c in validated_cands])
     penalties = np.array([c["penalty"] for c in validated_cands])
 
+    # The diameter of the specific fiber you're about to coat today -- fixed
+    # for this whole suggestion request, not something searched like the
+    # sputtering parameters. Defaults to 9.0 (neutral, middle of your 8-10um
+    # target) if not provided, so an old caller that doesn't send it behaves
+    # exactly as before this feature existed.
+    active_diameter_um = float(measured_core_diameter_um) if measured_core_diameter_um else 9.0
+
     # Transform candidate array into physics features
     candidates_physics = np.array([
         transform_to_physics_features(
             rf_power=c[0], pressure=c[1], distance=c[2], thickness=c[3], rotation=c[4], ar_flow=c[5],
-            pd_thickness=c[6], substrate_type=target_substrate
+            pd_thickness=c[6], substrate_type=target_substrate, core_diameter_um=active_diameter_um
         )
         for c in candidates
     ])
@@ -502,9 +534,9 @@ def generate_bayesian_suggestion(
     opt3 = candidates[idx_3]
 
     batch_options = [
-        {"type": "Max Quality", "data": format_candidate(opt1, mean_xrd[idx_1], mean_wave[idx_1], min_w, denom)},
-        {"type": "High Efficiency", "data": format_candidate(opt2, mean_xrd[idx_2], mean_wave[idx_2], min_w, denom)},
-        {"type": "Pure Exploration", "data": format_candidate(opt3, mean_xrd[idx_3], mean_wave[idx_3], min_w, denom)}
+        {"type": "Max Quality", "data": format_candidate(opt1, mean_xrd[idx_1], mean_wave[idx_1], min_w, denom, active_diameter_um)},
+        {"type": "High Efficiency", "data": format_candidate(opt2, mean_xrd[idx_2], mean_wave[idx_2], min_w, denom, active_diameter_um)},
+        {"type": "Pure Exploration", "data": format_candidate(opt3, mean_xrd[idx_3], mean_wave[idx_3], min_w, denom, active_diameter_um)}
     ]
 
     best_candidate = opt1
@@ -531,7 +563,7 @@ def generate_bayesian_suggestion(
         sandbox_physics = np.array([
             transform_to_physics_features(
                 rf_power=pt[0], pressure=pt[1], distance=pt[2], thickness=pt[3], rotation=pt[4], ar_flow=pt[5],
-                pd_thickness=pt[6], substrate_type=target_substrate
+                pd_thickness=pt[6], substrate_type=target_substrate, core_diameter_um=active_diameter_um
             )
             for pt in sandbox_raw
         ])
@@ -599,6 +631,7 @@ def generate_bayesian_suggestion(
             "rotation_speed": float(s_rot),
             "ar_flow": round(float(s_ar), 1),
             "pd_thickness": round(float(s_pd), 1),
+            "core_diameter_um": round(active_diameter_um, 2),
         },
         "expected": {
             "xrd_phase": expected_phase,
@@ -630,9 +663,10 @@ def simulate_sandbox_point(user_experiments: list, target_material: str, slider_
     for p in priors:
         p_pd = float(p[8]) if len(p) > 8 else 0.0
         p_stype = str(p[9]).strip() if len(p) > 9 else "Si Wafer"
+        p_diam = float(p[10]) if len(p) > 10 else 9.0
         p_feat = transform_to_physics_features(
             rf_power=p[0], pressure=p[1], distance=p[2], thickness=p[3], rotation=p[4], ar_flow=p[5],
-            pd_thickness=p_pd, substrate_type=p_stype
+            pd_thickness=p_pd, substrate_type=p_stype, core_diameter_um=p_diam
         )
         X_physics_list.append(p_feat)
         y_xrd_list.append(p[6])
@@ -649,10 +683,11 @@ def simulate_sandbox_point(user_experiments: list, target_material: str, slider_
         ar = float(exp.get("ar_flow") or exp.get("ar_flow_sccm") or 30.0)
         pd_t = float(exp.get("pd_thickness") or 0.0)
         stype = str(exp.get("substrate_type", "Si Wafer")).strip()
+        diam = float(exp.get("core_diameter_um") or 9.0)
 
         p_feat = transform_to_physics_features(
             rf_power=rf, pressure=press, distance=dist, thickness=thick, rotation=rot, ar_flow=ar,
-            pd_thickness=pd_t, substrate_type=stype
+            pd_thickness=pd_t, substrate_type=stype, core_diameter_um=diam
         )
 
         phase = str(exp.get("xrd_phase") or "Amorphous").strip()
@@ -689,7 +724,8 @@ def simulate_sandbox_point(user_experiments: list, target_material: str, slider_
             rotation=slider_params[4] if len(slider_params) > 4 else 5.0,
             ar_flow=slider_params[5] if len(slider_params) > 5 else 30.0,
             pd_thickness=slider_params[6] if len(slider_params) > 6 else 0.0,
-            substrate_type=target_substrate
+            substrate_type=target_substrate,
+            core_diameter_um=slider_params[7] if len(slider_params) > 7 else 9.0
         )
     ])
 
@@ -732,9 +768,10 @@ def generate_phase_map(user_experiments: list, target_material: str, param_x: st
     for p in priors:
         p_pd = float(p[8]) if len(p) > 8 else 0.0
         p_stype = str(p[9]).strip() if len(p) > 9 else "Si Wafer"
+        p_diam = float(p[10]) if len(p) > 10 else 9.0
         p_feat = transform_to_physics_features(
             rf_power=p[0], pressure=p[1], distance=p[2], thickness=p[3], rotation=p[4], ar_flow=p[5],
-            pd_thickness=p_pd, substrate_type=p_stype
+            pd_thickness=p_pd, substrate_type=p_stype, core_diameter_um=p_diam
         )
         X_physics_list.append(p_feat)
         y_xrd_list.append(p[6])
@@ -750,10 +787,11 @@ def generate_phase_map(user_experiments: list, target_material: str, param_x: st
         ar = float(exp.get("ar_flow") or exp.get("ar_flow_sccm") or 30.0)
         pd_t = float(exp.get("pd_thickness") or 0.0)
         stype = str(exp.get("substrate_type", "Si Wafer")).strip()
+        diam = float(exp.get("core_diameter_um") or 9.0)
 
         p_feat = transform_to_physics_features(
             rf_power=rf, pressure=press, distance=dist, thickness=thick, rotation=rot, ar_flow=ar,
-            pd_thickness=pd_t, substrate_type=stype
+            pd_thickness=pd_t, substrate_type=stype, core_diameter_um=diam
         )
         phase = str(exp.get("xrd_phase") or "Amorphous").strip()
         y_xrd_list.append(XRD_MAP.get(phase, 0.0))
@@ -771,7 +809,7 @@ def generate_phase_map(user_experiments: list, target_material: str, param_x: st
     idx_x = param_indices.get(param_x, 0)
     idx_y = param_indices.get(param_y, 1)
 
-    defaults = [120.0, 8.0, 5.0, 200.0, 5.0, 30.0, 0.0]
+    defaults = [120.0, 8.0, 5.0, 200.0, 5.0, 30.0, 0.0, 9.0]
     if user_experiments:
         best_run = max(user_experiments, key=lambda e: float(e.get("quality_score") or 0.0))
         defaults[0] = float(best_run.get("rf_power") or best_run.get("rf_power_w") or 120.0)
@@ -780,6 +818,7 @@ def generate_phase_map(user_experiments: list, target_material: str, param_x: st
         defaults[3] = float(best_run.get("film_thickness") or best_run.get("film_thickness_nm") or 200.0)
         defaults[5] = float(best_run.get("ar_flow") or best_run.get("ar_flow_sccm") or 30.0)
         defaults[6] = float(best_run.get("pd_thickness") or 0.0)
+        defaults[7] = float(best_run.get("core_diameter_um") or 9.0)
 
     x_min, x_max = (80.0, 150.0) if idx_x == 0 else (3.0, 10.0)
     y_min, y_max = (80.0, 150.0) if idx_y == 0 else (3.0, 10.0)
@@ -794,7 +833,7 @@ def generate_phase_map(user_experiments: list, target_material: str, param_x: st
             pt = list(defaults)
             pt[idx_x] = x_v
             pt[idx_y] = y_v
-            p_feat = np.array([transform_to_physics_features(pt[0], pt[1], pt[2], pt[3], pt[4], pt[5], pd_thickness=pt[6], substrate_type=target_substrate)])
+            p_feat = np.array([transform_to_physics_features(pt[0], pt[1], pt[2], pt[3], pt[4], pt[5], pd_thickness=pt[6], substrate_type=target_substrate, core_diameter_um=pt[7])])
             prior_val = physics_prior_mean(p_feat)[0]
             pred_res = gp_xrd.predict(p_feat)[0]
             pred = np.clip(pred_res + prior_val, 0.0, 1.0)
