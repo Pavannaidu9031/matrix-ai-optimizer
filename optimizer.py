@@ -31,6 +31,37 @@ MATERIAL_PRIORS = {
         [80.0, 6.0, 6.0, 300.0, 5.0, 20.0, 0.0, 30.0],
         [100.0, 4.0, 5.0, 250.0, 5.0, 25.0, 1.0, 85.0],
     ],
+    # NEW -- Pd as its OWN standalone material track (not the WO3_Pd catalyst
+    # layer -- this is for logging/optimizing a pure Pd film on its own, e.g.
+    # control samples or a separate study). Pd is a metal, so this is
+    # DC-sputtered in practice, same literature source already used for the
+    # WO3_Pd catalyst step's own defaults (Slavcheva et al. 2014: 100W DC,
+    # ~7.8cm target-substrate distance, deposition rate 3.2-4.5 nm/min).
+    # CAVEAT: this system's UI still labels the first parameter "RF_Power"
+    # everywhere, even though real Pd depositions use DC -- that label is
+    # generic across every material track, not accurate for this one
+    # specifically. Treat the number as "primary sputtering power (W)"
+    # regardless of what the label says, until that's worth a UI-wide fix.
+    "Pd": [
+        [100.0, 5.0, 7.0, 20.0, 5.0, 30.0, 0.0, 40.0],
+        [100.0, 3.75, 7.8, 10.0, 5.0, 30.0, 0.5, 90.0],
+        [80.0, 5.0, 5.0, 15.0, 10.0, 25.0, 1.0, 130.0],
+    ],
+    # NEW -- ITO (Indium Tin Oxide), a transparent conducting oxide, added as
+    # its own separate sensing-layer track (not related to WO3 or the Pd
+    # catalyst). Literature-seeded from RF-sputtered, ROOM-TEMPERATURE ITO
+    # studies specifically (no post-anneal), since that matches this system's
+    # no-heater constraint: ~150-200W RF, 2-3.5 mTorr, thickness 200-350nm
+    # gave good crystallinity/transmittance without any heat treatment.
+    # PLACEHOLDER seed values -- these papers report resistivity/transmittance,
+    # not this project's intensity-response metric, so calibrate against your
+    # own first few ITO runs before trusting these as targets, same caveat as
+    # every other literature-seeded row in this dict.
+    "ITO": [
+        [150.0, 3.5, 7.0, 200.0, 5.0, 30.0, 0.5, 50.0],
+        [200.0, 2.0, 5.0, 350.0, 5.0, 25.0, 1.0, 95.0],
+        [100.0, 3.5, 7.0, 200.0, 5.0, 30.0, 0.0, 20.0],
+    ],
     # NEW — WO3 + Pd catalyst track. Rows keep the original 8-value layout
     # ([rf, pressure, distance, thickness, rotation, ar, xrd, wave]) and
     # APPEND pd_thickness (nm) as a 9th value, so any existing code reading
