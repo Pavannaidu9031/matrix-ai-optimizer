@@ -73,7 +73,14 @@
             </div>
 
             <div>
-                <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">RF_Power [W]</label>
+                <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Sputter_Mode</label>
+                <select name="sputter_mode" id="sputter_mode" class="w-full bg-gray-900 border border-gray-800 rounded-none p-3 text-sm text-matrix-green font-mono focus:border-matrix-green transition-colors outline-none cursor-pointer touch-target" onchange="updatePowerLabel()">
+                    <option value="RF">RF (ceramic / oxide targets)</option>
+                    <option value="DC">DC (metal / conductive targets)</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2" id="powerLabel">RF_Power [W]</label>
                 <input type="number" step="0.1" name="rf_power_w" id="rf_power_w" required placeholder="150" class="w-full bg-gray-900 border border-gray-800 rounded-none p-3 text-sm text-matrix-green font-mono focus:border-matrix-green transition-colors outline-none placeholder-gray-700 touch-target">
             </div>
             <div>
@@ -123,7 +130,7 @@
                 </select>
             </div>
             <div id="coreDiameterField" style="display:none;">
-                <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Core_Diameter [\u00b5M]</label>
+                <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Core_Diameter <span class="normal-case">[µm]</span></label>
                 <input type="number" step="0.01" name="core_diameter_um" id="core_diameter_um" placeholder="e.g. 8.7" class="w-full bg-gray-900 border border-gray-800 rounded-none p-3 text-sm text-matrix-green font-mono focus:border-matrix-green transition-colors outline-none placeholder-gray-700 touch-target">
                 <p class="text-[9px] text-gray-600 mt-1 uppercase tracking-widest">Measured under microscope after etching, before coating</p>
             </div>
@@ -155,7 +162,7 @@
                 <input type="number" step="0.1" name="h2_response_time_s" required placeholder="12" class="w-full bg-gray-900 border border-gray-800 rounded-none p-3 text-sm text-matrix-green font-mono focus:border-matrix-green transition-colors outline-none placeholder-gray-700 touch-target">
             </div>
             <div>
-                <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Intensity_Change [µW]</label>
+                <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Intensity_Change <span class="normal-case">[µW]</span></label>
                 <input type="number" step="0.01" name="light_intensity_uw" id="light_intensity_uw" placeholder="e.g. 12.5" class="w-full bg-gray-900 border border-gray-800 rounded-none p-3 text-sm text-matrix-green font-mono focus:border-matrix-green transition-colors outline-none placeholder-gray-700 touch-target">
             </div>
             <div>
@@ -206,7 +213,7 @@
                     <th class="px-1.5 py-2">ROT[rpm]</th>
                     <th class="px-1.5 py-2">PHASE</th>
                     <th class="px-1.5 py-2">H2[s]</th>
-                    <th class="px-1.5 py-2">INTENSITY[µW]</th>
+                    <th class="px-1.5 py-2">INTENSITY<span class="normal-case">[µW]</span></th>
                     <th class="px-1.5 py-2 text-center">CMD</th>
                 </tr>
             </thead>
@@ -225,7 +232,7 @@
                         {% else %}<span class="text-red-500 font-bold text-[9px] tracking-widest uppercase">[ CRT: {{ q }} ]</span>{% endif %}
                     </td>
                     <td class="px-1.5 py-2 text-gray-500 uppercase">{{ exp.batch_notes or '-' }}</td>
-                    <td class="px-1.5 py-2 text-gray-300">{{ exp.rf_power }}</td>
+                    <td class="px-1.5 py-2 text-gray-300">{{ exp.rf_power }} <span class="text-gray-600">{{ exp.sputter_mode or 'RF' }}</span></td>
                     <td class="px-1.5 py-2 text-gray-300">{{ exp.working_pressure }}</td>
                     <td class="px-1.5 py-2 text-gray-300">{{ exp.target_distance }}</td>
                     <td class="px-1.5 py-2 text-matrix-green">{{ exp.sputter_time_s }}</td>
@@ -327,7 +334,7 @@
             <input type="hidden" name="notes" value="QUICK_LOG_ENTRY">
 
             <div>
-                <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">RF_Power [W]</label>
+                <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Power [W]</label>
                 <input type="number" step="0.1" name="rf_power_w" required class="w-full bg-gray-900 border border-gray-800 rounded-none p-3 text-sm text-matrix-green font-mono focus:border-matrix-green transition-colors outline-none touch-target">
             </div>
             <div>
@@ -347,7 +354,7 @@
                 </select>
             </div>
             <div>
-                <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Intensity_Change [µW]</label>
+                <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Intensity_Change <span class="normal-case">[µW]</span></label>
                 <input type="number" step="0.01" name="light_intensity_uw" class="w-full bg-gray-900 border border-gray-800 rounded-none p-3 text-sm text-matrix-green font-mono focus:border-matrix-green transition-colors outline-none touch-target">
             </div>
 
@@ -567,6 +574,18 @@
         const pdField = document.getElementById('pdStepBlock');
         if (!sel || !pdField) return;
         pdField.style.display = (sel.value === 'WO3_Pd') ? '' : 'none';
+        // Default sputter mode follows the target type: pure Pd metal -> DC,
+        // ceramic/oxide targets -> RF. Still manually changeable (ITO targets
+        // are conductive and can run on either).
+        const mode = document.getElementById('sputter_mode');
+        if (mode) { mode.value = (sel.value === 'Pd') ? 'DC' : 'RF'; updatePowerLabel(); }
+    }
+
+    function updatePowerLabel() {
+        const mode = document.getElementById('sputter_mode');
+        const lbl = document.getElementById('powerLabel');
+        if (!mode || !lbl) return;
+        lbl.innerText = mode.value + '_Power [W]';
     }
 
     function toggleDiameterField() {
