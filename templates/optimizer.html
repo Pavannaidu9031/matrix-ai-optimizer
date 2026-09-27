@@ -58,7 +58,7 @@
                 </select>
             </div>
             <div class="flex flex-col space-y-2 lg:col-span-1">
-                <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Today's_Core_Diameter [\u00b5m]</label>
+                <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Today's_Core_Diameter <span class="normal-case">[µm]</span></label>
                 <input type="number" step="0.01" id="measuredCoreDiameter" value="9.0" placeholder="9.0" class="w-full bg-[#111] border border-gray-700 hover:border-gray-500 text-matrix-green text-sm p-3 font-mono outline-none focus:border-matrix-green transition-colors placeholder-gray-700 touch-target">
                 <p class="text-[9px] text-gray-600 mt-1">Only affects fiber-track suggestions -- measure under microscope after etching</p>
             </div>
@@ -155,7 +155,7 @@
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8 bg-[#0a0a0a] p-4 sm:p-6 border border-gray-800">
             <div class="space-y-3">
                 <div class="flex justify-between text-[10px] font-bold tracking-widest uppercase">
-                    <span class="text-gray-400">RF_Power</span><span class="text-matrix-green font-mono text-xs" id="valRf">120 W</span>
+                    <span class="text-gray-400">Power</span><span class="text-matrix-green font-mono text-xs" id="valRf">120 W</span>
                 </div>
                 <input type="range" id="sliderRf" min="15" max="200" step="1" value="120" class="w-full accent-matrix-green bg-gray-800 h-1.5 appearance-none outline-none cursor-pointer touch-target">
             </div>
