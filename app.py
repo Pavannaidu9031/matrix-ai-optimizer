@@ -151,6 +151,7 @@ def ensure_pd_thickness_column(cur):
         ("pd_ar_flow", "FLOAT"),
         ("pd_o2_flow", "FLOAT DEFAULT 0"),
         ("core_diameter_um", "FLOAT"),
+        ("sputter_mode", "VARCHAR DEFAULT 'RF'"),
     ]:
         try:
             cur.execute(f"ALTER TABLE experiments ADD COLUMN IF NOT EXISTS {col} {ddl}")
@@ -220,6 +221,7 @@ class ExperimentModel(BaseModel):
     pd_ar_flow: Optional[float] = None
     pd_o2_flow: Optional[float] = 0.0
     core_diameter_um: Optional[float] = None
+    sputter_mode: str = "RF"
     batch_notes: Optional[str] = None
     branch_name: str = "main"
 
@@ -283,7 +285,7 @@ def index(request: Request, branch: str = 'main'):
                        rotation_speed, substrate_type, xrd_phase, grain_size,
                        h2_response_time, light_intensity_uw, batch_notes, quality_score, created_at, branch_name,
                        pd_thickness, pd_dc_power, pd_distance_cm, pd_sputter_time_s,
-                       pd_pressure_mtorr, pd_ar_flow, pd_o2_flow, core_diameter_um
+                       pd_pressure_mtorr, pd_ar_flow, pd_o2_flow, core_diameter_um, sputter_mode
                 FROM experiments
                 WHERE user_email = %s AND branch_name = %s
                 ORDER BY created_at DESC
@@ -359,7 +361,7 @@ def experiments_page(request: Request, branch: str = 'main'):
                    rotation_speed, substrate_type, xrd_phase, grain_size,
                    h2_response_time, light_intensity_uw, batch_notes, quality_score, created_at, branch_name,
                    pd_thickness, pd_dc_power, pd_distance_cm, pd_sputter_time_s,
-                       pd_pressure_mtorr, pd_ar_flow, pd_o2_flow, core_diameter_um
+                       pd_pressure_mtorr, pd_ar_flow, pd_o2_flow, core_diameter_um, sputter_mode
             FROM experiments
             WHERE user_email = %s AND branch_name = %s
             ORDER BY created_at DESC
@@ -581,6 +583,9 @@ async def add_experiment_form(request: Request):
         pd_ar_flow = get_float(["pd_ar_flow"], None)
         pd_o2_flow = get_float(["pd_o2_flow"], 0.0)
         core_diameter_um = get_float(["core_diameter_um"], None)
+        sputter_mode = get_str(["sputter_mode"], "RF").upper()
+        if sputter_mode not in ("RF", "DC"):
+            sputter_mode = "RF"
         rf_power = get_float(["rf_power_w", "rf_power"], 120.0)
         working_pressure = get_float(["working_pressure_mtorr", "working_pressure", "pressure"], 5.0)
         ar_flow = get_float(["ar_flow_sccm", "ar_flow"], 30.0)
@@ -639,9 +644,9 @@ async def add_experiment_form(request: Request):
                 grain_size, h2_response_time, light_intensity_uw, batch_notes,
                 quality_score, branch_name, pd_thickness, pd_dc_power,
                 pd_distance_cm, pd_sputter_time_s, pd_pressure_mtorr,
-                pd_ar_flow, pd_o2_flow, core_diameter_um, created_at
+                pd_ar_flow, pd_o2_flow, core_diameter_um, sputter_mode, created_at
             ) VALUES (
-                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW()
+                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW()
             )
         """, (
             user_email, target_material, rf_power, working_pressure, ar_flow,
@@ -650,7 +655,7 @@ async def add_experiment_form(request: Request):
             grain_size, h2_response_time, light_intensity_uw, batch_notes,
             quality_score, branch_name, pd_thickness, pd_dc_power,
             pd_distance_cm, pd_sputter_time_s, pd_pressure_mtorr,
-            pd_ar_flow, pd_o2_flow, core_diameter_um
+            pd_ar_flow, pd_o2_flow, core_diameter_um, sputter_mode
         ))
         conn.commit()
         cur.close()
@@ -695,9 +700,9 @@ async def save_experiment_json(request: Request, data: ExperimentModel):
                 grain_size, h2_response_time, light_intensity_uw, batch_notes,
                 quality_score, branch_name, pd_thickness, pd_dc_power,
                 pd_distance_cm, pd_sputter_time_s, pd_pressure_mtorr,
-                pd_ar_flow, pd_o2_flow, core_diameter_um, created_at
+                pd_ar_flow, pd_o2_flow, core_diameter_um, sputter_mode, created_at
             ) VALUES (
-                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW()
+                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW()
             ) RETURNING id
         """, (
             user_email, data.rf_power, data.working_pressure, data.ar_flow,
@@ -706,7 +711,8 @@ async def save_experiment_json(request: Request, data: ExperimentModel):
             data.grain_size, data.h2_response_time, data.light_intensity_uw, data.batch_notes,
             quality_score, data.branch_name, data.pd_thickness or 0.0, data.pd_dc_power,
             data.pd_distance_cm, data.pd_sputter_time_s, data.pd_pressure_mtorr,
-            data.pd_ar_flow, data.pd_o2_flow or 0.0, data.core_diameter_um
+            data.pd_ar_flow, data.pd_o2_flow or 0.0, data.core_diameter_um,
+            (data.sputter_mode or "RF").upper() if (data.sputter_mode or "RF").upper() in ("RF", "DC") else "RF"
         ))
         
         new_id = cur.fetchone()[0]
