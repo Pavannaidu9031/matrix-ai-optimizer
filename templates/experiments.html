@@ -117,15 +117,23 @@
             <div>
                 <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Rotation [rpm]</label>
                 <select name="rotation_speed_rpm" id="rotation_speed_rpm" class="w-full bg-gray-900 border border-gray-800 rounded-none p-3 text-sm text-matrix-green font-mono focus:border-matrix-green transition-colors outline-none cursor-pointer touch-target">
-                    <option value="1">1 RPM</option>
                     <option value="5" selected>5 RPM</option>
                     <option value="10">10 RPM</option>
+                    <option value="15">15 RPM</option>
+                    <option value="20">20 RPM</option>
+                    <option value="25">25 RPM</option>
+                    <option value="30">30 RPM</option>
+                    <option value="35">35 RPM</option>
+                    <option value="40">40 RPM</option>
+                    <option value="45">45 RPM</option>
+                    <option value="50">50 RPM</option>
                 </select>
             </div>
             <div>
                 <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Substrate_Type</label>
                 <select name="substrate_type" id="substrate_type" class="w-full bg-gray-900 border border-gray-800 rounded-none p-3 text-sm text-matrix-green font-mono focus:border-matrix-green transition-colors outline-none cursor-pointer touch-target" onchange="toggleDiameterField()">
                     <option value="Si Wafer">SI_WAFER</option>
+                    <option value="Glass">GLASS_THIN_FILM</option>
                     <option value="Optical Fiber">OPTICAL_FIBER</option>
                 </select>
             </div>
