@@ -79,6 +79,9 @@ MATERIAL_PRIORS = {
 
 XRD_MAP = {"Monoclinic": 1.0, "Partial": 0.75, "Amorphous": 0.0}
 PARAM_NAMES = ["RF Power", "Pressure", "Target Distance", "Film Thickness", "Rotation Speed", "Ar Flow", "Pd Thickness"]
+
+# Rotation fixture range is 5-50 RPM. Suggestions are drawn from steps of 5.
+ROTATION_CHOICES = [float(r) for r in range(5, 55, 5)]
 PHYSICS_FEATURE_NAMES = ["Energy Density", "Dep Rate Est", "Energy Per nm", "Plasma Density", "Rotation Factor", "Ar Normalized", "Catalyst Loading"]
 
 # ------------------------------------------------------------------------------
@@ -126,7 +129,11 @@ def transform_to_physics_features(
 
     # 5. Rotational Uniformity (Critical for 360-deg fiber coverage, neutral for wafer)
     if str(substrate_type).strip() == "Optical Fiber":
-        rotation_factor = 1.0 - math.exp(-rotation / 3.0)
+        # Time constant 15 RPM (was 3 when the range was 1-10 RPM). With the range
+        # now 5-50 RPM, a constant of 3 would saturate at ~1.0 by 10 RPM and the
+        # model could not tell 10 RPM from 50 RPM. PLACEHOLDER shape -- the GP
+        # learns the real rotation effect from your fiber runs.
+        rotation_factor = 1.0 - math.exp(-rotation / 15.0)
     else:
         rotation_factor = 0.5
 
@@ -289,8 +296,10 @@ def generate_bayesian_suggestion(
     sentences = []
     sentences.append("Physics-Informed Gaussian Process Active: Transformed parameter space into kinetic energy density & plasma dynamics.")
 
-    # Partition experiments into Si Wafer vs Optical Fiber
-    wafer_exps = [e for e in user_experiments if str(e.get("substrate_type", "Si Wafer")).strip() == "Si Wafer"]
+    # Partition experiments into flat substrates (Si Wafer / Glass) vs Optical Fiber.
+    # Glass thin films are flat like a wafer, so they share the wafer physics
+    # (no ring-coating rotation effect).
+    wafer_exps = [e for e in user_experiments if str(e.get("substrate_type", "Si Wafer")).strip() in ("Si Wafer", "Glass")]
     fiber_exps = [e for e in user_experiments if str(e.get("substrate_type", "")).strip() == "Optical Fiber"]
 
     target_substrate = "Optical Fiber" if len(fiber_exps) >= 3 else "Si Wafer"
@@ -298,7 +307,7 @@ def generate_bayesian_suggestion(
     if target_substrate == "Optical Fiber":
         sentences.append(f"Substrate Focus: Optical Fiber ({len(fiber_exps)} runs). Activating rotational core coverage factor.")
     else:
-        sentences.append(f"Substrate Focus: Si Wafer Calibration ({len(wafer_exps)} runs). Optimizing for Monoclinic Phase growth.")
+        sentences.append(f"Substrate Focus: Flat-substrate calibration, Si Wafer / Glass ({len(wafer_exps)} runs). Optimizing for Monoclinic Phase growth.")
 
     # --------------------------------------------------------------------------
     # PREPARE PHYSICS FEATURE MATRICES
@@ -453,14 +462,14 @@ def generate_bayesian_suggestion(
 
     # Physical machine constraints: CST8 RF magnetron sputtering
     if real_count <= 5:
-        bounds = [(80.0, 150.0), (press_lo, press_hi), (3.0, 7.0), (thick_lo, thick_hi), [1.0, 5.0, 10.0], (ar_lo, ar_hi), pd_bounds]
+        bounds = [(80.0, 150.0), (press_lo, press_hi), (3.0, 7.0), (thick_lo, thick_hi), ROTATION_CHOICES, (ar_lo, ar_hi), pd_bounds]
     elif real_count <= 12:
         bounds = [
             (max(80.0, b_rf * 0.75), min(150.0, b_rf * 1.25)),
             (press_lo, press_hi),
             (max(3.0, b_dist * 0.75), min(7.0, b_dist * 1.25)),
             (max(thick_lo, b_thick * 0.75), min(thick_hi, b_thick * 1.25)),
-            [1.0, 5.0, 10.0],
+            ROTATION_CHOICES,
             (max(ar_lo, b_ar * 0.75), min(ar_hi, b_ar * 1.25)),
             pd_bounds if pd_bounds[1] == 0.0 else (max(pd_bounds[0], b_pd * 0.6), min(pd_bounds[1], max(b_pd * 1.4, pd_bounds[0] + 2.0)))
         ]
@@ -470,7 +479,7 @@ def generate_bayesian_suggestion(
             (press_lo, press_hi),
             (max(3.0, b_dist * 0.88), min(7.0, b_dist * 1.12)),
             (max(thick_lo, b_thick * 0.88), min(thick_hi, b_thick * 1.12)),
-            [1.0, 5.0, 10.0],
+            ROTATION_CHOICES,
             (max(ar_lo, b_ar * 0.88), min(ar_hi, b_ar * 1.12)),
             pd_bounds if pd_bounds[1] == 0.0 else (max(pd_bounds[0], b_pd * 0.8), min(pd_bounds[1], max(b_pd * 1.2, pd_bounds[0] + 1.0)))
         ]
