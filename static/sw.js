@@ -8,3 +8,12 @@ self.addEventListener('install', (e) => {
 self.addEventListener('fetch', (e) => {
     e.respondWith(caches.match(e.request).then((res) => res || fetch(e.request)));
 });
+
+// Refresh the cached landing page when the MatrixAI identity update activates.
+self.addEventListener('activate', (e) => {
+    e.waitUntil(
+        caches.open(CACHE_NAME)
+            .then((cache) => cache.add(new Request('/', { cache: 'reload' })))
+            .catch(() => { /* Keep the existing offline page if the network is unavailable. */ })
+    );
+});

@@ -6,6 +6,10 @@
 {% block content %}
 {% if not user %}
     <div class="text-center py-24 space-y-8 max-w-3xl mx-auto">
+        <div class="flex items-center justify-center gap-4" aria-label="MatrixAI">
+            <img src="/static/logo-mark.svg" alt="" width="64" height="64" class="w-16 h-16">
+            <span class="font-display text-4xl font-bold tracking-tight text-white">Matrix<span class="text-matrix-green">AI</span></span>
+        </div>
         <div class="inline-flex items-center space-x-2 px-4 py-1.5 rounded-none border border-matrix-green text-matrix-green text-xs font-bold tracking-widest uppercase">
             <span>>_ SYS_STATUS: OPTIMAL</span>
         </div>

@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}MATRIX_AI // CORE{% endblock %}</title>
+    <link rel="icon" href="/static/favicon.ico?v=matrixai-1" sizes="any">
+    <link rel="icon" href="/static/favicon.svg?v=matrixai-1" type="image/svg+xml">
+    <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png">
     <link rel="manifest" href="/static/manifest.json">
     <meta name="theme-color" content="#000000">
     <link rel="apple-touch-icon" href="/static/icon-192.png">
@@ -97,6 +100,18 @@
         body.force-light-mode [class*="border-matrix-green"] { border-color: #16a34a !important; }
         body.force-light-mode [class*="shadow-hard"] { box-shadow: 4px 4px 0px 0px rgba(22, 163, 74, 0.3) !important; }
         body.force-light-mode .scanline::after { opacity: 0.1; }
+    </style>
+    <style>
+        /* MatrixAI identity: original markup is preserved. */
+        #appSidebar .w-8.h-8, header .w-6.h-6.bg-matrix-green {
+            background: #080C0A url('/static/logo-mark.svg') center / contain no-repeat !important;
+            color: transparent !important;
+        }
+        #splashScreen .font-display::before {
+            content: ''; display: inline-block; width: 48px; height: 48px;
+            margin-right: 12px; vertical-align: middle;
+            background: url('/static/logo-mark.svg') center / contain no-repeat;
+        }
     </style>
 </head>
 <body class="bg-black text-gray-300 min-h-screen font-sans antialiased flex selection:bg-matrix-green selection:text-black">

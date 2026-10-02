@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <title>MatrixAI — precision ring monogram</title>
+  <rect width="64" height="64" rx="14" fill="#080C0A"/>
+  <path d="M32 9a23 23 0 1 0 23 23" stroke="#00FF83" stroke-width="3.5" stroke-linecap="round"/>
+  <circle cx="48.26" cy="15.74" r="3" fill="#00FF83"/>
+  <path d="M20 41V25l12 11 12-11v16" stroke="#F0FFF6" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
