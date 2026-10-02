@@ -1,0 +1,30 @@
+  {# Consume the greeting once after a successful Google sign-in. #}
+{% if user %}
+{% set greeting = request.session.pop('login_greeting', none) %}
+{% if greeting %}
+{% set profile_name = (greeting.get('given_name') or user.get('name') or '') | trim %}
+{% if not profile_name or profile_name == 'Researcher' %}
+{% set profile_name = (user.get('email') or '').split('@')[0] %}
+{% endif %}
+{% set first_name = profile_name.split()[0][:60] if profile_name.split() else '' %}
+<section class="rounded-2xl border border-gray-800 bg-gray-900 p-5 sm:p-6 text-left" aria-labelledby="login-greeting-title">
+    <div class="flex items-center gap-4">
+        <img src="/static/logo-mark.svg" alt="" width="40" height="40" class="shrink-0">
+        <div class="min-w-0">
+            <h2 id="login-greeting-title" class="font-display text-xl sm:text-2xl font-bold text-white break-words">
+                {% if greeting.get('is_new') %}Welcome to MatrixAI{% else %}Welcome back{% endif %}{% if first_name %}, <bdi>{{ first_name | e }}</bdi>{% endif %}.
+            </h2>
+            <p class="text-sm text-gray-400 mt-2 leading-relaxed">
+                {% if not user.get('is_approved') %}
+                Your account is awaiting approval. Your workspace will be ready once access is granted.
+                {% elif greeting.get('is_new') %}
+                Ready to plan your first experiment?
+                {% else %}
+                Review your latest results or plan your next experiment.
+                {% endif %}
+            </p>
+        </div>
+    </div>
+</section>
+{% endif %}
+{% endif %}
