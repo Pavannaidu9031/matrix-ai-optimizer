@@ -411,6 +411,7 @@ async def auth_callback(request: Request):
         sub_id = user_info.get("sub") or user_info.get("id", "user_1")
 
         is_approved = (email.lower() == FOUNDER_EMAIL.lower())
+        greeting_is_new = False
 
         conn = get_db_connection()
         try:
@@ -433,6 +434,7 @@ async def auth_callback(request: Request):
                 cur.execute("INSERT INTO users (email, name, picture, is_approved) VALUES (%s, %s, %s, %s)",
                             (email, name, picture, is_approved))
                 conn.commit()
+                greeting_is_new = True
             else:
                 is_approved = user_row[0]
             cur.close()
@@ -442,6 +444,10 @@ async def auth_callback(request: Request):
             release_db_connection(conn)
 
         request.session["user"] = {"id": sub_id, "email": email, "name": name, "picture": picture, "is_approved": is_approved}
+        request.session["login_greeting"] = {
+            "is_new": greeting_is_new,
+            "given_name": user_info.get("given_name") or "",
+        }
         return RedirectResponse("/", status_code=303)
     except Exception as auth_err:
         return RedirectResponse("/login/google")
