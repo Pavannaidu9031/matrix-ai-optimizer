@@ -282,6 +282,7 @@
         {% endif %}
 
         <main class="flex-1 p-4 lg:p-6 space-y-8 max-w-7xl w-full mx-auto relative overflow-x-hidden min-w-0">
+            {% include "login_greeting.html" %}
             {% block content %}{% endblock %}
         </main>
     </div>
