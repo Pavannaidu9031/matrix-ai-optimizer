@@ -6,6 +6,11 @@ self.addEventListener('install', (e) => {
 });
 
 self.addEventListener('fetch', (e) => {
+    // Personalized pages must use the current authenticated session.
+    if (e.request.mode === 'navigate') {
+        e.respondWith(fetch(e.request, { cache: 'no-store' }));
+        return;
+    }
     e.respondWith(caches.match(e.request).then((res) => res || fetch(e.request)));
 });
 
