@@ -59,6 +59,17 @@ if os.path.exists("static"):
 
 templates = Jinja2Templates(directory="templates")
 
+def format_number(value, places=2):
+    """Ledger display: up to `places` decimals, no trailing zeros, '-' when not measured."""
+    if value is None or value == "":
+        return "-"
+    try:
+        return f"{float(value):.{places}f}".rstrip("0").rstrip(".")
+    except (TypeError, ValueError):
+        return value
+
+templates.env.filters["num"] = format_number
+
 # ==============================================================================
 # DYNAMIC SUPABASE POSTGRESQL CONNECTION 
 # ==============================================================================
@@ -104,6 +115,25 @@ def release_db_connection(conn):
             conn.close()
         except Exception:
             pass
+
+def fetch_user_experiments(user_email, branch=None):
+    """All of a user's experiments (optionally one branch) as dicts."""
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+        if branch:
+            cur.execute("SELECT * FROM experiments WHERE user_email = %s AND branch_name = %s ORDER BY created_at DESC", (user_email, branch))
+        else:
+            cur.execute("SELECT * FROM experiments WHERE user_email = %s ORDER BY created_at DESC", (user_email,))
+        cols = [desc[0] for desc in cur.description] if cur.description else []
+        rows = [dict(zip(cols, r)) for r in cur.fetchall()]
+        cur.close()
+    finally:
+        release_db_connection(conn)
+    for r in rows:
+        if isinstance(r.get("created_at"), datetime.datetime):
+            r["created_at"] = r["created_at"].isoformat()
+    return rows
 
 def safe_calculate_quality_score(xrd_phase, light_intensity_uw, h2_response_time, grain_size, existing_exps):
     try:
@@ -308,7 +338,7 @@ def index(request: Request, branch: str = 'main'):
         experiments = []
 
     total_runs = len(experiments)
-    monoclinic_runs = sum(1 for e in experiments if str(e.get("xrd_phase", "")).strip() == "Monoclinic")
+    monoclinic_runs = sum(1 for e in experiments if optimizer.normalize_xrd_phase(e.get("xrd_phase")) == "Monoclinic")
     
     shifts = []
     for e in experiments:
@@ -471,7 +501,7 @@ async def simulate_sandbox(request: Request):
         params = body.get("params", []) 
         branch = body.get("branch", "main")
         
-        if len(params) != 6: return JSONResponse({"error": "Invalid parameter array length."}, status_code=400)
+        if not 6 <= len(params) <= 8: return JSONResponse({"error": "Invalid parameter array length."}, status_code=400)
             
         conn = get_db_connection()
         try:
@@ -600,19 +630,23 @@ async def add_experiment_form(request: Request):
         target_distance = get_float(["target_substrate_distance_cm", "target_distance"], 7.0)
         
         # Dual time calculation
-        sputter_min = get_float(["sputtering_time_min", "sputter_time_min"], 0.0)
-        sputter_sec = get_float(["sputtering_time_sec", "sputter_time_sec"], 0.0)
-        sputter_time_s = (sputter_min * 60.0) + sputter_sec
+        # The ledger form sends total seconds as sputtering_time_s; the min/sec
+        # pair is kept for older forms and bulk imports.
+        sputter_time_s = get_float(["sputtering_time_s", "sputter_time_s"], 0.0)
+        if sputter_time_s <= 0:
+            sputter_min = get_float(["sputtering_time_min", "sputter_time_min"], 0.0)
+            sputter_sec = get_float(["sputtering_time_sec", "sputter_time_sec"], 0.0)
+            sputter_time_s = (sputter_min * 60.0) + sputter_sec
         if sputter_time_s <= 0:
             sputter_time_s = 1800.0 # fallback to 30 mins
 
-        film_thickness = get_float(["film_thickness_nm", "film_thickness"], 100.0)
+        film_thickness = get_float(["film_thickness_nm", "film_thickness"], None)
         rotation_speed = get_float(["rotation_speed_rpm", "rotation_speed"], 5.0)
         substrate_type = get_str(["substrate_type"], "Si Wafer")
-        xrd_phase = get_str(["xrd_phase"], "Amorphous")
-        grain_size = get_float(["grain_size_nm", "grain_size"], 10.0)
+        xrd_phase = optimizer.normalize_xrd_phase(get_str(["xrd_phase"], "Amorphous"))
+        grain_size = get_float(["grain_size_nm", "grain_size"], None)
         h2_response_time = get_float(["h2_response_time_s", "h2_response_time", "h2_response"], 10.0)
-        light_intensity_uw = get_float(["light_intensity_uw", "wavelength_shift_pm"], 0.0)
+        light_intensity_uw = get_float(["light_intensity_uw", "wavelength_shift_pm"], None)
         batch_notes = get_str(["notes", "batch_notes"], "Manual Entry")
         branch_name = get_str(["branch_name", "branch"], "main")
 
@@ -796,6 +830,8 @@ async def get_ai_suggestion(request: Request):
     target_material = "Generic"
     branch = "main"
     measured_core_diameter_um = None
+    acquisition_strategy = "ucb"
+    model_type = "standard"
 
     if request.method == "POST":
         try:
@@ -803,6 +839,8 @@ async def get_ai_suggestion(request: Request):
             target_material = body.get("target_material", "Generic")
             branch = body.get("branch", "main")
             measured_core_diameter_um = body.get("measured_core_diameter_um")
+            acquisition_strategy = body.get("acquisition", "ucb")
+            model_type = body.get("model_type", "standard")
         except Exception:
             measured_core_diameter_um = None
 
@@ -844,6 +882,8 @@ async def get_ai_suggestion(request: Request):
             experiments, 
             recent_suggestions, 
             target_material=target_material,
+            model_type=model_type,
+            acquisition_strategy=acquisition_strategy,
             measured_core_diameter_um=measured_core_diameter_um
         )
         
@@ -860,7 +900,7 @@ async def get_ai_suggestion(request: Request):
             """, (
                 user_email, s.get("rf_power"), s.get("working_pressure"),
                 s.get("target_distance"), s.get("film_thickness"), s.get("rotation_speed"),
-                s.get("ar_flow"), result.get("expected", {}).get("xrd_score"),
+                s.get("ar_flow"), result.get("expected", {}).get("xrd_score_predicted"),
                 result.get("expected", {}).get("light_intensity_uw_estimate"),
                 result.get("confidence", {}).get("score"), result.get("convergence", {}).get("converged"),
                 result.get("kappa_used")
@@ -1472,7 +1512,7 @@ async def get_equipment_health(request: Request):
     conn = get_db_connection()
     try:
         cur = conn.cursor()
-        cur.execute("SELECT film_thickness, sputter_time_s, working_pressure FROM experiments WHERE user_email = %s ORDER BY created_at DESC LIMIT 20", (user.get("email"),))
+        cur.execute("SELECT film_thickness, sputter_time_s, working_pressure, target_material FROM experiments WHERE user_email = %s ORDER BY created_at DESC LIMIT 40", (user.get("email"),))
         cols = [desc[0] for desc in cur.description]
         experiments = [dict(zip(cols, row)) for row in cur.fetchall()]
         cur.close()
@@ -1481,6 +1521,13 @@ async def get_equipment_health(request: Request):
         
     health = advanced_features.check_equipment_health(experiments)
     return JSONResponse({"success": True, "health": health})
+
+@app.get("/api/model/validation")
+async def get_model_validation(request: Request, branch: str = "main", target_material: str = "Generic"):
+    user = request.session.get("user")
+    if not user: return JSONResponse({"error": "not_authenticated"}, status_code=401)
+    experiments = fetch_user_experiments(user["email"], branch)
+    return JSONResponse({"success": True, "validation": optimizer.leave_one_out_validation(experiments, target_material)})
 
 @app.post("/api/sensor/predict")
 async def predict_sensor(request: Request):
@@ -1594,11 +1641,16 @@ async def get_fingerprint(request: Request):
 
 @app.post("/api/experiments/whatif")
 async def calculate_whatif(request: Request):
+    user = request.session.get("user")
+    if not user: return JSONResponse({"error": "unauthorized"}, status_code=401)
     body = await request.json()
     params = body.get("params", [])
     target_material = body.get("material", "Generic")
-    
-    sim = optimizer.simulate_sandbox_point([], target_material, params)
+
+    # Previously simulated against literature priors only; now uses the
+    # user's own runs so the counterfactual reflects their chamber.
+    experiments = fetch_user_experiments(user["email"], body.get("branch"))
+    sim = optimizer.simulate_sandbox_point(experiments, target_material, params)
     return JSONResponse({"success": True, "simulation": sim})
 
 # ==============================================================================
@@ -1612,11 +1664,14 @@ def agent_dashboard(request: Request):
 
 @app.post("/api/agent/campaign")
 async def generate_campaign(request: Request):
+    user = request.session.get("user")
+    if not user: return JSONResponse({"error": "unauthorized"}, status_code=401)
     body = await request.json()
     budget = int(body.get("budget", 25))
     deadline = body.get("deadline", "2026-12-31")
-    
-    campaign = matrix_ml_engine.generate_agent_campaign(budget, deadline, [])
+
+    experiments = fetch_user_experiments(user["email"], body.get("branch"))
+    campaign = matrix_ml_engine.generate_agent_campaign(budget, deadline, experiments)
     return JSONResponse({"success": True, "campaign": campaign})
 
 # ==============================================================================
@@ -1657,16 +1712,12 @@ async def api_calibrate_noise(request: Request):
     user = request.session.get("user")
     if not user: return JSONResponse({"error": "not_authenticated"}, status_code=401)
     
-    conn = get_db_connection()
     try:
-        cur = conn.cursor()
-        cur.execute("SELECT light_intensity_uw, wavelength_shift_pm FROM experiments WHERE user_email = %s", (user.get("email"),))
-        cols = [desc[0] for desc in cur.description]
-        experiments = [dict(zip(cols, row)) for row in cur.fetchall()]
-    finally:
-        release_db_connection(conn)
-        
-    calib = optimizer.calibrate_noise_variance(experiments)
+        body = await request.json()
+    except Exception:
+        body = {}
+    experiments = fetch_user_experiments(user.get("email"), body.get("branch"))
+    calib = optimizer.calibrate_noise_variance(experiments, body.get("target_material", "Generic"))
     return JSONResponse({"success": True, "calibration": calib})
 
 @app.post("/api/optimizer/recipe")

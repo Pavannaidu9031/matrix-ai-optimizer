@@ -176,11 +176,11 @@
             
             <div class="text-[10px] font-bold text-gray-600 uppercase tracking-widest px-3 mt-8 mb-3 border-b border-gray-800 pb-1 sm:hidden lg:block">Simulation & Logic</div>
             
-            <button onclick="toggleSandbox()" class="w-full nav-item flex items-center px-3 py-2 text-xs font-medium text-gray-400 hover:text-matrix-green hover:bg-gray-900 border-l-2 border-transparent hover:border-matrix-green transition-colors text-left touch-target">
+            <a href="/optimizer-view#sandbox" class="w-full nav-item flex items-center px-3 py-2 text-xs font-medium text-gray-400 hover:text-matrix-green hover:bg-gray-900 border-l-2 border-transparent hover:border-matrix-green transition-colors text-left touch-target">
                 <span class="w-8 inline-block text-gray-600 sidebar-icon text-center lg:text-left">[>]</span> 
                 <span class="sm:hidden lg:inline-block">Digital Twin Env</span>
                 <span class="tooltip-text">Digital Twin Env</span>
-            </button>
+            </a>
             <a href="/scheduler" class="nav-item flex items-center px-3 py-2 text-xs font-medium text-gray-400 hover:text-matrix-green hover:bg-gray-900 border-l-2 border-transparent hover:border-matrix-green transition-colors touch-target">
                 <span class="w-8 inline-block text-gray-600 sidebar-icon text-center lg:text-left">[t]</span> 
                 <span class="sm:hidden lg:inline-block">Lab Scheduler</span>
@@ -368,80 +368,32 @@
         });
     </script>
 
-    <!-- DIGITAL TWIN JS -->
+    <!-- SHARED UI HELPERS -->
+    <div id="toastStack" class="fixed top-4 right-4 z-[300] flex flex-col items-end gap-2 pointer-events-none" aria-live="polite"></div>
     <script>
-        const sandboxModal = document.getElementById('sandboxModal');
-        const sandboxContent = document.getElementById('sandboxContent');
-        let simTimeout;
-
-        function toggleSandbox() {
-            if (sandboxModal && sandboxModal.classList.contains('hidden')) {
-                sandboxModal.classList.remove('hidden');
-                setTimeout(() => {
-                    sandboxModal.classList.remove('opacity-0');
-                    if(sandboxContent) sandboxContent.classList.remove('scale-95');
-                    runSimulation(); 
-                }, 10);
-            } else if (sandboxModal) {
-                sandboxModal.classList.add('opacity-0');
-                if(sandboxContent) sandboxContent.classList.add('scale-95');
-                setTimeout(() => sandboxModal.classList.add('hidden'), 200);
-            }
+        // notify(msg, 'ok' | 'err' | 'info'): non-blocking replacement for alert().
+        function notify(msg, kind = 'info', ms = 4500) {
+            const stack = document.getElementById('toastStack');
+            if (!stack) { alert(msg); return; }
+            const el = document.createElement('div');
+            const tone = kind === 'err' ? 'border-red-500 text-red-400' : (kind === 'ok' ? 'border-matrix-green text-matrix-green' : 'border-gray-600 text-gray-200');
+            el.className = `pointer-events-auto max-w-sm bg-black border ${tone} px-4 py-3 text-[11px] font-mono tracking-wide shadow-hard whitespace-pre-line transition-opacity duration-300`;
+            el.textContent = msg;
+            stack.appendChild(el);
+            setTimeout(() => { el.style.opacity = '0'; setTimeout(() => el.remove(), 300); }, ms);
         }
 
-        function updateSim() {
-            if (document.getElementById('sim_rf')) {
-                document.getElementById('val_rf').innerText = document.getElementById('sim_rf').value;
-                document.getElementById('val_pres').innerText = document.getElementById('sim_pres').value;
-                document.getElementById('val_dist').innerText = document.getElementById('sim_dist').value;
-                document.getElementById('val_time').innerText = document.getElementById('sim_time').value;
-                document.getElementById('val_ar').innerText = document.getElementById('sim_ar').value;
-                document.getElementById('val_temp').innerText = document.getElementById('sim_temp').value;
-                
-                clearTimeout(simTimeout);
-                simTimeout = setTimeout(runSimulation, 300);
-            }
-        }
-
-        async function runSimulation() {
-            if (!document.getElementById('sim_rf')) return;
-            const params = [
-                document.getElementById('sim_rf').value,
-                document.getElementById('sim_pres').value,
-                document.getElementById('sim_dist').value,
-                document.getElementById('sim_time').value,
-                document.getElementById('sim_ar').value,
-                document.getElementById('sim_temp').value
-            ];
-
-            document.getElementById('pred_thick').innerText = '...';
-            document.getElementById('pred_shift').innerText = '...';
-            document.getElementById('pred_score').innerText = '...';
-
-            try {
-                const res = await fetch('/api/sandbox/simulate', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ params: params, target_material: 'Generic', branch: 'main' })
-                });
-                const data = await res.json();
-                
-                if (data.success && data.simulation) {
-                    const thick = data.simulation.thickness || data.simulation.film_thickness || (Math.random() * 80 + 50);
-                    const shift = data.simulation.predicted_light_intensity_uw || data.simulation.shift || (Math.random() * 8 + 2);
-                    const score = data.simulation.score || data.simulation.quality_score || (Math.random() * 40 + 50);
-                    
-                    document.getElementById('pred_thick').innerText = parseFloat(thick).toFixed(1) + ' nm';
-                    document.getElementById('pred_shift').innerText = parseFloat(shift).toFixed(2) + ' µW';
-                    document.getElementById('pred_score').innerText = parseFloat(score).toFixed(1) + ' / 100';
-                }
-            } catch (e) {
-                console.error('Simulation error:', e);
-                document.getElementById('pred_thick').innerText = 'ERR';
-                document.getElementById('pred_shift').innerText = 'ERR';
-                document.getElementById('pred_score').innerText = 'ERR';
-            }
-        }
+        // Keep the active branch when moving between pages; the nav links
+        // used to drop ?branch= and silently switch you back to main.
+        (function keepBranchInNav() {
+            const branch = new URLSearchParams(location.search).get('branch');
+            if (!branch || branch === 'main') return;
+            document.querySelectorAll('a[href="/"], a[href="/experiments-view"], a[href^="/optimizer-view"]').forEach(a => {
+                const url = new URL(a.getAttribute('href'), location.origin);
+                url.searchParams.set('branch', branch);
+                a.setAttribute('href', url.pathname + url.search + url.hash);
+            });
+        })();
     </script>
 
     <!-- HACKER CHAT SCRIPT -->

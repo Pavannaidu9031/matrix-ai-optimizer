@@ -94,17 +94,26 @@ def check_equipment_health(experiments):
         return {"status": "GREEN", "alerts": [{"message": "Collecting baseline data.", "severity": "INFO"}]}
         
     df = pd.DataFrame(experiments)
-    
-    # Updated to calculate dep rate correctly from seconds
-    df['time_min'] = df['sputter_time_s'].fillna(1800).clip(lower=60) / 60.0
-    df['dep_rate'] = df['film_thickness'] / df['time_min']
-    
+
+    # Deposition rate only means something within one target material, so
+    # compare the latest material's runs against each other. Runs with no
+    # measured thickness are skipped rather than counted as 0 nm.
+    if 'target_material' in df.columns and df['target_material'].notna().any():
+        latest_material = df['target_material'].iloc[0]
+        df = df[df['target_material'] == latest_material]
+    df = df[df['film_thickness'].notna() & df['sputter_time_s'].notna()].copy()
+    if len(df) < 5:
+        return {"status": "GREEN", "alerts": [{"message": "Collecting baseline data for this target.", "severity": "INFO"}]}
+
+    df['time_min'] = df['sputter_time_s'].astype(float).clip(lower=60) / 60.0
+    df['dep_rate'] = df['film_thickness'].astype(float) / df['time_min']
+
     alerts = []
     status = "GREEN"
-    
+
     recent_runs = df.head(3)
     older_runs = df.tail(len(df)-3)
-    
+
     if not older_runs.empty:
         avg_old_rate = older_runs['dep_rate'].mean()
         avg_new_rate = recent_runs['dep_rate'].mean()
@@ -116,7 +125,7 @@ def check_equipment_health(experiments):
     avg_press = df['working_pressure'].mean()
     press_std = df['working_pressure'].std()
     recent_press = recent_runs['working_pressure'].mean()
-    if abs(recent_press - avg_press) > press_std * 1.5:
+    if press_std and press_std > 0 and abs(recent_press - avg_press) > press_std * 1.5:
         alerts.append({"message": "Working pressure inconsistency detected across last few runs. Check for leaks.", "severity": "HIGH"})
         status = "RED"
         
@@ -126,7 +135,10 @@ def check_equipment_health(experiments):
     return {"status": status, "alerts": alerts}
 
 def predict_sensor_performance(params):
-    """Sensor Performance Predictor: ML estimation for extended sensor specs."""
+    """Rule-of-thumb sensor spec estimates from RF power and pressure.
+    These are fixed heuristic formulas, not a model trained on your data;
+    the UI labels them that way. Replace with a learned model once response
+    and recovery times are logged consistently."""
     rf = float(params.get('rf_power', 120.0))
     press = float(params.get('working_pressure', 5.0))
     
@@ -141,7 +153,8 @@ def predict_sensor_performance(params):
         "response_time_s": round(resp, 1),
         "recovery_time_s": round(recov, 1),
         "selectivity_score": round(sel, 2),
-        "stability_score": round(stab, 2)
+        "stability_score": round(stab, 2),
+        "is_heuristic": True
     }
 
 def check_publication_readiness(experiments):

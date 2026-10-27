@@ -28,7 +28,7 @@
         <div class="form-grid mb-8">
             <div class="flex flex-col space-y-2 lg:col-span-1">
                 <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Target_Domain</label>
-                <select id="targetMaterialSuggest" class="w-full bg-[#111] border border-gray-700 hover:border-gray-500 text-matrix-green text-sm p-3 font-mono outline-none focus:border-matrix-green transition-colors cursor-pointer touch-target" onchange="togglePdRateField(); triggerSimulation();">
+                <select id="targetMaterialSuggest" class="w-full bg-[#111] border border-gray-700 hover:border-gray-500 text-matrix-green text-sm p-3 font-mono outline-none focus:border-matrix-green transition-colors cursor-pointer touch-target" onchange="togglePdRateField(); triggerSimulation(); loadPhaseMap();">
                     <option value="Generic">GENERIC_MIXED</option>
                     <option value="WO3">WO3_TUNGSTEN_TRIOXIDE</option>
                     <option value="TiO2">TIO2_TITANIUM_DIOXIDE</option>
@@ -46,7 +46,7 @@
                 <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Model_Architecture</label>
                 <select id="modelType" class="w-full bg-[#111] border border-gray-700 hover:border-gray-500 text-matrix-green text-sm p-3 font-mono outline-none focus:border-matrix-green transition-colors cursor-pointer touch-target">
                     <option value="standard">STANDARD_GP_(SKLEARN)</option>
-                    <option value="dkl">DEEP_KERNEL_LEARNING</option>
+                    <option value="dkl">DEEP_KERNEL_LEARNING (not active yet)</option>
                 </select>
             </div>
             <div class="flex flex-col space-y-2 lg:col-span-1 md:col-span-2 lg:col-auto">
@@ -74,8 +74,9 @@
             
             <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 bg-[#0a0a0a] p-4 border border-gray-800">
                 <h3 class="text-lg font-display font-bold text-matrix-green uppercase tracking-widest">>_TARGET_BATCH_#<span id="runNum">X</span></h3>
-                <span id="confBadge" class="px-3 py-1 text-[10px] font-bold tracking-widest uppercase border border-gray-700 text-gray-300"></span>
+                <span id="confBadge" class="px-3 py-1 text-[10px] font-bold tracking-widest uppercase border border-gray-700 text-gray-300" title="Derived from the model's predictive spread at the suggested recipe"></span>
             </div>
+            <p id="trainingNote" class="text-[10px] text-gray-500 font-mono tracking-wide -mt-4"></p>
 
             <!-- BATCH OPTIONS GRID (Responsive Stack) -->
             <div id="batchOptionsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
@@ -85,10 +86,10 @@
                 <div class="text-xs font-bold text-gray-300 uppercase tracking-widest flex items-center space-x-2 border-b border-gray-800 pb-2">
                     <span>>_DIGITAL_TWIN_SIMULATION</span>
                 </div>
-                <p class="text-[10px] text-gray-500 font-mono uppercase tracking-widest">Simulated response ±1σ uncertainty.</p>
+                <p class="text-[10px] text-gray-500 font-mono uppercase tracking-widest">Predicted intensity around the top recipe, sweeping one parameter at a time. Shaded band = ±1σ.</p>
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <div id="plotRfCurve" class="w-full h-48 md:h-56 bg-black border border-gray-800 p-1"></div>
-                    <div id="plotPressCurve" class="w-full h-48 md:h-56 bg-black border border-gray-800 p-1"></div>
+                    <div id="plotThickCurve" class="w-full h-48 md:h-56 bg-black border border-gray-800 p-1"></div>
                 </div>
             </div>
 
@@ -107,7 +108,8 @@
 
                 <!-- PARAMETER UNCERTAINTIES MINI BARS -->
                 <div class="space-y-4 bg-[#0a0a0a] p-6 border border-gray-800">
-                    <div class="text-[10px] font-bold text-gray-400 uppercase tracking-widest border-b border-gray-800 pb-2 mb-4">NODE_UNCERTAINTY</div>
+                    <div class="text-[10px] font-bold text-gray-400 uppercase tracking-widest border-b border-gray-800 pb-2 mb-1">WHAT_DRIVES_PHASE</div>
+                    <p class="text-[9px] text-gray-600 font-mono mb-4">How strongly the crystallinity model reacts to each physics feature (from fitted length-scales).</p>
                     <div id="uncertaintyBars" class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4"></div>
                 </div>
             </div>
@@ -133,7 +135,7 @@
     <!-- ========================================== -->
     <!-- 2. INTERACTIVE PARAMETER SANDBOX           -->
     <!-- ========================================== -->
-    <div class="bg-[#050505] border border-gray-800 shadow-hard p-4 sm:p-6 md:p-8">
+    <div id="sandbox" class="scroll-mt-24 bg-[#050505] border border-gray-800 shadow-hard p-4 sm:p-6 md:p-8">
         <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-8 border-b border-gray-800 pb-4 gap-4">
             <div>
                 <h2 class="text-xl md:text-2xl font-display font-bold text-gray-200 uppercase tracking-widest">>_INTERACTIVE_SANDBOX</h2>
@@ -161,9 +163,9 @@
             </div>
             <div class="space-y-3">
                 <div class="flex justify-between text-[10px] font-bold tracking-widest uppercase">
-                    <span class="text-gray-400">Pressure</span><span class="text-matrix-green font-mono text-xs" id="valPress">5.0 mT</span>
+                    <span class="text-gray-400">Pressure</span><span class="text-matrix-green font-mono text-xs" id="valPress">8.0 mT</span>
                 </div>
-                <input type="range" id="sliderPress" min="3" max="10" step="0.1" value="5.0" class="w-full accent-matrix-green bg-gray-800 h-1.5 appearance-none outline-none cursor-pointer touch-target">
+                <input type="range" id="sliderPress" min="3" max="10" step="0.1" value="8.0" class="w-full accent-matrix-green bg-gray-800 h-1.5 appearance-none outline-none cursor-pointer touch-target">
             </div>
             <div class="space-y-3">
                 <div class="flex justify-between text-[10px] font-bold tracking-widest uppercase">
@@ -205,7 +207,8 @@
         
         <!-- SENSOR PERFORMANCE PREDICTOR -->
         <div class="mt-8 pt-6 border-t border-gray-800">
-            <div class="text-[10px] font-bold tracking-widest text-gray-500 uppercase mb-4 pl-2 border-l-2 border-gray-700">ML_Sensor_Diagnostics</div>
+            <div class="text-[10px] font-bold tracking-widest text-gray-500 uppercase mb-1 pl-2 border-l-2 border-gray-700">Rule-of-Thumb_Sensor_Specs</div>
+            <p class="text-[9px] text-gray-600 font-mono mb-4 pl-2">Fixed formulas from RF power &amp; pressure, not learned from your runs. Use for rough orientation only.</p>
             <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 text-left">
                 <div class="bg-[#0a0a0a] border border-gray-800 p-4">
                     <div class="text-[10px] text-gray-500 uppercase tracking-widest font-bold">Detect_Limit</div>
@@ -237,20 +240,28 @@
         <div class="flex flex-col md:flex-row justify-between items-start md:items-end border-b border-gray-800 pb-4 mb-6 gap-4">
             <div>
                 <h2 class="text-xl md:text-2xl font-display font-bold text-gray-200 uppercase tracking-widest">>_PHASE_MAP_CONTOUR</h2>
-                <p class="text-[10px] text-gray-500 font-mono tracking-widest uppercase mt-1">Spatial chamber intelligence mapping.</p>
+                <p class="text-[10px] text-gray-500 font-mono tracking-widest uppercase mt-1">Predicted crystallinity (0 = amorphous, 1 = monoclinic), other parameters held at your best run. Dots = your real runs.</p>
             </div>
             <div class="flex flex-row items-end space-x-2 w-full md:w-auto">
                 <div class="flex flex-col space-y-2 w-1/3 md:w-32 lg:w-40">
                     <select id="mapParamX" class="bg-[#111] border border-gray-700 text-matrix-green text-[9px] md:text-[10px] tracking-widest font-bold p-3 font-mono outline-none appearance-none cursor-pointer touch-target">
                         <option value="rf_power">RF_POWER</option>
                         <option value="working_pressure">PRESSURE</option>
+                        <option value="target_distance">DISTANCE</option>
+                        <option value="film_thickness">THICKNESS</option>
+                        <option value="ar_flow">AR_FLOW</option>
+                        <option value="rotation_speed">ROTATION</option>
                     </select>
                 </div>
                 <span class="text-[10px] font-bold text-gray-600 mb-3 uppercase">VS</span>
                 <div class="flex flex-col space-y-2 w-1/3 md:w-32 lg:w-40">
                     <select id="mapParamY" class="bg-[#111] border border-gray-700 text-matrix-green text-[9px] md:text-[10px] tracking-widest font-bold p-3 font-mono outline-none appearance-none cursor-pointer touch-target">
-                        <option value="working_pressure" selected>PRESSURE</option>
                         <option value="rf_power">RF_POWER</option>
+                        <option value="working_pressure">PRESSURE</option>
+                        <option value="target_distance">DISTANCE</option>
+                        <option value="film_thickness" selected>THICKNESS</option>
+                        <option value="ar_flow">AR_FLOW</option>
+                        <option value="rotation_speed">ROTATION</option>
                     </select>
                 </div>
                 <button id="btnLoadPhaseMap" class="w-1/3 md:w-auto bg-gray-800 hover:bg-matrix-green hover:text-black text-gray-300 font-bold px-2 md:px-4 text-[10px] uppercase tracking-widest transition-colors border border-gray-700 touch-target">
@@ -269,7 +280,7 @@
     <div class="bg-[#050505] border border-gray-800 shadow-hard p-6 md:p-8 flex flex-col md:flex-row justify-between items-center gap-6">
         <div class="w-full md:w-auto text-center md:text-left">
             <h2 class="text-xl font-display font-bold text-gray-200 uppercase tracking-widest">>_NOISE_CALIBRATION</h2>
-            <p class="text-[10px] text-gray-500 font-mono tracking-widest uppercase mt-1">Adjust WhiteKernel bounds based on variance.</p>
+            <p class="text-[10px] text-gray-500 font-mono tracking-widest uppercase mt-1">How much your intensity readings vary run-to-run, as fitted by the model.</p>
         </div>
         <div class="flex flex-col sm:flex-row items-center sm:space-x-4 space-y-4 sm:space-y-0 bg-[#0a0a0a] p-4 sm:p-2 border border-gray-800 w-full md:w-auto justify-between">
             <span id="noiseStatus" class="text-[10px] font-mono text-gray-400 uppercase tracking-widest px-4">UNCALIBRATED</span>
@@ -347,7 +358,8 @@
                                         <div class="flex justify-between"><span>THICK:</span> <span class="text-white">${opt.data.film_thickness} nm</span></div>
                                         ${opt.data.pd_thickness ? `<div class="flex justify-between"><span>PD:</span> <span class="text-white">${opt.data.pd_thickness} nm</span></div>` : ''}
                                         ${opt.data.core_diameter_um && opt.data.core_diameter_um != 9.0 ? `<div class="flex justify-between"><span>CORE_DIA:</span> <span class="text-white">${opt.data.core_diameter_um}µm</span></div>` : ''}
-                                        <div class="flex justify-between pt-4 mt-2 border-t border-gray-800 ${titleColor} font-bold tracking-widest"><span>EXP_INTENSITY:</span> <span>${opt.data.expected_shift}µW</span></div>
+                                        <div class="flex justify-between pt-4 mt-2 border-t border-gray-800 ${titleColor} font-bold tracking-widest"><span>EXP_INTENSITY:</span> <span>${opt.data.expected_shift} ±${opt.data.intensity_uncertainty ?? '?'} µW</span></div>
+                                        <div class="flex justify-between text-gray-500"><span>EXP_PHASE:</span> <span>${opt.data.expected_phase} (${opt.data.phase_probability ?? '-'})</span></div>
                                     </div>
                                 </div>
                                 <div class="mt-8 space-y-2">
@@ -364,7 +376,11 @@
                 
                 document.getElementById('expText').innerText = data.explanation;
                 const badge = document.getElementById('confBadge');
-                badge.innerText = `[ ${(data.confidence?.label || 'READY')} ]`;
+                badge.innerText = `[ ${(data.confidence?.label || 'READY')} · ${data.confidence?.score ?? '-'}% ]`;
+                const td = data.training_data || {};
+                document.getElementById('trainingNote').innerText =
+                    `Trained on ${td.real_runs ?? 0} of your runs (${td.real_intensity_runs ?? 0} with measured intensity) · acquisition: ${(data.acquisition_used || 'ucb').toUpperCase()}` +
+                    (td.literature_priors_for_intensity ? ' · intensity still leans on literature placeholders' : '');
 
                 const c = data.convergence;
                 document.getElementById('convText').innerText = c.convergence_score + "%";
@@ -374,9 +390,10 @@
 
                 const uContainer = document.getElementById('uncertaintyBars');
                 uContainer.innerHTML = '';
-                for (const [pName, uVal] of Object.entries(data.parameter_uncertainties)) {
+                const relevance = Object.entries(data.feature_relevance || {}).sort((a, b) => b[1] - a[1]);
+                for (const [pName, uVal] of relevance) {
                     const pct = Math.round(uVal * 100);
-                    const barColor = pct > 60 ? 'bg-gray-500' : 'bg-matrix-green';
+                    const barColor = pct > 60 ? 'bg-matrix-green' : 'bg-gray-500';
                     uContainer.innerHTML += `
                         <div class="space-y-2">
                             <div class="flex justify-between text-[10px] text-gray-400 font-mono tracking-widest uppercase">
@@ -412,20 +429,22 @@
                     };
 
                     plotCurve('plotRfCurve', data.digital_twin.rf_curve, 'RF Power (W)');
-                    plotCurve('plotPressCurve', data.digital_twin.pressure_curve, 'Pressure (mTorr)');
+                    if (data.digital_twin.thickness_curve) plotCurve('plotThickCurve', data.digital_twin.thickness_curve, 'Film thickness (nm)');
                 }
                 document.getElementById('resultCard').classList.remove('hidden');
-            } else { alert("[SYS_ERR] " + (data.message || "Engine failure.")); }
-        } catch (err) { alert("[SYS_ERR] API connection refused."); } finally {
+                document.getElementById('resultCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+            } else { notify("Suggestion failed: " + (data.message || "engine error"), 'err'); }
+        } catch (err) { notify("Could not reach the server. Check your connection.", 'err'); } finally {
             btn.disabled = false; btnText.innerText = "EXECUTE_SUGGESTION"; btnSpinner.classList.add('hidden');
         }
     });
 
     function applyBatch(index) {
         if(!window.latestBatch) return;
-        const s = window.latestBatch[index].data;
-        localStorage.setItem('matrixAutoFill', JSON.stringify(s));
-        window.location.href = '/experiments-view';
+        const s = { ...window.latestBatch[index].data, target_material: document.getElementById('targetMaterialSuggest')?.value || 'Generic' };
+        try { localStorage.setItem('matrixAutoFill', JSON.stringify(s)); } catch (e) {}
+        const branch = document.getElementById('branch_name')?.value || 'main';
+        window.location.href = '/experiments-view?branch=' + encodeURIComponent(branch);
     }
 
     function togglePdRateField() {
@@ -472,11 +491,12 @@
                     msg += `Estimated time range: ${r.estimated_time_min_range[0]}-${r.estimated_time_min_range[1]} min\n`;
                 }
                 msg += `\n${r.note}`;
-                alert(msg);
+                document.getElementById('recipeContent').innerText = msg;
+                document.getElementById('recipeModal').classList.remove('hidden');
             } else {
-                alert('[SYS_ERR] Pd recipe calculation failed.');
+                notify('Pd recipe calculation failed.', 'err');
             }
-        } catch (err) { alert('[SYS_ERR] Pd recipe endpoint unreachable.'); }
+        } catch (err) { notify('Pd recipe endpoint unreachable.', 'err'); }
     }
 
     document.getElementById('btnPdf')?.addEventListener('click', () => {
@@ -507,53 +527,83 @@
         block.style.display = (sel.value === 'WO3_Pd') ? '' : 'none';
     }
 
+    let simTimer = null;
+    let simSeq = 0;
     function triggerSimulation() {
         if (!document.getElementById('sliderRf')) return;
+        updateSliderLabels();
+        // Each call refits the GP server-side, so wait until the slider settles.
+        clearTimeout(simTimer);
+        simTimer = setTimeout(runSimulation, 250);
+    }
+
+    function updateSliderLabels() {
         toggleSandboxPdSlider();
+        const v = id => document.getElementById(id).value;
+        document.getElementById('valRf').innerText = v('sliderRf') + " W"; document.getElementById('valPress').innerText = v('sliderPress') + " mT"; document.getElementById('valDist').innerText = v('sliderDist') + " cm"; document.getElementById('valThick').innerText = v('sliderThick') + " nm"; document.getElementById('valRot').innerText = v('sliderRot') + " rpm"; document.getElementById('valAr').innerText = v('sliderAr') + " sccm";
+        document.getElementById('valPd').innerText = v('sliderPd') + " nm";
+        const t = parseFloat(v('sliderTime')); document.getElementById('valTime').innerText = `${t} s (${(t / 60).toFixed(1)} min)`;
+    }
+
+    function runSimulation() {
         const params = [parseFloat(document.getElementById('sliderRf').value), parseFloat(document.getElementById('sliderPress').value), parseFloat(document.getElementById('sliderDist').value), parseFloat(document.getElementById('sliderThick').value), parseFloat(document.getElementById('sliderRot').value), parseFloat(document.getElementById('sliderAr').value)];
-        const pdSlider = document.getElementById('sliderPd');
-        if (pdSlider) {
-            document.getElementById('valPd').innerText = pdSlider.value + " nm";
-            params.push(parseFloat(pdSlider.value));
-        }
-        document.getElementById('valRf').innerText = params[0] + " W"; document.getElementById('valPress').innerText = params[1] + " mT"; document.getElementById('valDist').innerText = params[2] + " cm"; document.getElementById('valThick').innerText = params[3] + " nm"; document.getElementById('valRot').innerText = params[4] + " rpm"; document.getElementById('valAr').innerText = params[5] + " sccm";
-        const timeSlider = document.getElementById('sliderTime'); if(timeSlider) { document.getElementById('valTime').innerText = timeSlider.value + " s"; }
+        params.push(parseFloat(document.getElementById('sliderPd').value));
         const targetMaterial = document.getElementById('targetMaterialSuggest')?.value || 'Generic';
         const branchName = document.getElementById('branch_name')?.value || 'main'; 
 
+        const seq = ++simSeq;
+        document.getElementById('simShift').classList.add('opacity-50');
         fetch('/api/sandbox/simulate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ target_material: targetMaterial, params: params, branch: branchName }) })
-        .then(res => res.json()).then(data => { if(data.success) { document.getElementById('simShift').innerText = data.simulation.predicted_light_intensity_uw + " (±" + data.simulation.uncertainty + ")"; document.getElementById('simPhase').innerText = data.simulation.expected_phase; } });
+        .then(res => res.json()).then(data => {
+            if (seq !== simSeq) return;   // a newer slider move is already in flight
+            document.getElementById('simShift').classList.remove('opacity-50');
+            if (data.success) {
+                document.getElementById('simShift').innerText = data.simulation.predicted_light_intensity_uw + " ±" + data.simulation.uncertainty + " µW";
+                document.getElementById('simPhase').innerText = data.simulation.expected_phase;
+            } else { document.getElementById('simShift').innerText = 'ERR'; }
+        }).catch(() => { document.getElementById('simShift').innerText = 'OFFLINE'; });
         fetch('/api/sensor/predict', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ params: { rf_power: params[0], working_pressure: params[1] } }) })
         .then(res => res.json()).then(data => { if(data.success) { document.getElementById('predLimit').innerText = data.predictions.detection_limit_h2 + " %"; document.getElementById('predResp').innerText = data.predictions.response_time_s + " s"; document.getElementById('predRecov').innerText = data.predictions.recovery_time_s + " s"; document.getElementById('predStab').innerText = data.predictions.stability_score + " / 1.0"; } });
     }
     sliders.forEach(slider => { if(slider) slider.addEventListener('input', triggerSimulation); });
-    setTimeout(triggerSimulation, 500);
+    triggerSimulation();
 
     // LAZY LOADED PLOTLY HEATMAP
     async function loadPhaseMap() {
         const paramX = document.getElementById('mapParamX').value;
         const paramY = document.getElementById('mapParamY').value;
         const targetMaterial = document.getElementById('targetMaterialSuggest')?.value || 'Generic';
-        document.getElementById('phaseMapChart').innerHTML = ''; // clear waiting text
+        const mapEl = document.getElementById('phaseMapChart');
+        mapEl.innerHTML = '';
+        // The placeholder centring (flex) made Plotly size itself to a corner.
+        mapEl.classList.remove('flex', 'items-center', 'justify-center');
 
         try {
             const res = await fetch('/api/optimizer/phase-map', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ target_material: targetMaterial, param_x: paramX, param_y: paramY }) });
             const data = await res.json();
             if(data.success && data.phase_map) {
                 const m = data.phase_map;
-                const trace = { z: m.z, x: m.x, y: m.y, type: 'heatmap', colorscale: 'Greens' };
+                const trace = { z: m.z, x: m.x, y: m.y, type: 'heatmap', colorscale: 'Greens', zmin: 0, zmax: 1,
+                    customdata: m.z_std, hovertemplate: 'x=%{x:.1f}<br>y=%{y:.1f}<br>crystallinity=%{z:.2f} ± %{customdata:.2f}<extra></extra>',
+                    colorbar: { title: { text: 'Crystallinity', side: 'right' }, tickfont: { size: 9 } } };
+                const phaseColor = { Monoclinic: '#00FF41', Partial: '#eab308', Amorphous: '#ef4444' };
+                const pts = m.points || [];
+                const runs = { x: pts.map(p => p.x), y: pts.map(p => p.y), text: pts.map(p => p.phase),
+                    mode: 'markers', type: 'scatter', hovertemplate: '%{text}<extra>your run</extra>',
+                    marker: { size: 9, color: pts.map(p => phaseColor[p.phase] || '#999'), line: { color: '#000', width: 1.5 } } };
+                const axisName = id => document.querySelector(`#mapParamX option[value="${id}"]`)?.innerText || id;
                 const isMobile = window.innerWidth < 640;
                 const layout = {
                     paper_bgcolor: 'transparent', plot_bgcolor: 'transparent', 
                     font: { color: '#a3a3a3', family: '"JetBrains Mono", monospace' }, 
                     margin: isMobile ? { t: 10, l: 40, r: 10, b: 40 } : { t: 20, l: 60, r: 20, b: 40 },
-                    xaxis: { gridcolor: '#1f2937', zerolinecolor: '#334155', tickfont: {size: isMobile ? 9 : 10} },
-                    yaxis: { gridcolor: '#1f2937', zerolinecolor: '#334155', tickfont: {size: isMobile ? 9 : 10} },
-                    autosize: true
+                    xaxis: { gridcolor: '#1f2937', zerolinecolor: '#334155', tickfont: {size: isMobile ? 9 : 10}, title: axisName(m.param_x) },
+                    yaxis: { gridcolor: '#1f2937', zerolinecolor: '#334155', tickfont: {size: isMobile ? 9 : 10}, title: axisName(m.param_y) },
+                    autosize: true, showlegend: false
                 };
-                Plotly.newPlot('phaseMapChart', [trace], layout, {displayModeBar: false, responsive: true});
+                Plotly.newPlot('phaseMapChart', [trace, runs], layout, {displayModeBar: false, responsive: true});
             }
-        } catch(err) { console.error(err); }
+        } catch(err) { notify('Phase map failed to load.', 'err'); }
     }
 
     const mapObserver = new IntersectionObserver((entries) => {
@@ -566,19 +616,23 @@
 
     document.getElementById('btnCalibrateNoise')?.addEventListener('click', async () => {
         const status = document.getElementById('noiseStatus'); status.innerText = "CALIBRATING...";
-        const res = await fetch('/api/optimizer/calibrate-noise', { method: 'POST' }); const data = await res.json();
-        if(data.success) status.innerText = `LEVEL: ${data.calibration.calibrated_noise} (VAR: ${data.calibration.sample_variance})`;
+        const res = await fetch('/api/optimizer/calibrate-noise', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ target_material: document.getElementById('targetMaterialSuggest')?.value || 'Generic', branch: document.getElementById('branch_name')?.value || 'main' }) });
+        const data = await res.json();
+        if (data.success) { status.innerText = data.calibration.message; status.classList.remove('uppercase'); }
+        else status.innerText = 'CALIBRATION_FAILED';
     });
 
     document.getElementById('btnRecipe')?.addEventListener('click', async () => {
         if(!latestSuggestion) return;
         const targetMaterial = document.getElementById('targetMaterialSuggest')?.value || 'Generic';
         const res = await fetch('/api/optimizer/recipe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ target_material: targetMaterial, params: latestSuggestion.suggested }) });
+        if (!res.ok) { notify('Recipe generation failed.', 'err'); return; }
         const data = await res.json();
         if(data.success) { document.getElementById('recipeContent').innerText = data.recipe; document.getElementById('recipeModal').classList.remove('hidden'); }
     });
     document.getElementById('btnCloseRecipe')?.addEventListener('click', () => document.getElementById('recipeModal').classList.add('hidden'));
-    document.getElementById('btnCopyRecipe')?.addEventListener('click', () => { navigator.clipboard.writeText(document.getElementById('recipeContent').innerText); alert("[SYS_MSG] Node copied to clipboard."); });
+    document.getElementById('btnCopyRecipe')?.addEventListener('click', () => { navigator.clipboard.writeText(document.getElementById('recipeContent').innerText).then(() => notify('Recipe copied to clipboard.', 'ok')); });
 
 </script>
 {% endblock %}

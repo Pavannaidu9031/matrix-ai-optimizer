@@ -68,6 +68,12 @@
         </div>
     </div>
 
+    <!-- NEXT STEP -->
+    <div class="flex flex-col sm:flex-row gap-3">
+        <a href="/optimizer-view?branch={{ current_branch|urlencode }}" class="flex-1 text-center bg-matrix-green hover:bg-green-400 text-black font-bold py-3 px-6 text-xs uppercase tracking-widest shadow-hard-hover transition-colors">>_ Get next suggested run</a>
+        <a href="/experiments-view?branch={{ current_branch|urlencode }}" class="flex-1 text-center border border-gray-700 hover:border-matrix-green text-gray-300 hover:text-matrix-green font-bold py-3 px-6 text-xs uppercase tracking-widest transition-colors">+ Log a run</a>
+    </div>
+
     <!-- EQUIPMENT HEALTH & CALIBRATION -->
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <section class="bg-black p-6 border border-gray-800 shadow-hard" id="healthWidget">
@@ -86,7 +92,7 @@
                 <span id="calibBadge" class="px-2 py-1 text-[9px] font-bold bg-gray-900 text-gray-500 border border-gray-700 uppercase tracking-widest">CHECKING...</span>
             </div>
             <div id="calibAlerts" class="space-y-3 font-mono">
-                <p class="text-[10px] text-gray-500 uppercase tracking-widest">Evaluating ECE...</p>
+                <p class="text-[10px] text-gray-500 uppercase tracking-widest">Testing the model on your own runs...</p>
             </div>
         </section>
     </div>
@@ -120,7 +126,7 @@
     <section class="bg-black p-6 border border-gray-800 shadow-hard space-y-4">
         <div class="border-b border-gray-800 pb-2">
             <h2 class="text-sm font-display font-bold text-gray-200 uppercase tracking-widest">>_LEARNING_CURVE</h2>
-            <p class="text-[10px] text-gray-500 font-mono uppercase tracking-widest">Quality score trajectory across epochs.</p>
+            <p class="text-[10px] text-gray-500 font-mono uppercase tracking-widest">Quality score per run, oldest to newest. Dashed line = best so far.</p>
         </div>
         <div class="h-64">
             <canvas id="qualityChart"></canvas>
@@ -155,8 +161,8 @@
         }
 
         async function loadHealth() {
-            const res = await fetch('/api/equipment/health');
-            const data = await res.json();
+            let data = {};
+            try { data = await (await fetch('/api/equipment/health')).json(); } catch (e) {}
             if(data.success && data.health) {
                 const badge = document.getElementById('healthBadge');
                 const alerts = document.getElementById('healthAlerts');
@@ -166,16 +172,40 @@
                 alerts.innerHTML = data.health.alerts.map(a => `<p class="text-[10px] font-mono uppercase tracking-widest ${a.severity === 'HIGH' ? 'text-yellow-500' : 'text-gray-400'}">${a.message}</p>`).join('');
             }
 
-            document.getElementById('calibBadge').className = 'px-2 py-1 text-[9px] font-bold bg-gray-800 text-matrix-green border border-matrix-green uppercase tracking-widest';
-            document.getElementById('calibBadge').innerText = 'CALIBRATED';
-            document.getElementById('calibAlerts').innerHTML = '<p class="text-[10px] font-mono text-gray-400 uppercase tracking-widest">Model ECE is 0.08. No isotonic regression required.</p>';
         }
-        setTimeout(loadHealth, 1500);
+
+        // Leave-one-out check: hide each measured run, predict it from the
+        // rest, and report how often the truth fell inside the model's ±2σ.
+        async function loadValidation() {
+            const badge = document.getElementById('calibBadge');
+            const box = document.getElementById('calibAlerts');
+            const line = (t, cls = 'text-gray-400') => { const p = document.createElement('p'); p.className = `text-[10px] font-mono tracking-wide ${cls}`; p.textContent = t; return p; };
+            try {
+                const branch = new URLSearchParams(location.search).get('branch') || 'main';
+                const v = (await (await fetch('/api/model/validation?branch=' + encodeURIComponent(branch))).json()).validation;
+                const styles = { CALIBRATED: 'bg-matrix-green text-black', OVERCONFIDENT: 'bg-yellow-500 text-black', NO_SKILL: 'bg-yellow-500 text-black', INSUFFICIENT: 'bg-gray-900 text-gray-500 border border-gray-700' };
+                badge.className = `px-2 py-1 text-[9px] font-bold uppercase tracking-widest ${styles[v.status] || styles.INSUFFICIENT}`;
+                badge.innerText = v.status === 'INSUFFICIENT' ? 'NEEDS DATA' : v.status.replace('_', ' ');
+                box.replaceChildren(line(v.message));
+                if (v.status !== 'INSUFFICIENT') {
+                    box.append(
+                        line(`Typical error: ±${v.mae_uw} µW (guessing your average: ±${v.baseline_mae_uw} µW)`),
+                        line(`Truth inside ±2σ band: ${Math.round(v.coverage_2sigma * 100)}% of ${v.n} runs (ideal ≈ 95%)`),
+                        line(`XRD phase predicted correctly: ${Math.round(v.phase_accuracy * 100)}%`)
+                    );
+                }
+            } catch (e) {
+                badge.innerText = 'UNAVAILABLE';
+                box.replaceChildren(line('Validation could not run.', 'text-red-400'));
+            }
+        }
+        loadHealth();
+        loadValidation();
 
         const ctx = document.getElementById('qualityChart')?.getContext('2d');
         if (ctx && expData.length > 0) {
             const labels = expData.map((e, idx) => `Run #${expData.length - idx}`);
-            const scores = expData.map(e => e.quality_score || 50.0).reverse();
+            const scores = expData.map(e => e.quality_score ?? 0).reverse();
             labels.reverse();
 
             new Chart(ctx, {
@@ -193,6 +223,15 @@
                         pointBackgroundColor: '#00FF41',
                         pointBorderColor: '#000',
                         pointRadius: 4
+                    }, {
+                        label: 'Best so far',
+                        data: scores.reduce((acc, v) => { acc.push(Math.max(v, acc.length ? acc[acc.length - 1] : -Infinity)); return acc; }, []),
+                        borderColor: '#a3a3a3',
+                        borderDash: [6, 4],
+                        borderWidth: 1.5,
+                        pointRadius: 0,
+                        fill: false,
+                        tension: 0
                     }]
                 },
                 options: {
