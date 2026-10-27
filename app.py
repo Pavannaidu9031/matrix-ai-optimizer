@@ -66,28 +66,57 @@ def _wants_html(request: Request) -> bool:
     return request.method == "GET" and "text/html" in request.headers.get("accept", "")
 
 
-def is_user_approved(request: Request, user: dict) -> bool:
-    """Founder is always approved. Otherwise trust the session flag, and if it
-    says no, re-check the DB once so a newly approved user needn't log out."""
-    email = (user.get("email") or "").lower()
-    if email == FOUNDER_EMAIL.lower() or user.get("is_approved"):
-        return True
+# The users table, not the session cookie, decides approval: a cookie lives
+# for 30 days, so trusting its is_approved flag meant a revoked user kept
+# access until it expired. Lookups are cached briefly per process, and
+# approve/revoke clear the entry so changes apply on the next request.
+APPROVAL_CACHE_TTL_S = 30
+_approval_cache = {}   # email -> (approved, checked_at)
+
+
+def forget_approval(email: str) -> None:
+    _approval_cache.pop((email or "").lower(), None)
+
+
+def _db_approval(email: str):
+    """True/False from the users table, or None if the DB can't be reached."""
     conn = None
     try:
         conn = get_db_connection()
         cur = conn.cursor()
-        cur.execute("SELECT is_approved FROM users WHERE email = %s", (user.get("email"),))
+        cur.execute("SELECT is_approved FROM users WHERE LOWER(email) = %s", (email,))
         row = cur.fetchone()
         cur.close()
-    except Exception:
-        return False
+        return bool(row and row[0])
+    except Exception as err:
+        print(f"Approval lookup failed for {email}: {err}")
+        return None
     finally:
         if conn:
             release_db_connection(conn)
-    if row and row[0]:
-        request.session["user"] = {**user, "is_approved": True}
+
+
+def is_user_approved(request: Request, user: dict) -> bool:
+    email = (user.get("email") or "").lower()
+    if email == FOUNDER_EMAIL.lower():
         return True
-    return False
+
+    now = datetime.datetime.now().timestamp()
+    cached = _approval_cache.get(email)
+    if cached and now - cached[1] < APPROVAL_CACHE_TTL_S:
+        approved = cached[0]
+    else:
+        approved = _db_approval(email)
+        if approved is None:
+            # DB unreachable: fall back to the last answer we got from it, and
+            # deny if we never got one (fail closed, not open).
+            approved = cached[0] if cached else False
+        else:
+            _approval_cache[email] = (approved, now)
+
+    if bool(user.get("is_approved")) != approved:
+        request.session["user"] = {**user, "is_approved": approved}
+    return approved
 
 
 async def approval_gate(request: Request, call_next):
@@ -332,26 +361,12 @@ def index(request: Request, branch: str = 'main'):
         return templates.TemplateResponse(request, "index.html", {"user": None, "experiments": [], "stats": {}, "branches": [], "current_branch": "main"})
 
     user_email = user_session.get("email", "")
-    is_approved = user_session.get("is_approved", False)
-    
-    if not is_approved and user_email.lower() != FOUNDER_EMAIL.lower():
-        conn = get_db_connection()
-        try:
-            cur = conn.cursor()
-            cur.execute("SELECT is_approved FROM users WHERE email = %s", (user_email,))
-            row = cur.fetchone()
-            if row and row[0]:
-                is_approved = True
-                user_session["is_approved"] = True
-                request.session["user"] = user_session
-            cur.close()
-        except Exception:
-            pass
-        finally:
-            release_db_connection(conn)
-            
-        if not is_approved:
-            return templates.TemplateResponse(request, "pending.html", {"user": user_session})
+
+    # "/" is public (it hosts the sign-in and pending pages), so it does its
+    # own approval check, the same DB-backed one the gate uses.
+    if not is_user_approved(request, user_session):
+        return templates.TemplateResponse(request, "pending.html", {"user": request.session.get("user", user_session)})
+    user_session = request.session.get("user", user_session)
 
     experiments = []
     branches = ['main']
@@ -1241,6 +1256,7 @@ def approve_user(request: Request, email: str, background_tasks: BackgroundTasks
         cur.close()
     finally:
         release_db_connection(conn)
+    forget_approval(email)
     return RedirectResponse("/admin/users", status_code=303)
 
 @app.post("/admin/users/{email}/revoke")
@@ -1260,6 +1276,7 @@ def revoke_user(request: Request, email: str):
         cur.close()
     finally:
         release_db_connection(conn)
+    forget_approval(email)   # takes effect on the revoked user's next request
     return RedirectResponse("/admin/users", status_code=303)
 
 # ==============================================================================

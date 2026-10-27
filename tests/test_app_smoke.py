@@ -117,6 +117,13 @@ def _make_client(monkeypatch, approved=True, logged_in=True):
     return c
 
 
+@pytest.fixture(autouse=True)
+def _fresh_approval_cache():
+    app_module._approval_cache.clear()
+    yield
+    app_module._approval_cache.clear()
+
+
 @pytest.fixture
 def client(monkeypatch):
     return _make_client(monkeypatch)
@@ -237,3 +244,40 @@ def test_public_routes_stay_open(monkeypatch):
     assert c.get("/").status_code == 200
     assert c.get("/static/manifest.json").status_code == 200
     assert c.post("/api/v1/predict", json={}).status_code == 422   # reaches the API-key check
+
+
+def test_revoked_user_loses_access_despite_approved_cookie(monkeypatch):
+    c = _make_client(monkeypatch, approved=True)     # cookie says approved
+    assert c.get("/experiments").status_code == 200
+    c.db.approved = False                            # founder revokes in the DB
+    app_module.forget_approval(EMAIL)                # what the revoke route does
+    assert c.get("/experiments").status_code == 403
+    assert "approval" in c.get("/").text.lower()     # dashboard now shows the pending page
+
+
+def test_revoke_route_clears_cache(monkeypatch):
+    c = _make_client(monkeypatch, approved=True)
+    assert c.get("/experiments").status_code == 200  # caches "approved"
+    founder = TestClient(app_module.app, base_url="https://testserver")
+    session = {"user": {"id": "0", "email": app_module.FOUNDER_EMAIL, "name": "F", "picture": "", "is_approved": True}}
+    founder.cookies.set("session", TimestampSigner(os.environ["SECRET_KEY"]).sign(base64.b64encode(json.dumps(session).encode())).decode())
+    c.db.approved = False                            # the UPDATE the route runs (fake DB ignores it)
+    assert founder.post(f"/admin/users/{EMAIL}/revoke", follow_redirects=False).status_code == 303
+    assert c.get("/experiments").status_code == 403
+
+
+def test_cached_answer_expires(monkeypatch):
+    c = _make_client(monkeypatch, approved=True)
+    assert c.get("/experiments").status_code == 200
+    c.db.approved = False                            # revoked by some other path, no cache clear
+    assert c.get("/experiments").status_code == 200  # still inside the TTL
+    monkeypatch.setattr(app_module, "APPROVAL_CACHE_TTL_S", 0)
+    assert c.get("/experiments").status_code == 403
+
+
+def test_db_outage_fails_closed_without_history(monkeypatch):
+    c = _make_client(monkeypatch, approved=True)
+    def broken():
+        raise RuntimeError("db down")
+    monkeypatch.setattr(app_module, "get_db_connection", broken)
+    assert c.get("/api/model/validation").status_code == 403
