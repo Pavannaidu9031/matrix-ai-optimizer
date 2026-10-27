@@ -53,7 +53,7 @@ class FakeCursor:
         q = " ".join(sql.split()).upper()
         self.description, self._result = None, []
         if q.startswith("SELECT IS_APPROVED"):
-            self.description, self._result = [("is_approved",)], [(True,)]
+            self.description, self._result = [("is_approved",)], [(self.db.approved,)]
         elif q.startswith("SELECT DISTINCT BRANCH_NAME"):
             self.description, self._result = [("branch_name",)], [("main",)]
         elif "FROM EXPERIMENTS" in q and q.startswith("SELECT"):
@@ -100,19 +100,26 @@ class FakeConn:
 class FakeDB:
     def __init__(self):
         self.rows, self.queries, self.inserts = _rows(), [], []
+        self.approved = True
+
+
+def _make_client(monkeypatch, approved=True, logged_in=True):
+    db = FakeDB()
+    db.approved = approved
+    monkeypatch.setattr(app_module, "get_db_connection", lambda: FakeConn(db))
+    monkeypatch.setattr(app_module, "release_db_connection", lambda conn: None)
+    c = TestClient(app_module.app, base_url="https://testserver")
+    if logged_in:
+        session = {"user": {"id": "1", "email": EMAIL, "name": "Tester", "picture": "", "is_approved": approved}}
+        payload = base64.b64encode(json.dumps(session).encode())
+        c.cookies.set("session", TimestampSigner(os.environ["SECRET_KEY"]).sign(payload).decode())
+    c.db = db
+    return c
 
 
 @pytest.fixture
 def client(monkeypatch):
-    db = FakeDB()
-    monkeypatch.setattr(app_module, "get_db_connection", lambda: FakeConn(db))
-    monkeypatch.setattr(app_module, "release_db_connection", lambda conn: None)
-    c = TestClient(app_module.app, base_url="https://testserver")
-    session = {"user": {"id": "1", "email": EMAIL, "name": "Tester", "picture": "", "is_approved": True}}
-    payload = base64.b64encode(json.dumps(session).encode())
-    c.cookies.set("session", TimestampSigner(os.environ["SECRET_KEY"]).sign(payload).decode())
-    c.db = db
-    return c
+    return _make_client(monkeypatch)
 
 
 @pytest.mark.parametrize("path", ["/", "/experiments-view", "/optimizer-view"])
@@ -181,7 +188,7 @@ def test_add_stores_real_time_and_null_for_unmeasured(client):
 
 def test_supervisor_requires_login(client):
     anon = TestClient(app_module.app, base_url="https://testserver")
-    res = anon.get("/supervisor", follow_redirects=False)
+    res = anon.get("/supervisor", headers={"accept": "text/html"}, follow_redirects=False)
     assert res.status_code == 303 and "/login/google" in res.headers["location"]
 
 
@@ -189,3 +196,44 @@ def test_supervisor_scopes_non_founder_to_own_runs(client):
     assert client.get("/supervisor").status_code == 200
     sql, params = next((q, p) for q, p in reversed(client.db.queries) if "FROM experiments" in q)
     assert "user_email = %s" in sql and params == (EMAIL,)
+
+
+# Every non-public route, with a minimal request for each.
+GATED = [("POST", "/api/chat"), ("POST", "/api/vision"), ("POST", "/api/thesis/generate"),
+         ("POST", "/api/scheduler/plan"), ("POST", "/api/optimizer/recipe"), ("POST", "/api/agent/campaign"),
+         ("POST", "/api/experiments/whatif"), ("POST", "/suggest"), ("GET", "/experiments"),
+         ("POST", "/api/sandbox/simulate"), ("GET", "/export/csv"), ("POST", "/api/literature/upload"),
+         ("POST", "/api/experiments/bulk"), ("DELETE", "/experiments/1")]
+
+
+@pytest.mark.parametrize("method,path", GATED)
+def test_gate_rejects_anonymous(monkeypatch, method, path):
+    c = _make_client(monkeypatch, logged_in=False)
+    assert c.request(method, path).status_code == 401
+
+
+@pytest.mark.parametrize("method,path", GATED)
+def test_gate_rejects_unapproved(monkeypatch, method, path):
+    c = _make_client(monkeypatch, approved=False)
+    res = c.request(method, path)
+    assert res.status_code == 403 and res.json()["error"] == "not_approved"
+
+
+def test_unapproved_pages_go_to_pending(monkeypatch):
+    c = _make_client(monkeypatch, approved=False)
+    res = c.get("/optimizer-view", headers={"accept": "text/html"}, follow_redirects=False)
+    assert res.status_code == 303 and res.headers["location"] == "/"
+    assert c.get("/").status_code == 200          # pending page itself stays reachable
+
+
+def test_newly_approved_user_is_let_in_without_relogin(monkeypatch):
+    c = _make_client(monkeypatch, approved=False)
+    c.db.approved = True                           # approved in the DB after login
+    assert c.get("/experiments").status_code == 200
+
+
+def test_public_routes_stay_open(monkeypatch):
+    c = _make_client(monkeypatch, logged_in=False)
+    assert c.get("/").status_code == 200
+    assert c.get("/static/manifest.json").status_code == 200
+    assert c.post("/api/v1/predict", json={}).status_code == 422   # reaches the API-key check

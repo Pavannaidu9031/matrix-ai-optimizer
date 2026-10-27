@@ -24,6 +24,7 @@ import pandas as pd
 import psycopg2
 from psycopg2 import pool
 from pydantic import BaseModel
+from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 
 from google import genai
@@ -45,6 +46,68 @@ if not SECRET_KEY:
         "python -c \"import secrets; print(secrets.token_hex(32))\" "
         "and add it in Render -> Environment."
     )
+
+# ------------------------------------------------------------------------------
+# APPROVAL GATE
+# ------------------------------------------------------------------------------
+# Many routes checked only "is someone logged in", so any Google account that
+# signed up (but was never approved) could call the AI chat, vision, thesis and
+# optimizer endpoints, and a few routes checked nothing at all. Every request
+# now passes through this gate; only the paths below stay public.
+PUBLIC_PATHS = {"/", "/login/google", "/auth/callback", "/logout", "/api/docs"}
+PUBLIC_PREFIXES = ("/static/", "/api/v1/")   # /api/v1 authenticates with X-API-Key
+
+
+def _is_public(path: str) -> bool:
+    return path in PUBLIC_PATHS or path.startswith(PUBLIC_PREFIXES)
+
+
+def _wants_html(request: Request) -> bool:
+    return request.method == "GET" and "text/html" in request.headers.get("accept", "")
+
+
+def is_user_approved(request: Request, user: dict) -> bool:
+    """Founder is always approved. Otherwise trust the session flag, and if it
+    says no, re-check the DB once so a newly approved user needn't log out."""
+    email = (user.get("email") or "").lower()
+    if email == FOUNDER_EMAIL.lower() or user.get("is_approved"):
+        return True
+    conn = None
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("SELECT is_approved FROM users WHERE email = %s", (user.get("email"),))
+        row = cur.fetchone()
+        cur.close()
+    except Exception:
+        return False
+    finally:
+        if conn:
+            release_db_connection(conn)
+    if row and row[0]:
+        request.session["user"] = {**user, "is_approved": True}
+        return True
+    return False
+
+
+async def approval_gate(request: Request, call_next):
+    if _is_public(request.url.path):
+        return await call_next(request)
+    user = request.session.get("user")
+    if not user:
+        if _wants_html(request):
+            return RedirectResponse("/login/google", status_code=303)
+        return JSONResponse({"error": "not_authenticated"}, status_code=401)
+    if not is_user_approved(request, user):
+        if _wants_html(request):
+            return RedirectResponse("/", status_code=303)   # "/" renders the pending-approval page
+        return JSONResponse({"error": "not_approved", "message": "Your account is waiting for approval."}, status_code=403)
+    return await call_next(request)
+
+
+# Registered before SessionMiddleware so that SessionMiddleware wraps it and
+# request.session is available inside the gate.
+app.add_middleware(BaseHTTPMiddleware, dispatch=approval_gate)
 
 app.add_middleware(
     SessionMiddleware,
