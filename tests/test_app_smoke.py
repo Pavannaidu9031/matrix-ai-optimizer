@@ -54,7 +54,9 @@ class FakeCursor:
         self.db.queries.append((sql, params))
         q = " ".join(sql.split()).upper()
         self.description, self._result = None, []
-        if q.startswith("SELECT IS_APPROVED"):
+        if "INFORMATION_SCHEMA.COLUMNS" in q:
+            self.description, self._result = [("column_name",)], [(c,) for c in self.db.legacy_columns]
+        elif q.startswith("SELECT IS_APPROVED"):
             self.description, self._result = [("is_approved",)], [(self.db.approved,)]
         elif q.startswith("SELECT DISTINCT BRANCH_NAME"):
             self.description, self._result = [("branch_name",)], [("main",)]
@@ -101,7 +103,7 @@ class FakeConn:
         pass
 
     def rollback(self):
-        pass
+        self.db.rollbacks += 1
 
     def close(self):
         pass
@@ -112,6 +114,8 @@ class FakeDB:
         self.rows, self.queries, self.inserts = _rows(), [], []
         self.approved = True
         self.suggestion_inserts, self.updates = [], []
+        self.legacy_columns = ["wavelength_shift", "light_intensity_uw"]   # what the live table has
+        self.rollbacks = 0
 
 
 def _make_client(monkeypatch, approved=True, logged_in=True):
@@ -360,3 +364,24 @@ def test_measurements_update_own_run(client):
 def test_track_record_endpoint(client):
     tr = client.get("/api/suggestions/track-record").json()["track_record"]
     assert tr["linked_runs"] == 0 and tr["manual_runs"] == 8 and tr["points"] == []
+
+
+
+def test_column_migration_survives_table_with_both_intensity_columns(monkeypatch):
+    """Regression: the rename used to fail on the live table and its full
+    rollback discarded every ADD COLUMN, so new columns never persisted."""
+    db = FakeDB()
+    cur = FakeConn(db).cursor()
+    app_module.ensure_material_column(cur)
+    sql = [" ".join(q.split()).upper() for q, _ in db.queries]
+    assert not any("RENAME COLUMN" in q for q in sql)
+    assert db.rollbacks == 0
+    assert any("ADD COLUMN IF NOT EXISTS CORE_DIAMETER_UM" in q for q in sql)
+    assert any("ADD COLUMN IF NOT EXISTS SUGGESTION_ID" in q for q in sql)
+
+
+def test_column_migration_renames_only_legacy_tables(monkeypatch):
+    db = FakeDB()
+    db.legacy_columns = ["wavelength_shift"]
+    app_module.ensure_material_column(FakeConn(db).cursor())
+    assert any("RENAME COLUMN WAVELENGTH_SHIFT TO LIGHT_INTENSITY_UW" in " ".join(q.split()).upper() for q, _ in db.queries)

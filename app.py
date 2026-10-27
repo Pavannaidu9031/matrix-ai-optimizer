@@ -297,17 +297,11 @@ def safe_calculate_quality_score(xrd_phase, light_intensity_uw, h2_response_time
         return 50.0
 
 def ensure_material_column(cur):
-    try:
-        cur.execute("ALTER TABLE experiments ADD COLUMN IF NOT EXISTS target_material VARCHAR DEFAULT 'Generic'")
-    except Exception:
-        pass
+    _safe_ddl(cur, "ALTER TABLE experiments ADD COLUMN IF NOT EXISTS target_material VARCHAR DEFAULT 'Generic'")
     ensure_pd_thickness_column(cur)
 
 def ensure_branch_column(cur):
-    try:
-        cur.execute("ALTER TABLE experiments ADD COLUMN IF NOT EXISTS branch_name VARCHAR DEFAULT 'main'")
-    except Exception:
-        pass
+    _safe_ddl(cur, "ALTER TABLE experiments ADD COLUMN IF NOT EXISTS branch_name VARCHAR DEFAULT 'main'")
     ensure_pd_thickness_column(cur)
 
 def ensure_pd_thickness_column(cur):
@@ -339,33 +333,37 @@ def ensure_pd_thickness_column(cur):
         ("predicted_phase", "VARCHAR"),
         ("followed_suggestion", "BOOLEAN"),
     ]:
-        try:
-            cur.execute(f"ALTER TABLE experiments ADD COLUMN IF NOT EXISTS {col} {ddl}")
-        except Exception:
-            pass
-    # Sensor is intensity-based (uW), not wavelength-shift-based -- rename the
-    # column to match. Runs once: after the first successful rename the old
-    # column name no longer exists, so this becomes a harmless no-op on every
-    # later call. The ADD COLUMN after it is a safety net for a fresh DB where
-    # wavelength_shift never existed at all, so light_intensity_uw still gets created.
+        _safe_ddl(cur, f"ALTER TABLE experiments ADD COLUMN IF NOT EXISTS {col} {ddl}")
+
+    # Sensor is intensity-based (uW), not wavelength-shift-based. Rename the
+    # old column only when it exists and the new one doesn't. The previous
+    # version tried the rename unconditionally; on a table that has both
+    # columns (the live one does) it failed every time, and its recovery was a
+    # full rollback that also discarded every ADD COLUMN above, so new columns
+    # never persisted and inserts/selects that use them failed.
+    cur.execute("""
+        SELECT column_name FROM information_schema.columns
+         WHERE table_schema = current_schema() AND table_name = 'experiments'
+           AND column_name IN ('wavelength_shift', 'light_intensity_uw')
+    """)
+    present = {r[0] for r in cur.fetchall()}
+    if "wavelength_shift" in present and "light_intensity_uw" not in present:
+        _safe_ddl(cur, "ALTER TABLE experiments RENAME COLUMN wavelength_shift TO light_intensity_uw")
+    else:
+        _safe_ddl(cur, "ALTER TABLE experiments ADD COLUMN IF NOT EXISTS light_intensity_uw FLOAT")
+
+
+def _safe_ddl(cur, sql):
+    """Runs one schema change inside a savepoint, so a failure (e.g. missing
+    privileges) is undone on its own without aborting the caller's
+    transaction or anything run before it."""
+    cur.execute("SAVEPOINT ensure_col")
     try:
-        cur.execute("ALTER TABLE experiments RENAME COLUMN wavelength_shift TO light_intensity_uw")
-    except Exception:
-        # Expected on every call after the first (old column no longer
-        # exists). Unlike ADD COLUMN IF NOT EXISTS above, this failure is a
-        # real Postgres error and leaves the transaction aborted, so every
-        # later query on this connection would fail until it's rolled back.
-        try:
-            cur.connection.rollback()
-        except Exception:
-            pass
-    try:
-        cur.execute("ALTER TABLE experiments ADD COLUMN IF NOT EXISTS light_intensity_uw FLOAT")
-    except Exception:
-        try:
-            cur.connection.rollback()
-        except Exception:
-            pass
+        cur.execute(sql)
+        cur.execute("RELEASE SAVEPOINT ensure_col")
+    except Exception as err:
+        print(f"Schema change skipped ({sql[:60]}...): {err}")
+        cur.execute("ROLLBACK TO SAVEPOINT ensure_col")
 
 # ==============================================================================
 # OAUTH CONFIGURATION
