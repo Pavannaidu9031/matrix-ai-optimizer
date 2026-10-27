@@ -1493,16 +1493,29 @@ async def api_schedule_plan(request: Request):
 
 @app.get("/supervisor", response_class=HTMLResponse)
 def supervisor_dashboard(request: Request):
-    """Real-Time Collaboration: Read-only view for supervisors."""
+    """Read-only lab overview. This used to need no login at all and showed
+    every user's runs to anyone with the URL. Now only the founder sees the
+    whole lab; other approved users see just their own runs."""
+    user = request.session.get("user")
+    if not user:
+        return RedirectResponse("/login/google", status_code=303)
+    email = user.get("email", "")
+    is_founder = email.lower() == FOUNDER_EMAIL.lower()
+    if not is_founder and not user.get("is_approved"):
+        return templates.TemplateResponse(request, "pending.html", {"user": user})
+
     conn = get_db_connection()
     try:
         cur = conn.cursor()
-        cur.execute("SELECT * FROM experiments ORDER BY created_at DESC LIMIT 50")
+        if is_founder:
+            cur.execute("SELECT * FROM experiments ORDER BY created_at DESC LIMIT 50")
+        else:
+            cur.execute("SELECT * FROM experiments WHERE user_email = %s ORDER BY created_at DESC LIMIT 50", (email,))
         cols = [desc[0] for desc in cur.description]
         experiments = [dict(zip(cols, row)) for row in cur.fetchall()]
     finally:
         release_db_connection(conn)
-    return templates.TemplateResponse(request, "supervisor.html", {"user": request.session.get("user"), "experiments": experiments})
+    return templates.TemplateResponse(request, "supervisor.html", {"user": user, "experiments": experiments})
 
 @app.get("/api/equipment/health")
 async def get_equipment_health(request: Request):

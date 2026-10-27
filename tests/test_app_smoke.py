@@ -177,3 +177,15 @@ def test_add_stores_real_time_and_null_for_unmeasured(client):
     assert row["light_intensity_uw"] is None         # was stored as 0.0
     assert row["grain_size"] is None                 # was stored as 10.0
     assert row["film_thickness"] is None             # was stored as 100.0
+
+
+def test_supervisor_requires_login(client):
+    anon = TestClient(app_module.app, base_url="https://testserver")
+    res = anon.get("/supervisor", follow_redirects=False)
+    assert res.status_code == 303 and "/login/google" in res.headers["location"]
+
+
+def test_supervisor_scopes_non_founder_to_own_runs(client):
+    assert client.get("/supervisor").status_code == 200
+    sql, params = next((q, p) for q, p in reversed(client.db.queries) if "FROM experiments" in q)
+    assert "user_email = %s" in sql and params == (EMAIL,)
