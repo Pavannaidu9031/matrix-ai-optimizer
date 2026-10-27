@@ -1031,3 +1031,55 @@ def suggest_pd_deposition_step(
         )
 
     return result
+
+
+# ------------------------------------------------------------------------------
+# SUGGESTION TRACK RECORD
+# ------------------------------------------------------------------------------
+def suggestion_track_record(runs: list) -> dict:
+    """Predicted-vs-actual for runs that came from a suggestion. The
+    prediction is the one stored on the run when it was logged, so this
+    measures what the model believed at the time, not a refit in hindsight."""
+    linked = [r for r in runs if r.get("suggestion_id") is not None]
+    points, errors, covered, phase_hits, phase_n = [], [], 0, 0, 0
+    for r in linked:
+        actual = _measured_intensity(r)
+        pred, sigma = r.get("predicted_intensity_uw"), r.get("predicted_intensity_sigma")
+        if r.get("predicted_phase"):
+            phase_n += 1
+            phase_hits += int(normalize_xrd_phase(r.get("predicted_phase")) == normalize_xrd_phase(r.get("xrd_phase")))
+        if actual is None or pred is None:
+            continue
+        err = abs(float(pred) - actual)
+        inside = sigma is not None and err <= 2 * float(sigma)
+        errors.append(err)
+        covered += int(inside)
+        points.append({
+            "id": r.get("id"),
+            "option": r.get("suggestion_option"),
+            "predicted": round(float(pred), 2),
+            "sigma": round(float(sigma), 2) if sigma is not None else None,
+            "actual": round(actual, 2),
+            "within_2sigma": inside,
+            "followed": r.get("followed_suggestion"),
+            "created_at": r.get("created_at"),
+        })
+    points.sort(key=lambda p: str(p.get("created_at") or ""))
+
+    def mean_quality(rs):
+        q = [float(r["quality_score"]) for r in rs if r.get("quality_score") is not None]
+        return round(float(np.mean(q)), 1) if q else None
+
+    manual = [r for r in runs if r.get("suggestion_id") is None]
+    n = len(points)
+    return {
+        "linked_runs": len(linked),
+        "measured_linked_runs": n,
+        "manual_runs": len(manual),
+        "mae_uw": round(float(np.mean(errors)), 2) if errors else None,
+        "coverage_2sigma": round(covered / n, 2) if n else None,
+        "phase_accuracy": round(phase_hits / phase_n, 2) if phase_n else None,
+        "mean_quality_suggested": mean_quality(linked),
+        "mean_quality_manual": mean_quality(manual),
+        "points": points,
+    }

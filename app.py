@@ -31,6 +31,7 @@ from google import genai
 from groq import AsyncGroq
 
 import optimizer
+import sensor_analysis
 import advanced_features 
 import matrix_ml_engine 
 
@@ -194,6 +195,12 @@ def get_db_connection():
 
 def release_db_connection(conn):
     global connection_pool
+    if conn:
+        try:
+            if not conn.closed:
+                conn.rollback()      # no-op after commit; clears an aborted transaction
+        except Exception:
+            pass
     if connection_pool and conn:
         try:
             connection_pool.putconn(conn)
@@ -226,6 +233,51 @@ def fetch_user_experiments(user_email, branch=None):
         if isinstance(r.get("created_at"), datetime.datetime):
             r["created_at"] = r["created_at"].isoformat()
     return rows
+
+MAX_RESPONSE_CURVE_CHARS = 200_000
+SUGGESTION_OPTIONS = ("Max Quality", "High Efficiency", "Pure Exploration")
+
+
+def clean_response_curve(raw):
+    """Accepts the analyzer's JSON (curve + metrics) from the browser; returns
+    re-serialized JSON, or None if absent, oversized or malformed."""
+    if not raw:
+        return None
+    if len(raw) > MAX_RESPONSE_CURVE_CHARS:
+        return None
+    try:
+        data = json.loads(raw)
+        curve = data.get("curve") or {}
+        if not isinstance(curve.get("t"), list) or len(curve["t"]) != len(curve.get("y") or []):
+            return None
+        return json.dumps(data, separators=(",", ":"))
+    except (ValueError, AttributeError, TypeError):
+        return None
+
+
+def suggestion_link_from_form(form) -> dict:
+    """Reads the hidden suggestion fields the ledger form carries after
+    'Apply node' on the optimizer page. Missing or bad values -> unlinked."""
+    def num(key):
+        try:
+            v = form.get(key)
+            return float(v) if v not in (None, "") else None
+        except (TypeError, ValueError):
+            return None
+    sid = num("suggestion_id")
+    option = form.get("suggestion_option") or None
+    if option not in SUGGESTION_OPTIONS:
+        option = None
+    followed = form.get("followed_suggestion")
+    return {
+        "suggestion_id": int(sid) if sid is not None else None,
+        "suggestion_option": option if sid is not None else None,
+        "predicted_intensity_uw": num("predicted_intensity_uw") if sid is not None else None,
+        "predicted_intensity_sigma": num("predicted_intensity_sigma") if sid is not None else None,
+        "predicted_phase": optimizer.normalize_xrd_phase(form.get("predicted_phase")) if sid is not None and form.get("predicted_phase") else None,
+        "followed_suggestion": (followed == "1") if sid is not None and followed in ("0", "1") else None,
+    }
+
 
 def safe_calculate_quality_score(xrd_phase, light_intensity_uw, h2_response_time, grain_size, existing_exps):
     try:
@@ -274,6 +326,18 @@ def ensure_pd_thickness_column(cur):
         ("pd_o2_flow", "FLOAT DEFAULT 0"),
         ("core_diameter_um", "FLOAT"),
         ("sputter_mode", "VARCHAR DEFAULT 'RF'"),
+        # H2 response-curve analysis (recovery_time_s already exists in the
+        # live table; IF NOT EXISTS keeps fresh databases in step).
+        ("recovery_time_s", "FLOAT"),
+        ("response_curve", "TEXT"),
+        # Which suggestion a run came from, and what the model predicted for
+        # it at the time, so predictions can be checked against reality.
+        ("suggestion_id", "BIGINT"),
+        ("suggestion_option", "VARCHAR"),
+        ("predicted_intensity_uw", "FLOAT"),
+        ("predicted_intensity_sigma", "FLOAT"),
+        ("predicted_phase", "VARCHAR"),
+        ("followed_suggestion", "BOOLEAN"),
     ]:
         try:
             cur.execute(f"ALTER TABLE experiments ADD COLUMN IF NOT EXISTS {col} {ddl}")
@@ -393,12 +457,14 @@ def index(request: Request, branch: str = 'main'):
                        rotation_speed, substrate_type, xrd_phase, grain_size,
                        h2_response_time, light_intensity_uw, batch_notes, quality_score, created_at, branch_name,
                        pd_thickness, pd_dc_power, pd_distance_cm, pd_sputter_time_s,
-                       pd_pressure_mtorr, pd_ar_flow, pd_o2_flow, core_diameter_um, sputter_mode
+                       pd_pressure_mtorr, pd_ar_flow, pd_o2_flow, core_diameter_um, sputter_mode,
+                       recovery_time_s, response_curve, suggestion_id, suggestion_option,
+                       predicted_intensity_uw, predicted_intensity_sigma, predicted_phase, followed_suggestion
                 FROM experiments
                 WHERE user_email = %s AND branch_name = %s
                 ORDER BY created_at DESC
             """, (user_email, branch))
-            
+
             rows = cur.fetchall()
             columns = [desc[0] for desc in cur.description]
             
@@ -463,13 +529,18 @@ def experiments_page(request: Request, branch: str = 'main'):
     conn = get_db_connection()
     try:
         cur = conn.cursor()
+        ensure_material_column(cur)
+        ensure_branch_column(cur)
+        conn.commit()
         cur.execute("""
             SELECT id, user_email, target_material, rf_power, working_pressure, ar_flow, o2_flow,
                    substrate_temp, target_distance, sputter_time_s, film_thickness,
                    rotation_speed, substrate_type, xrd_phase, grain_size,
                    h2_response_time, light_intensity_uw, batch_notes, quality_score, created_at, branch_name,
                    pd_thickness, pd_dc_power, pd_distance_cm, pd_sputter_time_s,
-                       pd_pressure_mtorr, pd_ar_flow, pd_o2_flow, core_diameter_um, sputter_mode
+                       pd_pressure_mtorr, pd_ar_flow, pd_o2_flow, core_diameter_um, sputter_mode,
+                       recovery_time_s, response_curve, suggestion_id, suggestion_option,
+                       predicted_intensity_uw, predicted_intensity_sigma, predicted_phase, followed_suggestion
             FROM experiments
             WHERE user_email = %s AND branch_name = %s
             ORDER BY created_at DESC
@@ -727,6 +798,9 @@ async def add_experiment_form(request: Request):
         light_intensity_uw = get_float(["light_intensity_uw", "wavelength_shift_pm"], None)
         batch_notes = get_str(["notes", "batch_notes"], "Manual Entry")
         branch_name = get_str(["branch_name", "branch"], "main")
+        recovery_time_s = get_float(["recovery_time_s"], None)
+        response_curve = clean_response_curve(get_str(["response_curve"], ""))
+        link = suggestion_link_from_form(form)
 
     except Exception as parse_err:
         return HTMLResponse(f"<h1>Form Parsing Error</h1><p>{str(parse_err)}</p>", status_code=400)
@@ -762,9 +836,13 @@ async def add_experiment_form(request: Request):
                 grain_size, h2_response_time, light_intensity_uw, batch_notes,
                 quality_score, branch_name, pd_thickness, pd_dc_power,
                 pd_distance_cm, pd_sputter_time_s, pd_pressure_mtorr,
-                pd_ar_flow, pd_o2_flow, core_diameter_um, sputter_mode, created_at
+                pd_ar_flow, pd_o2_flow, core_diameter_um, sputter_mode,
+                recovery_time_s, response_curve, suggestion_id, suggestion_option,
+                predicted_intensity_uw, predicted_intensity_sigma, predicted_phase,
+                followed_suggestion, created_at
             ) VALUES (
-                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW()
+                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                %s, %s, %s, %s, %s, %s, %s, %s, NOW()
             )
         """, (
             user_email, target_material, rf_power, working_pressure, ar_flow,
@@ -773,7 +851,10 @@ async def add_experiment_form(request: Request):
             grain_size, h2_response_time, light_intensity_uw, batch_notes,
             quality_score, branch_name, pd_thickness, pd_dc_power,
             pd_distance_cm, pd_sputter_time_s, pd_pressure_mtorr,
-            pd_ar_flow, pd_o2_flow, core_diameter_um, sputter_mode
+            pd_ar_flow, pd_o2_flow, core_diameter_um, sputter_mode,
+            recovery_time_s, response_curve, link["suggestion_id"], link["suggestion_option"],
+            link["predicted_intensity_uw"], link["predicted_intensity_sigma"], link["predicted_phase"],
+            link["followed_suggestion"]
         ))
         conn.commit()
         cur.close()
@@ -970,23 +1051,28 @@ async def get_ai_suggestion(request: Request):
             s = result.get("suggested", {})
             cur_hist.execute("""
                 INSERT INTO suggestion_history (
-                    user_email, suggested_rf_power, suggested_pressure,
+                    user_id, user_email, suggested_rf_power, suggested_pressure,
                     suggested_distance, suggested_thickness, suggested_rotation,
                     suggested_ar_flow, predicted_xrd_score, predicted_wavelength,
                     confidence_score, converged, kappa_used, created_at
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
+                RETURNING id
             """, (
-                user_email, s.get("rf_power"), s.get("working_pressure"),
+                str(user_session.get("id") or user_email), user_email, s.get("rf_power"), s.get("working_pressure"),
                 s.get("target_distance"), s.get("film_thickness"), s.get("rotation_speed"),
                 s.get("ar_flow"), result.get("expected", {}).get("xrd_score_predicted"),
                 result.get("expected", {}).get("light_intensity_uw_estimate"),
                 result.get("confidence", {}).get("score"), result.get("convergence", {}).get("converged"),
                 result.get("kappa_used")
             ))
+            result["suggestion_id"] = cur_hist.fetchone()[0]
             conn.commit()
             cur_hist.close()
-        except Exception:
-            pass
+        except Exception as hist_err:
+            # Still return the suggestion; it just won't be linkable.
+            print(f"Suggestion history insert failed: {hist_err}")
+            try: conn.rollback()
+            except Exception: pass
 
         return JSONResponse(content=result)
     except Exception as e:
@@ -1766,6 +1852,112 @@ async def generate_campaign(request: Request):
     experiments = fetch_user_experiments(user["email"], body.get("branch"))
     campaign = matrix_ml_engine.generate_agent_campaign(budget, deadline, experiments)
     return JSONResponse({"success": True, "campaign": campaign})
+
+# ==============================================================================
+# H2 RESPONSE-CURVE ANALYSIS
+# ==============================================================================
+def _opt_float(v):
+    try:
+        return float(v) if v not in (None, "") else None
+    except (TypeError, ValueError):
+        return None
+
+
+@app.post("/api/sensor/analyze-curve")
+async def analyze_curve(
+    request: Request,
+    file: UploadFile = File(...),
+    time_col: Optional[str] = Form(None),
+    intensity_col: Optional[str] = Form(None),
+    unit: Optional[str] = Form(None),
+    time_unit: Optional[str] = Form("s"),
+    h2_on_s: Optional[str] = Form(None),
+    h2_off_s: Optional[str] = Form(None),
+):
+    """Analyzes an uploaded power-meter export. Nothing is stored here; the
+    browser shows the result and sends it along when the run is saved."""
+    raw = await file.read(sensor_analysis.MAX_FILE_BYTES + 1)
+    try:
+        result = sensor_analysis.analyze_file(
+            raw,
+            time_col=int(time_col) if time_col not in (None, "") else None,
+            intensity_col=int(intensity_col) if intensity_col not in (None, "") else None,
+            unit=unit or None,
+            time_unit=time_unit or "s",
+            h2_on_s=_opt_float(h2_on_s),
+            h2_off_s=_opt_float(h2_off_s),
+        )
+    except sensor_analysis.CurveError as e:
+        return JSONResponse({"success": False, "message": str(e)}, status_code=422)
+    except Exception as e:
+        print(f"Curve analysis crashed: {e}")
+        return JSONResponse({"success": False, "message": "Could not read that file."}, status_code=422)
+    result["filename"] = file.filename
+    return JSONResponse({"success": True, "analysis": result})
+
+
+@app.post("/experiments/{experiment_id}/measurements")
+async def update_measurements(experiment_id: int, request: Request):
+    """Attach results measured after a run was logged (intensity change,
+    response and recovery time, the analyzed curve). Recomputes quality."""
+    user = request.session.get("user")
+    body = await request.json()
+    intensity = _opt_float(body.get("light_intensity_uw"))
+    response_t = _opt_float(body.get("h2_response_time"))
+    recovery_t = _opt_float(body.get("recovery_time_s"))
+    curve = clean_response_curve(json.dumps(body["response_curve"])) if body.get("response_curve") else None
+    if intensity is None and response_t is None and recovery_t is None:
+        return JSONResponse({"error": "nothing_to_update"}, status_code=400)
+
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+        ensure_material_column(cur)
+        conn.commit()
+        cur.execute("SELECT * FROM experiments WHERE id = %s AND user_email = %s", (experiment_id, user["email"]))
+        cols = [d[0] for d in cur.description] if cur.description else []
+        row = cur.fetchone()
+        if not row:
+            return JSONResponse({"error": "not_found"}, status_code=404)
+        exp = dict(zip(cols, row))
+        cur.execute("SELECT * FROM experiments WHERE user_email = %s AND branch_name = %s",
+                    (user["email"], exp.get("branch_name") or "main"))
+        bcols = [d[0] for d in cur.description] if cur.description else []
+        branch_exps = [dict(zip(bcols, r)) for r in cur.fetchall()]
+
+        new_intensity = intensity if intensity is not None else exp.get("light_intensity_uw")
+        new_response = response_t if response_t is not None else exp.get("h2_response_time")
+        quality = safe_calculate_quality_score(exp.get("xrd_phase"), new_intensity, new_response, exp.get("grain_size"), branch_exps)
+
+        cur.execute("""
+            UPDATE experiments
+               SET light_intensity_uw = %s, h2_response_time = %s,
+                   recovery_time_s = COALESCE(%s, recovery_time_s),
+                   response_curve = COALESCE(%s, response_curve),
+                   quality_score = %s
+             WHERE id = %s AND user_email = %s
+        """, (new_intensity, new_response, recovery_t, curve, quality, experiment_id, user["email"]))
+        cur.execute("INSERT INTO audit_log (action, experiment_id, user_email) VALUES (%s, %s, %s)",
+                    ("UPDATE_MEASUREMENTS", experiment_id, user["email"]))
+        conn.commit()
+        cur.close()
+        return JSONResponse({"success": True, "quality_score": quality})
+    except Exception as e:
+        conn.rollback()
+        return JSONResponse({"error": "update_failed", "message": str(e)}, status_code=500)
+    finally:
+        release_db_connection(conn)
+
+
+# ==============================================================================
+# SUGGESTION TRACK RECORD (PREDICTED VS ACTUAL)
+# ==============================================================================
+@app.get("/api/suggestions/track-record")
+async def suggestion_track_record(request: Request, branch: str = "main"):
+    user = request.session.get("user")
+    runs = fetch_user_experiments(user["email"], branch)
+    return JSONResponse({"success": True, "track_record": optimizer.suggestion_track_record(runs)})
+
 
 # ==============================================================================
 # API DOCS PAGE

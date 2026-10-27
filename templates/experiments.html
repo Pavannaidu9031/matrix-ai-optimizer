@@ -21,6 +21,19 @@
 
     <form action="/add" method="POST" id="runForm" class="bg-black p-4 sm:p-8 border border-gray-800 shadow-hard relative">
         <input type="hidden" name="branch_name" id="branch_name" value="{{ current_branch|default('main') }}">
+        <input type="hidden" name="suggestion_id" id="suggestion_id">
+        <input type="hidden" name="suggestion_option" id="suggestion_option">
+        <input type="hidden" name="predicted_intensity_uw" id="predicted_intensity_uw">
+        <input type="hidden" name="predicted_intensity_sigma" id="predicted_intensity_sigma">
+        <input type="hidden" name="predicted_phase" id="predicted_phase">
+        <input type="hidden" name="followed_suggestion" id="followed_suggestion">
+        <input type="hidden" name="recovery_time_s" id="recovery_time_s">
+        <input type="hidden" name="response_curve" id="response_curve">
+
+        <div id="suggestionBanner" class="hidden mb-6 border border-matrix-green/50 bg-matrix-green/5 p-3 flex items-start justify-between gap-4">
+            <p id="suggestionBannerText" class="text-[10px] text-matrix-green font-mono leading-relaxed"></p>
+            <button type="button" onclick="setSuggestionLink(null)" class="text-[9px] text-gray-500 hover:text-red-400 font-bold uppercase tracking-widest whitespace-nowrap">Unlink</button>
+        </div>
 
         <div class="form-grid">
             <div class="lg:col-span-3 sm:col-span-2 pb-4 border-b border-gray-800 mb-2">
@@ -174,8 +187,12 @@
                 <input type="number" step="0.1" name="h2_response_time_s" id="h2_response_time_s" required placeholder="12" class="w-full bg-gray-900 border border-gray-800 rounded-none p-3 text-sm text-matrix-green font-mono focus:border-matrix-green transition-colors outline-none placeholder-gray-700 touch-target">
             </div>
             <div>
-                <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Intensity_Change <span class="normal-case">[µW]</span></label>
+                <div class="flex justify-between items-center mb-2">
+                    <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest">Intensity_Change <span class="normal-case">[µW]</span></label>
+                    <button type="button" onclick="openCurveModal(null)" class="text-[9px] text-matrix-green hover:text-white tracking-widest font-bold border-b border-matrix-green transition-colors touch-target">[ FROM_CURVE ]</button>
+                </div>
                 <input type="number" step="0.01" name="light_intensity_uw" id="light_intensity_uw" placeholder="blank = not measured yet" class="w-full bg-gray-900 border border-gray-800 rounded-none p-3 text-sm text-matrix-green font-mono focus:border-matrix-green transition-colors outline-none placeholder-gray-700 touch-target">
+                <p id="curveAttached" class="hidden text-[9px] text-matrix-green mt-1 font-mono"></p>
             </div>
             <div>
                 <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Sys_Notes</label>
@@ -247,7 +264,7 @@
                         {% elif q >= 40 %}<span class="text-yellow-500 font-bold text-[9px] tracking-widest uppercase">[ MAR: {{ q|num(1) }} ]</span>
                         {% else %}<span class="text-red-500 font-bold text-[9px] tracking-widest uppercase">[ CRT: {{ q|num(1) }} ]</span>{% endif %}
                     </td>
-                    <td class="px-1.5 py-2 text-gray-500 uppercase">{{ exp.batch_notes or '-' }}</td>
+                    <td class="px-1.5 py-2 text-gray-500 uppercase">{{ exp.batch_notes or '-' }}{% if exp.suggestion_id %} <span class="text-matrix-green normal-case" title="From AI suggestion #{{ exp.suggestion_id }}{% if exp.followed_suggestion == false %} (settings changed){% endif %}">· AI{% if exp.followed_suggestion == false %}*{% endif %}</span>{% endif %}</td>
                     <td class="px-1.5 py-2 text-gray-300">{{ exp.rf_power|num }} <span class="text-gray-600">{{ exp.sputter_mode or 'RF' }}</span></td>
                     <td class="px-1.5 py-2 text-gray-300">{{ exp.working_pressure|num }}</td>
                     <td class="px-1.5 py-2 text-gray-300">{{ exp.target_distance|num }}</td>
@@ -265,6 +282,7 @@
                     
                     <td class="px-1.5 py-2 text-center space-x-1 whitespace-nowrap">
                         <button onclick='loadRunIntoForm({{ loop.index0 }})' class="text-gray-500 hover:text-matrix-green font-bold text-[10px] tracking-widest uppercase transition-colors" title="Copy this run's settings into the form">[R]</button>
+                        <button onclick='openCurveModal({{ loop.index0 }})' class="{% if exp.response_curve %}text-matrix-green{% else %}text-gray-500{% endif %} hover:text-matrix-green font-bold text-[10px] tracking-widest uppercase transition-colors" title="{% if exp.response_curve %}View H2 response curve{% else %}Attach H2 response curve{% endif %}">[~]</button>
                         <button onclick='openWhatIf({{ loop.index0 }})' class="text-gray-500 hover:text-matrix-green font-bold text-[10px] tracking-widest uppercase transition-colors" title="What-If Sandbox">[?]</button>
                         <button onclick='checkFingerprint({{ loop.index0 }})' class="text-gray-500 hover:text-matrix-green font-bold text-[10px] tracking-widest uppercase transition-colors" title="DNA Fingerprint">[&]</button>
                         <button onclick='downloadLabDossier({{ exp | tojson | safe }})' class="text-gray-500 hover:text-matrix-green font-bold text-[10px] tracking-widest uppercase transition-colors" title="Export PDF">[P]</button>
@@ -302,6 +320,7 @@
             </div>
             <div class="flex gap-2 text-[10px] font-bold tracking-widest uppercase">
                 <button onclick="loadRunIntoForm({{ loop.index0 }})" class="flex-1 bg-black text-matrix-green border border-gray-700 hover:border-matrix-green transition-colors touch-target" title="Reuse settings">[R]</button>
+                <button onclick="openCurveModal({{ loop.index0 }})" class="flex-1 bg-black {% if exp.response_curve %}text-matrix-green{% else %}text-gray-400{% endif %} border border-gray-700 hover:border-matrix-green transition-colors touch-target" title="H2 response curve">[~]</button>
                 <button onclick="openWhatIf({{ loop.index0 }})" class="flex-1 bg-black text-matrix-green border border-gray-700 hover:border-matrix-green transition-colors touch-target">[?]</button>
                 <button onclick="deleteExperiment({{ exp.id }})" class="flex-1 bg-black text-red-500 border border-gray-700 hover:border-red-500 transition-colors touch-target">[X]</button>
                 <button onclick="toggleCardMore({{ exp.id }})" class="flex-[2] bg-black text-gray-300 border border-gray-700 hover:border-gray-500 transition-colors touch-target" id="btn-more-{{ exp.id }}">[▼MORE]</button>
@@ -389,6 +408,58 @@
                 COMMIT_LOG
             </button>
         </form>
+    </div>
+</div>
+
+
+<!-- H2 RESPONSE CURVE ANALYZER -->
+<div id="curveModal" class="fixed inset-0 bg-black/90 backdrop-blur-sm hidden z-[210] flex items-start sm:items-center justify-center p-4 overflow-y-auto">
+    <div class="bg-black border-2 border-gray-800 p-5 sm:p-8 shadow-hard w-full max-w-3xl relative my-8">
+        <button type="button" onclick="closeCurveModal()" class="absolute top-4 right-4 text-gray-600 hover:text-red-500 font-bold transition-colors uppercase text-[10px] tracking-widest touch-target">[X]</button>
+        <h3 class="text-lg sm:text-xl font-display font-bold text-gray-200 uppercase tracking-widest mb-1">>_H2_RESPONSE_CURVE</h3>
+        <p id="curveTarget" class="text-[10px] text-gray-500 font-mono mb-5"></p>
+
+        <label class="block cursor-pointer border border-dashed border-gray-700 hover:border-matrix-green p-4 text-center transition-colors">
+            <span id="curveFileLabel" class="text-[11px] text-matrix-green font-bold tracking-widest uppercase">[+] Choose power-meter export (CSV / TXT)</span>
+            <span class="block text-[9px] text-gray-600 font-mono mt-1 normal-case">Time + intensity columns. Instrument header lines are skipped automatically. W, mW, µW, nW or dBm.</span>
+            <input type="file" id="curveFile" accept=".csv,.txt,.tsv,.dat,text/csv,text/plain" class="hidden">
+        </label>
+
+        <div id="curveOptions" class="hidden grid grid-cols-2 sm:grid-cols-3 gap-3 mt-5">
+            <div><label class="block text-[9px] font-bold text-gray-500 uppercase tracking-widest mb-1">Time column</label>
+                <select id="curveTimeCol" class="w-full bg-gray-900 border border-gray-800 p-2 text-xs text-matrix-green font-mono"></select></div>
+            <div><label class="block text-[9px] font-bold text-gray-500 uppercase tracking-widest mb-1">Intensity column</label>
+                <select id="curvePowerCol" class="w-full bg-gray-900 border border-gray-800 p-2 text-xs text-matrix-green font-mono"></select></div>
+            <div><label class="block text-[9px] font-bold text-gray-500 uppercase tracking-widest mb-1">Intensity unit</label>
+                <select id="curveUnit" class="w-full bg-gray-900 border border-gray-800 p-2 text-xs text-matrix-green font-mono">
+                    <option value="uw">µW</option><option value="nw">nW</option><option value="mw">mW</option><option value="w">W</option><option value="dbm">dBm</option>
+                </select></div>
+            <div><label class="block text-[9px] font-bold text-gray-500 uppercase tracking-widest mb-1">Time unit</label>
+                <select id="curveTimeUnit" class="w-full bg-gray-900 border border-gray-800 p-2 text-xs text-matrix-green font-mono">
+                    <option value="s">seconds</option><option value="ms">milliseconds</option><option value="min">minutes</option>
+                </select></div>
+            <div><label class="block text-[9px] font-bold text-gray-500 uppercase tracking-widest mb-1">H2 on [s] <span class="normal-case text-gray-600">optional</span></label>
+                <input type="number" step="0.1" id="curveOn" placeholder="auto" class="w-full bg-gray-900 border border-gray-800 p-2 text-xs text-matrix-green font-mono placeholder-gray-700"></div>
+            <div><label class="block text-[9px] font-bold text-gray-500 uppercase tracking-widest mb-1">H2 off [s] <span class="normal-case text-gray-600">optional</span></label>
+                <input type="number" step="0.1" id="curveOff" placeholder="auto" class="w-full bg-gray-900 border border-gray-800 p-2 text-xs text-matrix-green font-mono placeholder-gray-700"></div>
+            <p class="col-span-2 sm:col-span-3 text-[9px] text-gray-600 font-mono">Switch times count seconds from the first sample. Leave blank to detect them from the signal.</p>
+            <button type="button" onclick="runCurveAnalysis()" class="col-span-2 sm:col-span-3 bg-gray-800 hover:bg-gray-700 text-matrix-green border border-gray-700 hover:border-matrix-green font-bold text-[10px] uppercase tracking-widest py-2 transition-colors">Re-analyze</button>
+        </div>
+
+        <div id="curveResult" class="hidden mt-6 space-y-4">
+            <div id="curvePlot" class="w-full h-64 sm:h-72 bg-[#0a0a0a] border border-gray-800"></div>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div class="bg-[#0a0a0a] border border-matrix-green/50 p-3"><div class="text-[9px] text-matrix-green uppercase tracking-widest font-bold">Intensity change</div><div id="curveDelta" class="text-lg font-mono font-bold text-matrix-green mt-1">--</div><div id="curveDir" class="text-[9px] text-gray-500 font-mono"></div></div>
+                <div class="bg-[#0a0a0a] border border-gray-800 p-3"><div class="text-[9px] text-gray-500 uppercase tracking-widest font-bold">Response t90</div><div id="curveResp" class="text-lg font-mono font-bold text-gray-200 mt-1">--</div></div>
+                <div class="bg-[#0a0a0a] border border-gray-800 p-3"><div class="text-[9px] text-gray-500 uppercase tracking-widest font-bold">Recovery t10</div><div id="curveRecov" class="text-lg font-mono font-bold text-gray-200 mt-1">--</div></div>
+                <div class="bg-[#0a0a0a] border border-gray-800 p-3"><div class="text-[9px] text-gray-500 uppercase tracking-widest font-bold">Signal / noise</div><div id="curveSnr" class="text-lg font-mono font-bold text-gray-200 mt-1">--</div></div>
+            </div>
+            <ul id="curveWarnings" class="space-y-1 text-[10px] font-mono text-yellow-500"></ul>
+            <div class="flex flex-col sm:flex-row gap-3">
+                <button type="button" id="btnUseCurve" onclick="useCurveResult()" class="flex-1 bg-matrix-green hover:bg-green-400 text-black font-bold text-xs uppercase tracking-widest py-3 transition-colors shadow-hard-hover">Use these values</button>
+                <button type="button" onclick="closeCurveModal()" class="sm:w-40 border border-gray-700 text-gray-400 hover:text-white font-bold text-xs uppercase tracking-widest py-3 transition-colors">Cancel</button>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -626,6 +697,175 @@
         diamField.style.display = (sel.value === 'Optical Fiber') ? '' : 'none';
     }
 
+
+    // ------------------------------------------------------------------
+    // H2 RESPONSE CURVE ANALYZER
+    // ------------------------------------------------------------------
+    // Target is either the new-run form (curveTargetId = null) or an
+    // existing run (its id), which is updated in place.
+    let curveTargetId = null, curveFileObj = null, curveAnalysis = null;
+
+    function openCurveModal(index) {
+        const run = (index === null || index === undefined) ? null : expData[index];
+        curveTargetId = run ? run.id : null;
+        curveFileObj = null; curveAnalysis = null;
+        document.getElementById('curveTarget').innerText = run
+            ? `Results for run #${run.id} (${run.target_material || 'Generic'}${run.created_at ? ', logged ' + String(run.created_at).slice(0, 10) : ''}). Saving updates that run.`
+            : 'Results for the run you are logging now. Values go into the form above.';
+        document.getElementById('curveFileLabel').innerText = '[+] Choose power-meter export (CSV / TXT)';
+        document.getElementById('curveOptions').classList.add('hidden');
+        document.getElementById('curveResult').classList.add('hidden');
+        ['curveOn', 'curveOff'].forEach(id => document.getElementById(id).value = '');
+        document.getElementById('btnUseCurve').innerText = run ? 'Save to run #' + run.id : 'Use these values';
+        // A run that already has an analyzed curve opens on it.
+        if (run && run.response_curve) {
+            try { curveAnalysis = JSON.parse(run.response_curve); renderCurve(curveAnalysis, true); } catch (e) {}
+        }
+        document.getElementById('curveModal').classList.remove('hidden');
+    }
+    function closeCurveModal() { document.getElementById('curveModal').classList.add('hidden'); }
+
+    document.getElementById('curveFile')?.addEventListener('change', (e) => {
+        curveFileObj = e.target.files[0] || null;
+        if (!curveFileObj) return;
+        document.getElementById('curveFileLabel').innerText = curveFileObj.name;
+        // New file: let the server guess columns/units again.
+        ['curveTimeCol', 'curvePowerCol'].forEach(id => document.getElementById(id).innerHTML = '');
+        runCurveAnalysis(true);
+        e.target.value = '';
+    });
+
+    async function runCurveAnalysis(fresh) {
+        if (!curveFileObj) { notify('Choose a file first.', 'info'); return; }
+        const fd = new FormData();
+        fd.append('file', curveFileObj);
+        if (!fresh) {
+            fd.append('time_col', document.getElementById('curveTimeCol').value);
+            fd.append('intensity_col', document.getElementById('curvePowerCol').value);
+            fd.append('unit', document.getElementById('curveUnit').value);
+        }
+        fd.append('time_unit', document.getElementById('curveTimeUnit').value);
+        fd.append('h2_on_s', document.getElementById('curveOn').value);
+        fd.append('h2_off_s', document.getElementById('curveOff').value);
+        try {
+            const res = await fetch('/api/sensor/analyze-curve', { method: 'POST', body: fd });
+            const data = await res.json();
+            if (!data.success) { notify(data.message || 'Analysis failed.', 'err', 7000); return; }
+            curveAnalysis = data.analysis;
+            renderCurve(curveAnalysis, false);
+        } catch (err) { notify('Could not reach the server.', 'err'); }
+    }
+
+    function fillSelect(id, options, selected) {
+        const sel = document.getElementById(id);
+        sel.innerHTML = '';
+        options.forEach((label, i) => { const o = document.createElement('option'); o.value = i; o.textContent = label; sel.appendChild(o); });
+        sel.value = selected;
+    }
+
+    function renderCurve(a, stored) {
+        if (!stored) {
+            fillSelect('curveTimeCol', a.columns, a.time_col);
+            fillSelect('curvePowerCol', a.columns, a.intensity_col);
+            document.getElementById('curveUnit').value = a.unit;
+            document.getElementById('curveTimeUnit').value = a.time_unit;
+            document.getElementById('curveOptions').classList.remove('hidden');
+        }
+        const fmt = (v, u) => v === null || v === undefined ? '—' : `${v} ${u}`;
+        document.getElementById('curveDelta').innerText = fmt(a.intensity_change_uw == null ? null : Number(a.intensity_change_uw).toFixed(2), 'µW');
+        document.getElementById('curveDir').innerText = `${a.direction}${a.relative_change_pct != null ? ` · ${a.relative_change_pct}% of baseline` : ''}`;
+        document.getElementById('curveResp').innerText = fmt(a.response_time_s, 's');
+        document.getElementById('curveRecov').innerText = fmt(a.recovery_time_s, 's');
+        document.getElementById('curveSnr').innerText = a.snr != null ? `${a.snr}:1` : '—';
+        const warn = document.getElementById('curveWarnings');
+        warn.replaceChildren(...(a.warnings || []).map(w => { const li = document.createElement('li'); li.textContent = '! ' + w; return li; }));
+        if (stored) { const li = document.createElement('li'); li.className = 'text-gray-500'; li.textContent = `Saved analysis${a.filename ? ' of ' + a.filename : ''}. Upload a file to replace it.`; warn.appendChild(li); }
+        document.getElementById('btnUseCurve').classList.toggle('hidden', stored);
+        document.getElementById('curveResult').classList.remove('hidden');
+
+        const line = (y, name, color) => ({ x: [a.curve.t[0], a.curve.t[a.curve.t.length - 1]], y: [y, y], mode: 'lines', name, line: { color, width: 1, dash: 'dash' }, hoverinfo: 'name+y' });
+        const vline = (x, name) => ({ type: 'line', x0: x, x1: x, yref: 'paper', y0: 0, y1: 1, line: { color: '#6b7280', width: 1, dash: 'dot' }, name });
+        const traces = [
+            { x: a.curve.t, y: a.curve.y, mode: 'lines', name: 'Intensity', line: { color: '#00FF41', width: 1.5 } },
+            line(a.baseline_uw, 'Baseline', '#a3a3a3'),
+            line(a.plateau_uw, 'Plateau', '#eab308'),
+        ];
+        const shapes = [vline(a.h2_on_s, 'H2 on')];
+        if (a.h2_off_s != null) shapes.push(vline(a.h2_off_s, 'H2 off'));
+        Plotly.newPlot('curvePlot', traces, {
+            paper_bgcolor: 'transparent', plot_bgcolor: 'transparent', showlegend: false, shapes,
+            margin: { t: 10, l: 50, r: 10, b: 40 }, font: { color: '#a3a3a3', family: '"JetBrains Mono", monospace', size: 10 },
+            xaxis: { title: 'Time from start (s)', gridcolor: '#1f2937' }, yaxis: { title: 'Intensity (µW)', gridcolor: '#1f2937' },
+            annotations: [{ x: a.h2_on_s, y: 1, yref: 'paper', text: 'H2 on', showarrow: false, font: { size: 9, color: '#9ca3af' }, yanchor: 'bottom' }]
+                .concat(a.h2_off_s != null ? [{ x: a.h2_off_s, y: 1, yref: 'paper', text: 'H2 off', showarrow: false, font: { size: 9, color: '#9ca3af' }, yanchor: 'bottom' }] : []),
+        }, { displayModeBar: false, responsive: true });
+    }
+
+    async function useCurveResult() {
+        const a = curveAnalysis;
+        if (!a) return;
+        const curveJson = JSON.stringify(a);
+        if (curveTargetId === null) {
+            const set = (id, v) => { const el = document.getElementById(id); if (el && v !== null && v !== undefined) { el.value = v; el.classList.add('bg-matrix-green/20'); setTimeout(() => el.classList.remove('bg-matrix-green/20'), 1200); } };
+            set('light_intensity_uw', a.intensity_change_uw);
+            set('h2_response_time_s', a.response_time_s);
+            document.getElementById('recovery_time_s').value = a.recovery_time_s ?? '';
+            document.getElementById('response_curve').value = curveJson;
+            document.getElementById('curveAttached').classList.remove('hidden');
+            document.getElementById('curveAttached').innerText = `Curve attached: ${a.filename || 'analysis'} · recovery ${a.recovery_time_s ?? '—'} s`;
+            closeCurveModal();
+            notify('Values filled in. Commit the run to save them with the curve.', 'ok');
+            return;
+        }
+        try {
+            const res = await fetch(`/experiments/${curveTargetId}/measurements`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ light_intensity_uw: a.intensity_change_uw, h2_response_time: a.response_time_s, recovery_time_s: a.recovery_time_s, response_curve: a })
+            });
+            const data = await res.json();
+            if (res.ok && data.success) {
+                notify(`Run #${curveTargetId} updated. Quality score is now ${data.quality_score}.`, 'ok');
+                setTimeout(() => location.reload(), 900);
+            } else notify(`Save failed: ${data.message || data.error}`, 'err');
+        } catch (err) { notify('Could not reach the server; nothing was saved.', 'err'); }
+    }
+
+    // ------------------------------------------------------------------
+    // SUGGESTION LINK
+    // ------------------------------------------------------------------
+    // Set when the form was filled from "Apply node" on the optimizer page.
+    let appliedSuggestion = null;
+    const LINK_FIELDS = { rf_power: 'rf_power_w', target_distance: 'target_substrate_distance_cm', film_thickness: 'film_thickness_nm',
+                          ar_flow: 'ar_flow_sccm', rotation_speed: 'rotation_speed_rpm', pd_thickness: 'pd_thickness' };
+
+    function setSuggestionLink(applied) {
+        appliedSuggestion = applied && applied.suggestion ? applied : null;
+        const sug = appliedSuggestion ? appliedSuggestion.suggestion : {};
+        document.getElementById('suggestion_id').value = sug.id ?? '';
+        document.getElementById('suggestion_option').value = sug.option ?? '';
+        document.getElementById('predicted_intensity_uw').value = sug.predicted_intensity_uw ?? '';
+        document.getElementById('predicted_intensity_sigma').value = sug.predicted_intensity_sigma ?? '';
+        document.getElementById('predicted_phase').value = sug.predicted_phase ?? '';
+        const banner = document.getElementById('suggestionBanner');
+        if (!appliedSuggestion) { banner.classList.add('hidden'); return; }
+        document.getElementById('suggestionBannerText').innerText =
+            `Linked to AI suggestion #${sug.id} (${sug.option}). Model predicted ${sug.predicted_intensity_uw} ± ${sug.predicted_intensity_sigma ?? '?'} µW, ${sug.predicted_phase}. ` +
+            `Your result will be compared with this in the track record.`;
+        banner.classList.remove('hidden');
+    }
+
+    // Did the run actually use the suggested settings? (2 % tolerance)
+    function followedSuggestion() {
+        if (!appliedSuggestion) return '';
+        for (const [key, id] of Object.entries(LINK_FIELDS)) {
+            const want = parseFloat(appliedSuggestion[key]);
+            const got = parseFloat(document.getElementById(id)?.value);
+            if (!isFinite(want) || (want === 0 && !isFinite(got))) continue;
+            if (!isFinite(got) || Math.abs(got - want) > Math.max(0.02 * Math.abs(want), 1e-6)) return '0';
+        }
+        return '1';
+    }
+
     function normalizePhase(v) {
         const p = String(v || '').trim().toLowerCase();
         if (p.startsWith('mono')) return 'Monoclinic';
@@ -648,6 +888,7 @@
             if (el && run[key] !== null && run[key] !== undefined) { el.value = run[key]; el.classList.add('bg-matrix-green/20'); setTimeout(() => el.classList.remove('bg-matrix-green/20'), 1200); }
         });
         toggleWpFields(true); toggleDiameterField(); updateSputterMinutes();
+        setSuggestionLink(null);
         document.getElementById('formSection').scrollIntoView({ behavior: 'smooth' });
         notify(`Loaded settings from run #${run.id}. Enter the new results, then commit.`, 'info');
     }
@@ -689,6 +930,7 @@
         updateSputterMinutes();
         document.getElementById('sputtering_time_s')?.addEventListener('input', updateSputterMinutes);
         document.getElementById('runForm')?.addEventListener('submit', () => {
+            document.getElementById('followed_suggestion').value = followedSuggestion();
             saveSticky();
             const b = document.getElementById('btnCommit'); if (b) { b.disabled = true; b.innerText = 'SAVING...'; }
         });
@@ -698,6 +940,7 @@
             const fields = [{ id: 'target_material', val: s.target_material }, { id: 'rf_power_w', val: s.rf_power }, { id: 'working_pressure_mtorr', val: s.working_pressure }, { id: 'target_substrate_distance_cm', val: s.target_distance }, { id: 'film_thickness_nm', val: s.film_thickness }, { id: 'rotation_speed_rpm', val: s.rotation_speed }, { id: 'ar_flow_sccm', val: s.ar_flow }, { id: 'pd_thickness', val: s.pd_thickness }, { id: 'core_diameter_um', val: s.core_diameter_um }];
             fields.forEach(f => { const el = document.getElementById(f.id); if (el && f.val !== undefined && f.val !== null) { el.value = f.val; el.classList.add('bg-matrix-green/20'); setTimeout(() => el.classList.remove('bg-matrix-green/20'), 1200); } });
             toggleWpFields(); toggleDiameterField();
+            setSuggestionLink(s);
             localStorage.removeItem('matrixAutoFill');
             notify('Suggested recipe loaded. Run it, then fill in the results.', 'ok');
         }

@@ -441,7 +441,20 @@
 
     function applyBatch(index) {
         if(!window.latestBatch) return;
-        const s = { ...window.latestBatch[index].data, target_material: document.getElementById('targetMaterialSuggest')?.value || 'Generic' };
+        const opt = window.latestBatch[index];
+        const s = {
+            ...opt.data,
+            target_material: document.getElementById('targetMaterialSuggest')?.value || 'Generic',
+            // Link back to the suggestion so the ledger can record what the
+            // model predicted for this exact option (see the track record).
+            suggestion: latestSuggestion?.suggestion_id ? {
+                id: latestSuggestion.suggestion_id,
+                option: opt.type,
+                predicted_intensity_uw: opt.data.expected_shift,
+                predicted_intensity_sigma: opt.data.intensity_uncertainty,
+                predicted_phase: opt.data.expected_phase,
+            } : null,
+        };
         try { localStorage.setItem('matrixAutoFill', JSON.stringify(s)); } catch (e) {}
         const branch = document.getElementById('branch_name')?.value || 'main';
         window.location.href = '/experiments-view?branch=' + encodeURIComponent(branch);

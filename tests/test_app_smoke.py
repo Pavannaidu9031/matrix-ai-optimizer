@@ -31,7 +31,9 @@ COLUMNS = ["id", "user_email", "target_material", "rf_power", "working_pressure"
            "substrate_type", "xrd_phase", "grain_size", "h2_response_time", "light_intensity_uw",
            "batch_notes", "quality_score", "created_at", "branch_name", "pd_thickness", "pd_dc_power",
            "pd_distance_cm", "pd_sputter_time_s", "pd_pressure_mtorr", "pd_ar_flow", "pd_o2_flow",
-           "core_diameter_um", "sputter_mode"]
+           "core_diameter_um", "sputter_mode", "recovery_time_s", "response_curve", "suggestion_id",
+           "suggestion_option", "predicted_intensity_uw", "predicted_intensity_sigma", "predicted_phase",
+           "followed_suggestion"]
 
 
 def _rows():
@@ -61,9 +63,17 @@ class FakeCursor:
             wanted = COLUMNS if m.group(1).strip() == "*" else [c.strip() for c in m.group(1).split(",")]
             idx = [COLUMNS.index(c) for c in wanted]
             self.description = [(c,) for c in wanted]
-            self._result = [tuple(r[i] for i in idx) for r in self.db.rows]
+            rows = self.db.rows
+            if "WHERE ID = %S" in q:
+                rows = [r for r in rows if r[0] == params[0]]
+            self._result = [tuple(r[i] for i in idx) for r in rows]
         elif q.startswith("SELECT") and "SUGGESTION_HISTORY" in q:
             self.description, self._result = [("id",)], []
+        elif q.startswith("INSERT INTO SUGGESTION_HISTORY"):
+            self.db.suggestion_inserts.append((sql, params))
+            self.description, self._result = [("id",)], [(555,)]
+        elif q.startswith("UPDATE EXPERIMENTS"):
+            self.db.updates.append((sql, params))
         elif q.startswith("INSERT INTO EXPERIMENTS"):
             self.db.inserts.append((sql, params))
             self.description, self._result = [("id",)], [(999,)]
@@ -101,6 +111,7 @@ class FakeDB:
     def __init__(self):
         self.rows, self.queries, self.inserts = _rows(), [], []
         self.approved = True
+        self.suggestion_inserts, self.updates = [], []
 
 
 def _make_client(monkeypatch, approved=True, logged_in=True):
@@ -281,3 +292,71 @@ def test_db_outage_fails_closed_without_history(monkeypatch):
         raise RuntimeError("db down")
     monkeypatch.setattr(app_module, "get_db_connection", broken)
     assert c.get("/api/model/validation").status_code == 403
+
+
+
+def _insert_row(db):
+    sql, params = db.inserts[-1]
+    cols = [c.strip() for c in re.search(r"INSERT INTO experiments \((.*?)\) VALUES", sql, re.S).group(1).split(",")]
+    return dict(zip(cols, params))
+
+
+def test_suggest_records_history_with_user_id(client):
+    data = client.post("/suggest", json={"target_material": "WO3"}).json()
+    assert data["suggestion_id"] == 555
+    sql, params = client.db.suggestion_inserts[-1]
+    assert "user_id" in sql and params[0] == "1"      # session user id; was missing (NOT NULL)
+
+
+def test_add_stores_suggestion_link(client):
+    form = {"target_material": "WO3", "rf_power_w": "120", "working_pressure_mtorr": "8", "ar_flow_sccm": "30",
+            "o2_flow_sccm": "5", "substrate_temp_c": "25", "target_substrate_distance_cm": "5",
+            "h2_response_time_s": "15", "branch_name": "main",
+            "suggestion_id": "555", "suggestion_option": "Max Quality", "predicted_intensity_uw": "42.5",
+            "predicted_intensity_sigma": "3.1", "predicted_phase": "MONOCLINIC", "followed_suggestion": "1",
+            "recovery_time_s": "70.5", "response_curve": json.dumps({"curve": {"t": [0, 1], "y": [5, 4]}, "snr": 9})}
+    assert client.post("/add", data=form, follow_redirects=False).status_code == 303
+    row = _insert_row(client.db)
+    assert row["suggestion_id"] == 555 and row["suggestion_option"] == "Max Quality"
+    assert row["predicted_intensity_uw"] == 42.5 and row["predicted_phase"] == "Monoclinic"
+    assert row["followed_suggestion"] is True and row["recovery_time_s"] == 70.5
+    assert json.loads(row["response_curve"])["snr"] == 9
+
+
+def test_add_without_suggestion_is_unlinked_and_rejects_bad_curve(client):
+    form = {"target_material": "WO3", "rf_power_w": "120", "h2_response_time_s": "15", "branch_name": "main",
+            "suggestion_option": "Max Quality", "response_curve": "{not json"}
+    client.post("/add", data=form, follow_redirects=False)
+    row = _insert_row(client.db)
+    assert row["suggestion_id"] is None and row["suggestion_option"] is None
+    assert row["response_curve"] is None
+
+
+def test_analyze_curve_endpoint(client):
+    from test_sensor_analysis import synthetic, to_csv, ON, OFF, DROP
+    t, y = synthetic()
+    res = client.post("/api/sensor/analyze-curve", files={"file": ("run12.csv", to_csv(t, y), "text/csv")},
+                      data={"h2_on_s": str(ON), "h2_off_s": str(OFF)})
+    assert res.status_code == 200, res.text
+    a = res.json()["analysis"]
+    assert a["filename"] == "run12.csv"
+    assert a["intensity_change_uw"] == pytest.approx(DROP, rel=0.03)
+    bad = client.post("/api/sensor/analyze-curve", files={"file": ("x.csv", b"nothing here", "text/csv")})
+    assert bad.status_code == 422 and bad.json()["success"] is False
+
+
+def test_measurements_update_own_run(client):
+    res = client.post("/experiments/3/measurements", json={
+        "light_intensity_uw": 7.9, "h2_response_time": 27.5, "recovery_time_s": 66.0,
+        "response_curve": {"curve": {"t": [0, 1, 2], "y": [5, 4, 4]}}})
+    assert res.status_code == 200, res.text
+    sql, params = client.db.updates[-1]
+    assert params[0] == 7.9 and params[1] == 27.5 and params[2] == 66.0
+    assert params[-2:] == (3, EMAIL)                    # scoped to this user's row
+    assert client.post("/experiments/99999/measurements", json={"light_intensity_uw": 1}).status_code == 404
+    assert client.post("/experiments/3/measurements", json={}).status_code == 400
+
+
+def test_track_record_endpoint(client):
+    tr = client.get("/api/suggestions/track-record").json()["track_record"]
+    assert tr["linked_runs"] == 0 and tr["manual_runs"] == 8 and tr["points"] == []

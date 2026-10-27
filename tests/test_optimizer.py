@@ -119,3 +119,17 @@ def test_leave_one_out_beats_baseline_on_learnable_data():
     assert v["mae_uw"] < v["baseline_mae_uw"]
     assert 0.0 <= v["coverage_2sigma"] <= 1.0
     assert optimizer.leave_one_out_validation(make_runs(3), "WO3")["status"] == "INSUFFICIENT"
+
+
+def test_suggestion_track_record_scores_stored_predictions():
+    runs = make_runs(6)
+    runs[0].update(suggestion_id=1, suggestion_option="Max Quality", predicted_intensity_uw=runs[0]["light_intensity_uw"] + 1,
+                   predicted_intensity_sigma=1.0, predicted_phase="Monoclinic", followed_suggestion=True)
+    runs[1].update(suggestion_id=2, suggestion_option="Pure Exploration", predicted_intensity_uw=runs[1]["light_intensity_uw"] + 10,
+                   predicted_intensity_sigma=1.0, predicted_phase="Amorphous", followed_suggestion=False)
+    runs[2].update(suggestion_id=3, predicted_intensity_uw=5.0, light_intensity_uw=None)   # not measured yet
+    tr = optimizer.suggestion_track_record(runs)
+    assert tr["linked_runs"] == 3 and tr["measured_linked_runs"] == 2 and tr["manual_runs"] == 3
+    assert tr["mae_uw"] == pytest.approx(5.5)
+    assert tr["coverage_2sigma"] == 0.5
+    assert {p["option"] for p in tr["points"]} == {"Max Quality", "Pure Exploration"}
