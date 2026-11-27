@@ -21,7 +21,7 @@ Sputtering recipes (power, Ar flow, pressure, thickness, substrate rotation) are
 
 ## Tech stack
 
-Python, FastAPI, scikit-learn, Supabase, deployed on Render.
+Python, FastAPI, scikit-learn, SQLAlchemy, PostgreSQL (Supabase), deployed on Render.
 
 ## Project structure
 
@@ -46,10 +46,10 @@ pip install -r requirements.txt
 
 Set these environment variables **[confirm the exact names your code uses]**:
 
-```
-SECRET_KEY=<a long random string>
-SUPABASE_URL=<your Supabase project URL>
-SUPABASE_KEY=<your Supabase key>
+```bash
+export DATABASE_URL="postgresql://USER:PASSWORD@HOST:5432/DBNAME"
+export SECRET_KEY="a-long-random-string"
+# Windows (PowerShell): $env:DATABASE_URL="..."; $env:SECRET_KEY="..."
 ```
 
 Start the app **[confirm the command, e.g. check your Procfile]**:
@@ -59,6 +59,10 @@ uvicorn app:app --reload
 ```
 
 Then open http://127.0.0.1:8000.
+
+## Deployment
+
+The included `Procfile` runs the app with `uvicorn app:app --host 0.0.0.0 --port $PORT`, which works on Render and similar platforms. Set the same environment variables in your host's dashboard.
 
 ## Roadmap
 
