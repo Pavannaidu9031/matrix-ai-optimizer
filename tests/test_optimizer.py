@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-import optimizer  # noqa: E402
+from matrixai.science import optimizer  # noqa: E402
 
 
 def make_runs(n, material="WO3", seed=0, with_intensity=True):

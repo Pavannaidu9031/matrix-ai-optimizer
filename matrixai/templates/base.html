@@ -219,7 +219,7 @@
                 <span class="tooltip-text">Resource Burn</span>
             </a>
 
-            {% if user and user.email.lower() == 'pavannaidu9031@gmail.com' %}
+            {% if is_founder %}
             <div class="text-[10px] font-bold text-gray-600 uppercase tracking-widest px-3 mt-8 mb-3 border-b border-gray-800 pb-1 sm:hidden lg:block">Root Access</div>
             <a href="/admin/users" class="nav-item flex items-center px-3 py-2 text-xs font-bold text-red-500 hover:bg-gray-900 border-l-2 border-transparent hover:border-red-500 transition-colors touch-target">
                 <span class="w-8 inline-block text-red-800 sidebar-icon text-center lg:text-left">[#]</span> 
@@ -388,7 +388,7 @@
         (function keepBranchInNav() {
             const branch = new URLSearchParams(location.search).get('branch');
             if (!branch || branch === 'main') return;
-            document.querySelectorAll('a[href="/"], a[href="/experiments-view"], a[href^="/optimizer-view"]').forEach(a => {
+            document.querySelectorAll('a[href="/"], a[href="/experiments-view"], a[href^="/optimizer-view"], a[href="/bulk-import"], a[href="/cost-tracker"]').forEach(a => {
                 const url = new URL(a.getAttribute('href'), location.origin);
                 url.searchParams.set('branch', branch);
                 a.setAttribute('href', url.pathname + url.search + url.hash);

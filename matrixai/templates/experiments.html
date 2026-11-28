@@ -195,6 +195,16 @@
                 <p id="curveAttached" class="hidden text-[9px] text-matrix-green mt-1 font-mono"></p>
             </div>
             <div>
+                <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Fiber_Power_Before <span class="normal-case">[µW]</span></label>
+                <input type="number" step="0.01" min="0" name="fiber_power_before_uw" id="fiber_power_before_uw" placeholder="blank = not measured" class="w-full bg-gray-900 border border-gray-800 rounded-none p-3 text-sm text-matrix-green font-mono focus:border-matrix-green transition-colors outline-none placeholder-gray-700 touch-target">
+                <p class="text-[9px] text-gray-600 mt-1 uppercase tracking-widest">Light through the fiber before coating</p>
+            </div>
+            <div>
+                <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Fiber_Power_After <span class="normal-case">[µW]</span></label>
+                <input type="number" step="0.01" min="0" name="fiber_power_after_uw" id="fiber_power_after_uw" placeholder="blank = not measured" class="w-full bg-gray-900 border border-gray-800 rounded-none p-3 text-sm text-matrix-green font-mono focus:border-matrix-green transition-colors outline-none placeholder-gray-700 touch-target">
+                <p class="text-[9px] text-gray-600 mt-1 uppercase tracking-widest">Light through the fiber after coating</p>
+            </div>
+            <div>
                 <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Sys_Notes</label>
                 <input type="text" name="notes" placeholder="BATCH-A" class="w-full bg-gray-900 border border-gray-800 rounded-none p-3 text-sm text-matrix-green font-mono focus:border-matrix-green transition-colors outline-none placeholder-gray-700 touch-target">
             </div>
@@ -247,6 +257,7 @@
                     <th class="px-1.5 py-2">PHASE</th>
                     <th class="px-1.5 py-2">H2[s]</th>
                     <th class="px-1.5 py-2">INTENSITY<span class="normal-case">[µW]</span></th>
+                    <th class="px-1.5 py-2" title="Light power through the fiber before -> after coating">FIBER_P<span class="normal-case">[µW]</span></th>
                     <th class="px-1.5 py-2 text-center">CMD</th>
                 </tr>
             </thead>
@@ -279,6 +290,7 @@
                     </td>
                     <td class="px-1.5 py-2 text-gray-300">{{ exp.h2_response_time|num }}</td>
                     <td class="px-1.5 py-2 font-bold text-gray-200">{{ exp.light_intensity_uw|num }}</td>
+                    <td class="px-1.5 py-2 text-gray-300 whitespace-nowrap">{% if exp.fiber_power_before_uw is not none or exp.fiber_power_after_uw is not none %}{{ exp.fiber_power_before_uw|num }} <span class="text-gray-600">&rarr;</span> {{ exp.fiber_power_after_uw|num }}{% else %}-{% endif %}</td>
                     
                     <td class="px-1.5 py-2 text-center space-x-1 whitespace-nowrap">
                         <button onclick='loadRunIntoForm({{ loop.index0 }})' class="text-gray-500 hover:text-matrix-green font-bold text-[10px] tracking-widest uppercase transition-colors" title="Copy this run's settings into the form">[R]</button>
@@ -290,7 +302,7 @@
                     </td>
                 </tr>
                 {% else %}
-                <tr><td colspan="14" class="p-8 text-center text-gray-600 uppercase tracking-widest font-bold">SYSTEM_EMPTY. LOG_DATA_TO_PROCEED.</td></tr>
+                <tr><td colspan="15" class="p-8 text-center text-gray-600 uppercase tracking-widest font-bold">SYSTEM_EMPTY. LOG_DATA_TO_PROCEED.</td></tr>
                 {% endfor %}
             </tbody>
         </table>
@@ -334,6 +346,8 @@
                 <div>SUB: <span class="text-white font-bold">{{ exp.substrate_type|upper }}</span></div>
                 <div>GRAIN: <span class="text-white font-bold">{{ exp.grain_size|num }}nm</span></div>
                 <div>H2: <span class="text-white font-bold">{{ exp.h2_response_time|num }}s</span></div>
+                <div>P_BEFORE: <span class="text-white font-bold">{{ exp.fiber_power_before_uw|num }}µW</span></div>
+                <div>P_AFTER: <span class="text-white font-bold">{{ exp.fiber_power_after_uw|num }}µW</span></div>
                 <div class="col-span-2 text-gray-500">NOTES: <span class="text-white font-bold uppercase">{{ exp.batch_notes or '-' }}</span></div>
             </div>
         </div>
@@ -402,6 +416,17 @@
             <div>
                 <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Intensity_Change <span class="normal-case">[µW]</span></label>
                 <input type="number" step="0.01" name="light_intensity_uw" placeholder="blank = not measured yet" class="w-full bg-gray-900 border border-gray-800 rounded-none p-3 text-sm text-matrix-green font-mono focus:border-matrix-green transition-colors outline-none touch-target">
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Fiber_P_Before <span class="normal-case">[µW]</span></label>
+                    <input type="number" step="0.01" min="0" name="fiber_power_before_uw" placeholder="optional" class="w-full bg-gray-900 border border-gray-800 rounded-none p-3 text-sm text-matrix-green font-mono focus:border-matrix-green transition-colors outline-none touch-target">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Fiber_P_After <span class="normal-case">[µW]</span></label>
+                    <input type="number" step="0.01" min="0" name="fiber_power_after_uw" placeholder="optional" class="w-full bg-gray-900 border border-gray-800 rounded-none p-3 text-sm text-matrix-green font-mono focus:border-matrix-green transition-colors outline-none touch-target">
+                </div>
             </div>
 
             <button type="submit" class="w-full bg-matrix-green hover:bg-green-400 text-black font-bold py-3 mt-4 transition-colors text-xs uppercase tracking-widest touch-target">

@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-import sensor_analysis as sa  # noqa: E402
+from matrixai.science import sensor_analysis as sa  # noqa: E402
 
 TAU_ON, TAU_OFF = 12.0, 30.0          # s
 ON, OFF, END = 60.0, 300.0, 700.0     # s

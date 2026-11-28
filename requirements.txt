@@ -2,16 +2,13 @@ fastapi
 uvicorn
 jinja2
 python-multipart
+itsdangerous
+authlib
+httpx
+psycopg2-binary
 pandas
 scikit-learn
 scikit-optimize
-plotly
-authlib
-httpx
-requests
-starlette
-itsdangerous
-psycopg2-binary
 google-genai
 groq
 

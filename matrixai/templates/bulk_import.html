@@ -145,7 +145,7 @@
             const res = await fetch('/api/experiments/bulk', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ experiments: parsedRows })
+                body: JSON.stringify({ experiments: parsedRows, branch: {{ current_branch|tojson }} })
             });
 
             const data = await res.json();
