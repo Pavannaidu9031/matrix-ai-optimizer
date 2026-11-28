@@ -13,7 +13,7 @@ Sputtering recipes (power, Ar flow, pressure, thickness, substrate rotation) are
 ## What it does
 
 - **Experiment suggestions:** a Gaussian process surrogate model with a UCB acquisition function recommends the next parameters to try.
-- **Experiment ledger:** log every run, including sputter mode (RF or DC) and, for optical fibers, the measured core diameter.
+- **Experiment ledger:** log every run, including sputter mode (RF or DC), the light power through the fiber before and after coating (µW) and, for optical fibers, the measured core diameter.
 - **Multiple materials:** WO3, Pd and ITO tracks, plus a WO3+Pd bilayer workflow.
 - **Multiple substrates:** Si wafer, glass thin film and optical fiber.
 - **What-if simulator and phase map:** explore parameter space before spending lab time.
@@ -21,18 +21,21 @@ Sputtering recipes (power, Ar flow, pressure, thickness, substrate rotation) are
 
 ## Tech stack
 
-Python, FastAPI, scikit-learn, SQLAlchemy, PostgreSQL (Supabase), deployed on Render.
+Python, FastAPI, scikit-learn, scikit-optimize, GPyTorch, psycopg2, PostgreSQL (Supabase), deployed on Render.
 
 ## Project structure
 
 | File | Purpose |
 |---|---|
-| `app.py` | Web application and routes |
-| `optimizer.py` | Optimization logic |
-| `matrix_ml_engine.py` | Machine-learning engine |
-| `advanced_features.py` | Additional features |
-| `database.py` | Database access |
-| `templates/`, `static/` | Front-end pages and assets |
+| `app.py` | Entry point (`uvicorn app:app`); builds the app from `matrixai/` |
+| `matrixai/main.py`, `config.py`, `auth.py` | App setup, environment settings, Google sign-in and approval gate |
+| `matrixai/models.py` | Every experiment field and how it is read from forms, CSVs and the API |
+| `matrixai/store.py`, `db.py` | All database queries, connection pool, migration runner |
+| `matrixai/migrations/` | Versioned SQL schema changes, applied automatically at startup |
+| `matrixai/routes/` | Pages, experiment ledger, optimizer, AI and admin endpoints |
+| `matrixai/science/` | Bayesian optimizer, ML engine, H2 response-curve analysis, cost estimates |
+| `matrixai/templates/`, `matrixai/static/` | Front-end pages and assets |
+| `tests/` | `python -m pytest tests` |
 
 ## Run locally
 
@@ -44,15 +47,16 @@ source venv/bin/activate        # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-Set these environment variables **[confirm the exact names your code uses]**:
+Set `SECRET_KEY` (required). Without `DATABASE_URL` the app runs on an in-memory store, which is handy for trying the UI. Google sign-in needs `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`; the AI features need `GEMINI_API_KEY` / `GROQ_API_KEY`. For plain-http localhost also set `HTTPS_ONLY=0`.
 
 ```bash
 export DATABASE_URL="postgresql://USER:PASSWORD@HOST:5432/DBNAME"
 export SECRET_KEY="a-long-random-string"
+export HTTPS_ONLY=0
 # Windows (PowerShell): $env:DATABASE_URL="..."; $env:SECRET_KEY="..."
 ```
 
-Start the app **[confirm the command, e.g. check your Procfile]**:
+Start the app:
 
 ```bash
 uvicorn app:app --reload
@@ -62,13 +66,14 @@ Then open http://127.0.0.1:8000.
 
 ## Deployment
 
-The included `Procfile` runs the app with `uvicorn app:app --host 0.0.0.0 --port $PORT`, which works on Render and similar platforms. Set the same environment variables in your host's dashboard.
+The included `Procfile` runs the app with `uvicorn app:app --host 0.0.0.0 --port $PORT`, which works on Render and similar platforms. Set the same environment variables in your host's dashboard. Database migrations in `matrixai/migrations/` run automatically at startup (set `RUN_MIGRATIONS=0` to skip).
 
 ## Roadmap
 
-- [ ] Automated tests and CI
+- [x] Automated tests (`python -m pytest tests`)
+- [ ] CI
 - [ ] Validation against real sputtering experiments, with results published openly
-- [ ] Bulk CSV import
+- [x] Bulk CSV import
 - [ ] Wafer-to-fiber thickness conversion, verified experimentally
 - [ ] Setup guide, methodology notes and example datasets
 - [ ] Generalize toward other thin-film processes
