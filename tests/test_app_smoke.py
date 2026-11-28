@@ -414,3 +414,14 @@ def test_measurements_can_add_fiber_power_later(client):
 def test_legacy_intensity_migration_is_guarded():
     sql = (migration_files()[-1]).read_text(encoding="utf-8")
     assert "light_intensity_uw IS NULL" in sql and "DROP" not in sql.upper()
+
+
+def test_intensity_is_before_minus_after_when_blank(client):
+    client.post("/add", data=dict(FORM, fiber_power_before_uw="412.5", fiber_power_after_uw="300", light_intensity_uw=""),
+                follow_redirects=False)
+    assert client.store.rows[-1]["light_intensity_uw"] == 112.5
+    client.post("/add", data=dict(FORM, fiber_power_before_uw="412.5", fiber_power_after_uw="300", light_intensity_uw="90"),
+                follow_redirects=False)
+    assert client.store.rows[-1]["light_intensity_uw"] == 90.0          # a typed value wins
+    client.post("/add", data=dict(FORM, fiber_power_before_uw="412.5", light_intensity_uw=""), follow_redirects=False)
+    assert client.store.rows[-1]["light_intensity_uw"] is None          # needs both powers

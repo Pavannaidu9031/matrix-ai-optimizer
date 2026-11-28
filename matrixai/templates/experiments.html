@@ -192,6 +192,7 @@
                     <button type="button" onclick="openCurveModal(null)" class="text-[9px] text-matrix-green hover:text-white tracking-widest font-bold border-b border-matrix-green transition-colors touch-target">[ FROM_CURVE ]</button>
                 </div>
                 <input type="number" step="0.01" name="light_intensity_uw" id="light_intensity_uw" placeholder="blank = not measured yet" class="w-full bg-gray-900 border border-gray-800 rounded-none p-3 text-sm text-matrix-green font-mono focus:border-matrix-green transition-colors outline-none placeholder-gray-700 touch-target">
+                <p class="text-[9px] text-gray-600 mt-1 uppercase tracking-widest">Auto: fiber power before - after (you can overwrite)</p>
                 <p id="curveAttached" class="hidden text-[9px] text-matrix-green mt-1 font-mono"></p>
             </div>
             <div>
@@ -970,5 +971,27 @@
             notify('Suggested recipe loaded. Run it, then fill in the results.', 'ok');
         }
     });
+</script>
+<script>
+    // Intensity change = fiber power before coating - after coating.
+    // Fills in as soon as both are entered; typing in the intensity field
+    // yourself stops the auto-fill for that form until a power changes again.
+    (function autoIntensityFromFiberPower() {
+        document.querySelectorAll('form').forEach(form => {
+            const before = form.querySelector('[name="fiber_power_before_uw"]');
+            const after = form.querySelector('[name="fiber_power_after_uw"]');
+            const intensity = form.querySelector('[name="light_intensity_uw"]');
+            if (!before || !after || !intensity) return;
+            const update = () => {
+                const b = parseFloat(before.value), a = parseFloat(after.value);
+                if (Number.isFinite(b) && Number.isFinite(a)) {
+                    intensity.value = (Math.round((b - a) * 100) / 100).toString();
+                    intensity.dispatchEvent(new Event('input', { bubbles: true }));
+                }
+            };
+            before.addEventListener('input', update);
+            after.addEventListener('input', update);
+        });
+    })();
 </script>
 {% endblock %}

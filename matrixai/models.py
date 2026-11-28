@@ -161,6 +161,11 @@ def parse_experiment(source: Mapping, overrides: Mapping | None = None) -> dict:
         total = minutes * 60.0 + seconds
         out["sputter_time_s"] = total if total > 0 else DEFAULT_SPUTTER_TIME_S
 
+    # Intensity change = fiber power before coating - after coating, when
+    # both were measured and no intensity was typed in.
+    if out["light_intensity_uw"] is None and out["fiber_power_before_uw"] is not None             and out["fiber_power_after_uw"] is not None:
+        out["light_intensity_uw"] = round(out["fiber_power_before_uw"] - out["fiber_power_after_uw"], 4)
+
     # Prediction fields only mean something when tied to a stored suggestion.
     if out["suggestion_id"] is None:
         for name in SUGGESTION_LINK_FIELDS:
